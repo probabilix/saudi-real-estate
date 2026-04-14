@@ -86,7 +86,7 @@ export default function ListingCard({ listing, index = 0 }: ListingCardProps) {
             {/* Property Type Badge */}
             <div className="absolute bottom-4 start-4">
               <span className="bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-charcoal rounded-lg border border-surface-100 shadow-sm uppercase tracking-wide">
-                {tTypes(listing.type as any)}
+                {tTypes(listing.type as string)}
               </span>
             </div>
           </div>
@@ -97,7 +97,7 @@ export default function ListingCard({ listing, index = 0 }: ListingCardProps) {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-baseline gap-1">
                 <span className={`text-2xl font-bold text-charcoal tracking-tight ${locale === 'ar' ? 'font-arabic' : ''}`}>
-                  {formatPriceCompact(listing.price, locale as any)}
+                  {formatPriceCompact(listing.price, locale as 'en' | 'ar')}
                 </span>
                 {listing.purpose === 'RENT' && (
                   <span className="text-xs text-charcoal-muted font-medium">/{t('perYear')}</span>

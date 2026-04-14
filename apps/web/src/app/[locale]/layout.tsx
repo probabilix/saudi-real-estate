@@ -38,6 +38,7 @@ export async function generateMetadata({
 }: {
   params: { locale: string };
 }): Promise<Metadata> {
+  console.log('Generating metadata for locale:', locale);
   return {
     alternates: {
       languages: {

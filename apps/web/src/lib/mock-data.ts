@@ -4,7 +4,7 @@
 // Uses Cloudinary demo images so the loader works from day 1
 // ──────────────────────────────────────────────
 
-import type { Listing, ListingWithOwner } from '@saudi-re/shared';
+import type { ListingWithOwner } from '@saudi-re/shared';
 
 // Cloudinary demo/sample images — these work without any account
 const DEMO_PHOTOS = [

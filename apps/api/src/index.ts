@@ -11,12 +11,15 @@ import oauth2 from '@fastify/oauth2';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { ZodError } from 'zod';
 import v1Routes from './routes/v1';
-import { AuthService } from './services/auth.service';
-import { EmailService } from './services/email.service';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Initialize Fastify Instance
 const app = Fastify({ 
   logger: {
-    transport: {
+    level: isProduction ? 'info' : 'debug',
+    // Disable pino-pretty in production to avoid worker thread issues on Vercel
+    transport: isProduction ? undefined : {
       target: 'pino-pretty',
       options: {
         translateTime: 'HH:MM:ss Z',
@@ -30,10 +33,14 @@ const app = Fastify({
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
 
-// ── Security Middlewares ──
-const start = async () => {
+// Flag to ensure initialization only happens once
+let initialized = false;
+
+const bootstrap = async () => {
+  if (initialized) return;
+
   try {
-    // 0. Cookie Support (Crucial for Auth)
+    // 0. Cookie Support
     await app.register(cookie, {
       secret: process.env.JWT_SECRET || 'dev-secret-change-me',
       parseOptions: {},
@@ -53,21 +60,30 @@ const start = async () => {
       callbackUri: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/v1/auth/google/callback`,
     });
 
-    // 1. Helmet: Secure HTTP headers
+    // 1. Helmet
     await app.register(helmet, {
-      contentSecurityPolicy: process.env.NODE_ENV === 'production',
+      contentSecurityPolicy: isProduction,
     });
 
-    // 2. CORS: Cross-Origin Resource Sharing
+    // 2. CORS
     await app.register(cors, {
       origin: process.env.CORS_ORIGIN || '*',
       credentials: true,
     });
 
-    // 3. Rate Limit: Prevent abuse
+    // 3. Rate Limit
     await app.register(rateLimit, {
       max: 100,
       timeWindow: '1 minute',
+    });
+
+    // ── Root Route (Health Check) ──
+    app.get('/', async () => {
+      return { 
+        status: 'online', 
+        message: 'Saudi Real Estate API is running',
+        environment: process.env.NODE_ENV 
+      };
     });
 
     // ── Register v1 API ──
@@ -84,7 +100,6 @@ const start = async () => {
         });
       }
 
-      // Handle Zod errors specifically
       if (error instanceof ZodError || error.name === 'ZodError') {
         return reply.status(400).send({
           success: false,
@@ -94,7 +109,6 @@ const start = async () => {
         });
       }
 
-      // Default error handler
       const statusCode = error.statusCode || 500;
       app.log.error(error);
       
@@ -105,34 +119,30 @@ const start = async () => {
       });
     });
 
-    // ── Server Startup ──
-    const port = parseInt(process.env.PORT || '3001', 10);
-    
-    // Only listen if not in a serverless environment
-    if (process.env.NODE_ENV !== 'production') {
-      await app.listen({ port, host: '0.0.0.0' });
-      app.log.info(`🚀 Saudi Real Estate API running on http://localhost:${port}`);
-    }
-    
+    initialized = true;
   } catch (err) {
     app.log.error(err);
-    if (process.env.NODE_ENV !== 'production') {
+    if (!isProduction) {
       process.exit(1);
     }
+    throw err;
   }
 };
 
-// Export the start function for manual control
-export { start };
-
-// Automatically run start() in local development
-if (process.env.NODE_ENV !== 'production') {
+// Automatically run bootstrap and listen in local development
+if (!isProduction) {
+  const start = async () => {
+    await bootstrap();
+    const port = parseInt(process.env.PORT || '3001', 10);
+    await app.listen({ port, host: '0.0.0.0' });
+    app.log.info(`🚀 Saudi Real Estate API running locally on http://localhost:${port}`);
+  };
   start();
 }
 
 // Default export for Vercel
 export default async (req: any, res: any) => {
-  await start(); // Ensure plugins and routes are registered
+  await bootstrap();
   await app.ready();
   app.server.emit('request', req, res);
 };

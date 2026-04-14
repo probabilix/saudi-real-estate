@@ -67,8 +67,16 @@ const bootstrap = async () => {
 
     // 2. CORS
     await app.register(cors, {
-      origin: process.env.CORS_ORIGIN || '*',
+      origin: (origin, cb) => {
+        const allowed = (process.env.CORS_ORIGIN || '').split(',');
+        if (!origin || allowed.includes(origin) || !isProduction) {
+          cb(null, true);
+          return;
+        }
+        cb(new Error('Not allowed by CORS'), false);
+      },
       credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'Bypass-Tunnel-Reminder'],
     });
 
     // 3. Rate Limit

@@ -15,7 +15,7 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
-    
+
     // Auto-inject Authorization header if token exists in localStorage
     // Note: We use cookies for refreshToken, but accessToken is typically stored in memory/localStorage
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -51,7 +51,7 @@ class ApiClient {
   }
 
   // ── Auth Endpoints ──
-  
+
   async register(data: RegisterInput) {
     return this.fetcher<{ userId: string; accessToken?: string; user?: any }>('/auth/register', {
       method: 'POST',
@@ -80,7 +80,7 @@ class ApiClient {
   }
 
   // ── Listings Endpoints (Placeholders) ──
-  
+
   async getListings(params: string) {
     return this.fetcher<any[]>(`/listings?${params}`);
   }

@@ -25,7 +25,7 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     // Simulate API call to save permit/license
     // In a real scenario, this updates the user's professional profile
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -36,7 +36,7 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
   if (success) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="max-w-md w-full text-center bg-white p-10 rounded-[2.5rem] shadow-2xl border border-primary-100"
@@ -48,7 +48,7 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
           <p className="text-gray-500 mb-10 leading-relaxed font-medium">
             {t('successDesc', { type: isDaily ? 'Permit' : 'License' })}
           </p>
-          <Link 
+          <Link
             href={`/${locale}`}
             className="inline-block w-full bg-primary-600 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-primary-600/20 hover:bg-primary-500 transition-all active:scale-[0.98]"
           >
@@ -66,7 +66,7 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
 
       <div className="max-w-2xl mx-auto relative">
         {/* Back Link */}
-        <button 
+        <button
           onClick={() => router.back()}
           className="inline-flex items-center gap-2 text-gray-400 hover:text-primary-600 transition-colors mb-12 font-bold group"
         >
@@ -74,7 +74,7 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
           {tCommon('back')}
         </button>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
@@ -116,7 +116,7 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
 
           {/* Help Link */}
           {!isDaily && (
-            <button 
+            <button
               onClick={() => setShowHelp(true)}
               className="mt-12 inline-flex items-center gap-2 text-primary-600 font-bold hover:underline transition-all"
             >
@@ -139,21 +139,21 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
       <AnimatePresence>
         {showHelp && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowHelp(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="fixed left-4 right-4 top-1/2 -translate-y-1/2 md:left-auto md:right-auto md:w-full md:max-w-2xl bg-white rounded-[2.5rem] shadow-2xl z-[101] overflow-hidden"
             >
               <div className="p-8 md:p-12 relative">
-                <button 
+                <button
                   onClick={() => setShowHelp(false)}
                   className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 transition-colors"
                 >
@@ -163,7 +163,7 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">
                   {t('helpTitle')}
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
                   <div className="p-6 bg-primary-50 rounded-2xl border border-primary-100 relative">
                     <div className="absolute -top-3 left-6 px-3 py-1 bg-primary-600 text-white text-[10px] font-bold rounded-lg uppercase tracking-wider">{tCommon('phase')} 1</div>

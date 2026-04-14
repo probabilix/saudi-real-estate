@@ -49,9 +49,9 @@ export default function ListingsPage() {
 
         const res = await api.getListings(queryParams.toString());
         if (res.success && res.data) {
-          setResults({ 
-            items: (res.data as any).items || [], 
-            total: (res.data as any).items?.length || 0 
+          setResults({
+            items: (res.data as any).items || [],
+            total: (res.data as any).items?.length || 0
           });
         }
       } catch (error) {
@@ -129,24 +129,23 @@ export default function ListingsPage() {
 
             {/* Price Range */}
             <div className="z-20">
-               <PriceDropdown 
-                 minPrice={minPrice} 
-                 maxPrice={maxPrice} 
-                 onChange={(min, max) => {
-                   updateFilter('minPrice', min ? String(min) : '');
-                   updateFilter('maxPrice', max ? String(max) : '');
-                 }}
-               />
+              <PriceDropdown
+                minPrice={minPrice}
+                maxPrice={maxPrice}
+                onChange={(min, max) => {
+                  updateFilter('minPrice', min ? String(min) : '');
+                  updateFilter('maxPrice', max ? String(max) : '');
+                }}
+              />
             </div>
 
             {/* More Filters Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-sm font-bold transition-all shadow-sm ${
-                showFilters || hasActiveFilters
-                   ? 'border-primary-600 text-primary-700 bg-primary-50'
-                   : 'border-surface-200 text-charcoal hover:border-primary-500 hover:bg-surface-50 hover:text-primary-600'
-              }`}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-sm font-bold transition-all shadow-sm ${showFilters || hasActiveFilters
+                  ? 'border-primary-600 text-primary-700 bg-primary-50'
+                  : 'border-surface-200 text-charcoal hover:border-primary-500 hover:bg-surface-50 hover:text-primary-600'
+                }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
               {t('sortBy')}
@@ -231,7 +230,7 @@ export default function ListingsPage() {
           </div>
         ) : viewMode === 'map' ? (
           <div className="rounded-3xl overflow-hidden border border-surface-200 h-[650px] shadow-xl relative bg-surface-50 group">
-             {/* Map Placeholder with elite styling */}
+            {/* Map Placeholder with elite styling */}
             <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
               <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 mb-6 group-hover:scale-110 transition-transform duration-500">
                 <Map className="w-10 h-10" />

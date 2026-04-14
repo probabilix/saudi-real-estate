@@ -1,29 +1,16 @@
-// ──────────────────────────────────────────────
-// Saudi Real Estate — Database Connection
-// ──────────────────────────────────────────────
-
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import { Pool } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
 
-// Use the pooled connection URL from Neon
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error('DATABASE_URL environment variable is not set');
-}
-
-/**
- * The Neon serverless pooler. 
- * This handles many concurrent connections efficiently.
- */
-const pool = new Pool({ connectionString });
+// Use HTTP connection for Vercel Serverless compatibility
+const connectionString = process.env.DATABASE_URL!;
+const client = neon(connectionString);
 
 /**
  * The Drizzle instance used for all database queries.
  * import { db } from '@/db'
  */
-export const db = drizzle(pool, { schema });
+export const db = drizzle(client, { schema });
 
-// Export the raw pool and schema for utility/migration use
-export { pool, schema };
+// Export the raw client and schema for utility use
+export { client, schema };

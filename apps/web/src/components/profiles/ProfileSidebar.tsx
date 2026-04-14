@@ -27,10 +27,9 @@ interface ProfileSidebarProps {
   };
 }
 
-export default function ProfileSidebar({ type, data }: ProfileSidebarProps) {
+export default function ProfileSidebar({ data }: ProfileSidebarProps) {
   const t = useTranslations('profiles');
   const locale = useLocale();
-  const isRTL = locale === 'ar';
 
   const bio = locale === 'ar' ? data.bioAr : data.bioEn;
   const experience = data.experienceLevel || '0-2';

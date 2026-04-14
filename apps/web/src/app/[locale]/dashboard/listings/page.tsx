@@ -14,7 +14,6 @@ import {
   TrendingUp,
   AlertCircle
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 
 export default function MyListingsPage({ params: { locale } }: { params: { locale: string } }) {
@@ -22,7 +21,6 @@ export default function MyListingsPage({ params: { locale } }: { params: { local
   const tCommon = useTranslations('common');
   
   // Mock state for now
-  const [listings] = useState([]); // Empty state for buyer/new broker
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeTab, setActiveTab] = useState<'active' | 'draft' | 'pending' | 'removed' | 'license'>('active');
 
@@ -112,7 +110,7 @@ export default function MyListingsPage({ params: { locale } }: { params: { local
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as 'active' | 'draft' | 'pending' | 'removed' | 'license')}
                 className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   activeTab === tab.id 
                     ? 'bg-white text-primary-700 shadow-sm border border-gray-100' 

@@ -9,13 +9,12 @@ import {
   LayoutDashboard, 
   Settings, 
   LogOut, 
-  Menu, 
-  X, 
   ChevronRight,
   ShieldCheck,
   Building
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 
 interface DashboardLayoutProps {
@@ -71,7 +70,7 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center border border-primary-100 text-primary-600 font-bold overflow-hidden shrink-0">
               {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.name ?? ''} className="w-full h-full object-cover" />
+                <Image src={user.avatarUrl} alt={user.name ?? ''} fill className="object-cover" unoptimized />
               ) : (
                 <User className="w-5 h-5" />
               )}

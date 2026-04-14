@@ -1,29 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SlidersHorizontal, Map, Grid3X3, X, Search, ChevronDown, Loader2 } from 'lucide-react';
+import { SlidersHorizontal, Map, Grid3X3, X, ChevronDown, Loader2, Search } from 'lucide-react';
 import ListingCard from '@/components/listings/ListingCard';
 import ChatWidget from '@/components/chat/ChatWidget';
 import PriceDropdown from '@/components/search/PriceDropdown';
 import PropertyTypeDropdown from '@/components/search/PropertyTypeDropdown';
-import { LISTING_TYPES, CITIES } from '@saudi-re/shared';
+import { CITIES, Listing } from '@saudi-re/shared';
 import { api } from '@/lib/api';
 
-export default function ListingsPage() {
+function ListingsContent() {
+  const router = useRouter();
   const locale = useLocale();
   const t = useTranslations('search');
-  const tTypes = useTranslations('propertyTypes');
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   const [isLoading, setIsLoading] = useState(true);
-  const [results, setResults] = useState<{ items: any[]; total: number }>({ items: [], total: 0 });
+  const [results, setResults] = useState<{ items: Listing[]; total: number }>({ items: [], total: 0 });
 
   // Read filters from URL
   const city = searchParams.get('city') || '';
@@ -45,13 +44,13 @@ export default function ListingsPage() {
         if (maxPrice) queryParams.set('maxPrice', String(maxPrice));
         if (bedrooms) queryParams.set('bedrooms', String(bedrooms));
         queryParams.set('lang', locale);
-        queryParams.set('limit', '40'); // Fetch more for testing
+        queryParams.set('limit', '40');
 
         const res = await api.getListings(queryParams.toString());
         if (res.success && res.data) {
           setResults({
-            items: (res.data as any).items || [],
-            total: (res.data as any).items?.length || 0
+            items: res.data.items || [],
+            total: res.data.total || res.data.items?.length || 0
           });
         }
       } catch (error) {
@@ -143,8 +142,8 @@ export default function ListingsPage() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-sm font-bold transition-all shadow-sm ${showFilters || hasActiveFilters
-                  ? 'border-primary-600 text-primary-700 bg-primary-50'
-                  : 'border-surface-200 text-charcoal hover:border-primary-500 hover:bg-surface-50 hover:text-primary-600'
+                ? 'border-primary-600 text-primary-700 bg-primary-50'
+                : 'border-surface-200 text-charcoal hover:border-primary-500 hover:bg-surface-50 hover:text-primary-600'
                 }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
@@ -230,7 +229,7 @@ export default function ListingsPage() {
           </div>
         ) : viewMode === 'map' ? (
           <div className="rounded-3xl overflow-hidden border border-surface-200 h-[650px] shadow-xl relative bg-surface-50 group">
-            {/* Map Placeholder with elite styling */}
+            {/* Map Placeholder */}
             <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
               <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 mb-6 group-hover:scale-110 transition-transform duration-500">
                 <Map className="w-10 h-10" />
@@ -260,7 +259,7 @@ export default function ListingsPage() {
           </motion.div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
-            {results.items.map((listing: any, i: number) => (
+            {results.items.map((listing, i) => (
               <ListingCard key={listing.id} listing={listing} index={i} />
             ))}
           </div>
@@ -270,5 +269,17 @@ export default function ListingsPage() {
       {/* Floating Chat Integration */}
       <ChatWidget floating />
     </div>
+  );
+}
+
+export default function ListingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
+      </div>
+    }>
+      <ListingsContent />
+    </Suspense>
   );
 }

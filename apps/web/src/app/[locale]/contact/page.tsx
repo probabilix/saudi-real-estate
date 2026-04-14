@@ -4,9 +4,8 @@ import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Send, HelpCircle } from 'lucide-react';
 
-export default function ContactPage({ params: { locale } }: { params: { locale: string } }) {
+export default function ContactPage() {
   const t = useTranslations('contact');
-  const tCommon = useTranslations('common');
 
   return (
     <div className="min-h-screen bg-gray-50 pt-32 pb-24">

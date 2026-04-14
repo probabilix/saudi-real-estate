@@ -1,14 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, FileCheck, Info, X, CheckCircle2, ShieldCheck, FileText } from 'lucide-react';
-import { api } from '@/lib/api';
+import { ArrowLeft, FileCheck, Info, X, CheckCircle2, ShieldCheck, FileText, Loader2 } from 'lucide-react';
 
-export default function VerifyListingPage({ params: { locale } }: { params: { locale: string } }) {
+function VerifyListingContent({ locale }: { locale: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const type = searchParams.get('type') || 'sell';
@@ -27,7 +26,6 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
     setLoading(true);
 
     // Simulate API call to save permit/license
-    // In a real scenario, this updates the user's professional profile
     await new Promise(resolve => setTimeout(resolve, 1500));
     setSuccess(true);
     setLoading(false);
@@ -208,5 +206,17 @@ export default function VerifyListingPage({ params: { locale } }: { params: { lo
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function VerifyListingPage({ params: { locale } }: { params: { locale: string } }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
+      </div>
+    }>
+      <VerifyListingContent locale={locale} />
+    </Suspense>
   );
 }

@@ -1,15 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { 
   Building, 
   ChevronLeft, 
   ChevronRight, 
-  LayoutGrid, 
-  List as ListIcon,
-  Search,
-  Filter,
   Users
 } from 'lucide-react';
 import Link from 'next/link';
@@ -18,15 +14,27 @@ import FirmHero from '@/components/profiles/FirmHero';
 import ProfileSidebar from '@/components/profiles/ProfileSidebar';
 import AgentGrid from '@/components/profiles/AgentGrid';
 import { api } from '@/lib/api';
+import { User, Listing } from '@saudi-re/shared';
+
+interface FirmStats {
+  activeListings: number;
+  successListings: number;
+  agentsCount: number;
+}
+
+interface FirmData {
+  firm: User & { stats: FirmStats };
+  agents: User[];
+  stats: FirmStats;
+}
 
 export default function FirmProfilePage({ params: { locale, id } }: { params: { locale: string, id: string } }) {
   const t = useTranslations('profiles');
   const tCommon = useTranslations('common');
-  const localeStr = locale as 'ar' | 'en';
   const isRTL = locale === 'ar';
 
-  const [firmData, setFirmData] = useState<any>(null);
-  const [listings, setListings] = useState<any[]>([]);
+  const [firmData, setFirmData] = useState<FirmData | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'listings' | 'agents'>('listings');
 
@@ -38,14 +46,15 @@ export default function FirmProfilePage({ params: { locale, id } }: { params: { 
         const res = await api.getPublicFirm(id);
         
         if (res.success) {
-          setFirmData(res.data);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setFirmData(res.data as any);
         }
 
         // Fetch firm's listings
         const listingsRes = await api.getListings(`firmId=${id}&limit=20`);
         
         if (listingsRes.success && listingsRes.data) {
-          setListings((listingsRes.data as any).items || []);
+          setListings(listingsRes.data.items || []);
         }
       } catch (err) {
         console.error('Failed to fetch firm profile:', err);
@@ -128,7 +137,8 @@ export default function FirmProfilePage({ params: { locale, id } }: { params: { 
            </div>
 
            <div className="lg:col-span-4">
-              <ProfileSidebar type="firm" data={{ ...firm.brokerProfile, stats, createdAt: firm.createdAt }} />
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              <ProfileSidebar type="firm" data={{ ...((firm as any).profile || {}), stats, createdAt: firm.createdAt }} />
            </div>
         </div>
       </div>

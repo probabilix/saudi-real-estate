@@ -4,14 +4,13 @@ import React from 'react';
 import Image from 'next/image';
 import { 
   Building2, 
-  MapPin, 
   Users, 
   Globe,
   CheckCircle2,
   Mail,
   Phone
 } from 'lucide-react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 
 interface FirmHeroProps {
   firm: {
@@ -30,8 +29,6 @@ interface FirmHeroProps {
 
 export default function FirmHero({ firm }: FirmHeroProps) {
   const t = useTranslations('profiles');
-  const locale = useLocale();
-  const isRTL = locale === 'ar';
 
   return (
     <div className="bg-white rounded-[40px] border border-surface-100 shadow-xl shadow-black/[0.03] overflow-hidden">

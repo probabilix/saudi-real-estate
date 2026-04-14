@@ -43,7 +43,7 @@ export default function PropertyTypeDropdown({ type, onChange }: PropertyTypeDro
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const label = type ? (tTypes as any)(type) : tSearch('propertyType') || 'Property Type';
+  const label = type ? tTypes(type as never) : tSearch('propertyType') || 'Property Type';
 
   return (
     <div className="relative" ref={ref}>
@@ -96,7 +96,7 @@ export default function PropertyTypeDropdown({ type, onChange }: PropertyTypeDro
               </label>
 
               {(activeTab === 'residential' ? RESIDENTIAL_TYPES : COMMERCIAL_TYPES).map((pt) => {
-                const ptName = (tTypes as any)(pt) || pt;
+                const ptName = tTypes(pt as never) || pt;
                 return (
                   <label key={pt} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-surface-50 rounded-lg group">
                     <input 

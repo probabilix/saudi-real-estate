@@ -6,6 +6,7 @@ import type {
   UserRole, ListingType, ListingPurpose, ListingStatus,
   LeadStatus, SubscriptionTier, BuyerPurpose, TranslationStatus,
   PlacementType, Language, FurnishingStatus, CompletionStatus,
+  VerificationStatus,
 } from './constants';
 
 export interface PropertyHistoryEvent {
@@ -30,6 +31,7 @@ export interface User {
   name: string;
   regaLicence: string | null;
   regaVerified: boolean;
+  verificationStatus: VerificationStatus;
   subscriptionTier: SubscriptionTier;
   subscriptionUntil: string | null;
   avatarUrl: string | null;
@@ -124,7 +126,7 @@ export interface Listing {
 
 // Listing with owner details
 export interface ListingWithOwner extends Listing {
-  owner: Pick<User, 'id' | 'name' | 'avatarUrl' | 'role' | 'regaVerified'>;
+  owner: Pick<User, 'id' | 'name' | 'avatarUrl' | 'phone' | 'role' | 'regaVerified'>;
 }
 
 // ── Buyer Profile ──

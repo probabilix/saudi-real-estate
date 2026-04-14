@@ -8,16 +8,13 @@ import {
   MapPin,
   Award,
   Globe,
-  Sparkles,
   AlertCircle,
   Briefcase,
   Save,
   Loader2,
-  ChevronRight,
   ShieldCheck,
   Camera,
   MessageSquare,
-  Zap,
   ArrowRightLeft,
   Wand2
 } from 'lucide-react';
@@ -47,10 +44,12 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
     whatsapp: '',
     nationalId: '',
     regaLicenseNumber: '',
-    experienceLevel: '',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    experienceLevel: null as any,
     languages: [] as string[],
     serviceAreas: [] as string[],
-    gender: '',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gender: null as any,
     address: '',
     avatarUrl: ''
   });
@@ -70,10 +69,10 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
           whatsapp: p.whatsapp || u.phone || '',
           nationalId: p.nationalId || '',
           regaLicenseNumber: p.regaLicenseNumber || u.regaLicence || '',
-          experienceLevel: p.experienceLevel || '',
+          experienceLevel: p.experienceLevel || null,
           languages: p.languages || [],
           serviceAreas: p.serviceAreas || [],
-          gender: p.gender || '',
+          gender: p.gender || null,
           address: p.address || '',
           avatarUrl: u.avatarUrl || ''
         });
@@ -85,7 +84,22 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
 
   const handleSave = async () => {
     setSaving(true);
-    const res = await api.updateProfile(formData);
+    const profileUpdate = {
+      titleEn: formData.titleEn,
+      titleAr: formData.titleAr,
+      bioEn: formData.bioEn,
+      bioAr: formData.bioAr,
+      whatsapp: formData.whatsapp,
+      nationalId: formData.nationalId,
+      regaLicenseNumber: formData.regaLicenseNumber,
+      experienceLevel: formData.experienceLevel,
+      languages: formData.languages,
+      serviceAreas: formData.serviceAreas,
+      gender: formData.gender,
+      address: formData.address,
+    };
+    
+    const res = await api.updateProfile(profileUpdate);
     if (res.success) {
       // Success logic
     }
@@ -97,11 +111,9 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
     const sourceEn = isBio ? formData.bioEn : formData.titleEn;
     const sourceAr = isBio ? formData.bioAr : formData.titleAr;
 
-    // Detect Source: If En has text, translate to Ar. If Ar has text, translate to En.
-    // If both have text, default to English -> Arabic.
-    let textToProcess = sourceEn || sourceAr;
-    let fromLang: 'en' | 'ar' = sourceEn ? 'en' : 'ar';
-    let toLang: 'en' | 'ar' = sourceEn ? 'ar' : 'en';
+    const textToProcess = sourceEn || sourceAr;
+    const fromLang: 'en' | 'ar' = sourceEn ? 'en' : 'ar';
+    const toLang: 'en' | 'ar' = sourceEn ? 'ar' : 'en';
 
     if (!textToProcess) return;
 
@@ -110,7 +122,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
       text: textToProcess,
       fromLang,
       toLang,
-      context: isBio ? 'bio' : 'title' // Matching backend Zod enum exactly
+      context: isBio ? 'bio' : 'title'
     });
 
     if (res.success && res.data?.translatedText) {
@@ -118,7 +130,6 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
 
       try {
         if (isBio) {
-          // Parse the bilingual JSON from AI
           const cleanedText = translatedText.replace(/```json|```/g, '').trim();
           const bilingualData = JSON.parse(cleanedText);
           
@@ -128,7 +139,6 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
             bioAr: bilingualData.ar || prev.bioAr
           }));
         } else {
-          // Standard title sync behavior (one field at a time)
           setFormData(prev => ({
             ...prev,
             [toLang === 'en' ? 'titleEn' : 'titleAr']: translatedText
@@ -136,7 +146,6 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
         }
       } catch (err) {
         console.error('Failed to parse AI response:', err);
-        // Fallback: just update the target field if JSON fails
         setFormData(prev => ({
           ...prev,
           [isBio ? (toLang === 'en' ? 'bioEn' : 'bioAr') : (toLang === 'en' ? 'titleEn' : 'titleAr')]: translatedText
@@ -157,12 +166,11 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
 
   const verStatus = user?.verificationStatus || 'UNVERIFIED';
 
-  const CITIES = ['Riyadh', 'Jeddah', 'Khobar', 'Dammam', 'Mecca', 'Medina']; // Keys in common.cities
-  const LANGUAGES = ['English', 'Arabic', 'Urdu', 'Hindi', 'French']; // Keys in common.languages
+  const CITIES = ['Riyadh', 'Jeddah', 'Khobar', 'Dammam', 'Mecca', 'Medina'];
+  const LANGUAGES = ['English', 'Arabic', 'Urdu', 'Hindi', 'French'];
 
   return (
     <div className="space-y-8 pb-20" dir={isRTL ? 'rtl' : 'ltr'}>
-      {/* ── Page Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-1">{tSettings('title')}</h1>
@@ -180,7 +188,6 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
         </div>
       </div>
 
-      {/* ── Verification Banner ── */}
       <AnimatePresence>
         {verStatus !== 'VERIFIED' && (
           <motion.div
@@ -215,10 +222,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
       </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* ── Left Column: Core Info ── */}
         <div className="lg:col-span-2 space-y-8">
-
-          {/* Section: Professional Profile */}
           <section className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-xl shadow-black/[0.03] space-y-8">
             <div className="flex items-center gap-3 pb-6 border-b border-gray-50">
               <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
@@ -246,9 +250,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
               </div>
             </div>
 
-            {/* Unified Bilingual Section */}
             <div className="space-y-8">
-              {/* Professional Title Group */}
               <div className="p-6 md:p-8 rounded-[32px] bg-gray-50/50 border border-gray-100 space-y-6">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-primary-600 text-white flex items-center justify-center">
@@ -268,12 +270,11 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
                     />
                   </div>
 
-                  {/* Central Sync Button - Robust Mobile & Desktop Design */}
                   <div className="flex justify-center md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:z-10 py-4 md:py-0">
                     <button
                       onClick={() => handleUnifiedPolish('title')}
                       disabled={aiLoading || (!formData.titleEn && !formData.titleAr)}
-                      className="w-10 h-10 bg-white border-2 border-primary-100 rounded-full flex items-center justify-center text-primary-600 shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-50 group bg-white hover:bg-primary-50 relative z-20"
+                      className="w-10 h-10 bg-white border-2 border-primary-100 rounded-full flex items-center justify-center text-primary-600 shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-50 group hover:bg-primary-50 relative z-20"
                       title={tSettings('aiPolishTranslate')}
                     >
                       {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRightLeft className="w-4 h-4" />}
@@ -292,7 +293,6 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
                 </div>
               </div>
 
-              {/* Bio Description Group */}
               <div className="p-6 md:p-8 rounded-[32px] bg-primary-50/30 border border-primary-100/50 space-y-6">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-primary-600 text-white flex items-center justify-center">
@@ -313,7 +313,6 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
                     />
                   </div>
 
-                  {/* Central "AI Magic" Button - Robust Mobile & Desktop Design */}
                   <div className="flex justify-center md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:z-10 py-4 md:py-0">
                     <button
                       onClick={() => handleUnifiedPolish('bio')}
@@ -363,7 +362,6 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
             </div>
           </section>
 
-          {/* Section: Professional Credentials */}
           <section className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-xl shadow-black/[0.03] space-y-8">
             <div className="flex items-center gap-3 pb-6 border-b border-gray-50">
               <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
@@ -398,9 +396,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
           </section>
         </div>
 
-        {/* ── Right Column: Metadata & Photo ── */}
         <div className="space-y-8">
-          {/* Section: Profile Image */}
           <section className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-xl shadow-black/[0.03] text-center">
             <div className="relative inline-block w-40 h-40 group">
               <div className="w-full h-full rounded-full bg-gray-50 border-4 border-white shadow-xl flex items-center justify-center overflow-hidden relative">
@@ -422,7 +418,6 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
             </div>
           </section>
 
-          {/* Section: Experience & Languages */}
           <section className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-xl shadow-black/[0.03] space-y-6">
             <div className="space-y-4">
               <label className="text-sm font-bold text-gray-700 flex items-center gap-2">

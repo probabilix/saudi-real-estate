@@ -42,14 +42,6 @@ const nextConfig = {
       },
     ];
   },
-  // ── Ignore ESLint during builds ──
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  // ── Ignore TypeScript errors during builds ──
-  typescript: {
-    ignoreBuildErrors: true,
-  },
 };
 
 module.exports = withNextIntl(nextConfig);

@@ -89,7 +89,7 @@ export const mockListings: ListingWithOwner[] = [
     deletedAt: null,
     createdAt: '2026-03-15T10:00:00Z',
     updatedAt: '2026-03-28T14:30:00Z',
-    owner: { id: 'broker-1', name: 'Ahmed Al-Rashid', avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&q=80', role: 'SOLO_BROKER', regaVerified: true },
+    owner: { id: 'broker-1', name: 'Ahmed Al-Rashid', avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&q=80', phone: '+966-500000000', role: 'SOLO_BROKER', regaVerified: true },
   },
   {
     id: '2',
@@ -198,7 +198,7 @@ export const mockListings: ListingWithOwner[] = [
     deletedAt: null,
     createdAt: '2026-03-11T08:00:00Z',
     updatedAt: '2026-03-27T11:20:00Z',
-    owner: { id: 'broker-2', name: 'Abdullah Almasabi', avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&q=80', role: 'FIRM', regaVerified: true },
+    owner: { id: 'broker-2', name: 'Abdullah Almasabi', avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&q=80', phone: '+966-500000001', role: 'FIRM', regaVerified: true },
   },
   {
     id: '3',
@@ -247,7 +247,7 @@ export const mockListings: ListingWithOwner[] = [
     deletedAt: null,
     createdAt: '2026-03-05T12:00:00Z',
     updatedAt: '2026-03-25T09:00:00Z',
-    owner: { id: 'broker-3', name: 'Mohammed Al-Otaibi', avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&q=80', role: 'FIRM', regaVerified: true },
+    owner: { id: 'broker-3', name: 'Mohammed Al-Otaibi', avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&q=80', phone: '+966-500000002', role: 'FIRM', regaVerified: true },
   },
   {
     id: '4',
@@ -296,7 +296,7 @@ export const mockListings: ListingWithOwner[] = [
     deletedAt: null,
     createdAt: '2026-03-12T14:00:00Z',
     updatedAt: '2026-03-26T16:45:00Z',
-    owner: { id: 'broker-1', name: 'Ahmed Al-Rashid', avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&q=80', role: 'SOLO_BROKER', regaVerified: true },
+    owner: { id: 'broker-1', name: 'Ahmed Al-Rashid', avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&q=80', phone: '+966-500000000', role: 'SOLO_BROKER', regaVerified: true },
   },
   {
     id: '5',
@@ -345,7 +345,7 @@ export const mockListings: ListingWithOwner[] = [
     deletedAt: null,
     createdAt: '2026-03-18T09:00:00Z',
     updatedAt: '2026-03-29T10:30:00Z',
-    owner: { id: 'broker-4', name: 'Sara Al-Dosari', avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&q=80', role: 'AGENT', regaVerified: true },
+    owner: { id: 'broker-4', name: 'Sara Al-Dosari', avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&q=80', phone: '+966-500000003', role: 'AGENT', regaVerified: true },
   },
   {
     id: '6',
@@ -394,7 +394,7 @@ export const mockListings: ListingWithOwner[] = [
     deletedAt: null,
     createdAt: '2026-03-20T07:00:00Z',
     updatedAt: '2026-03-28T08:00:00Z',
-    owner: { id: 'broker-5', name: 'Khalid Al-Harbi', avatarUrl: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=400&q=80', role: 'SOLO_BROKER', regaVerified: true },
+    owner: { id: 'broker-5', name: 'Khalid Al-Harbi', avatarUrl: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=400&q=80', phone: '+966-500000004', role: 'SOLO_BROKER', regaVerified: true },
   },
 ];
 

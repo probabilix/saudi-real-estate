@@ -13,12 +13,11 @@ interface Message {
 
 interface ChatWidgetProps {
   floating?: boolean;
-  onProfileExtracted?: (profile: Record<string, unknown>) => void;
 }
 
 const WELCOME_DELAY = 800;
 
-export default function ChatWidget({ floating = false, onProfileExtracted }: ChatWidgetProps) {
+export default function ChatWidget({ floating = false }: ChatWidgetProps) {
   const t = useTranslations('chat');
   const locale = useLocale();
   const [open, setOpen] = useState(!floating);

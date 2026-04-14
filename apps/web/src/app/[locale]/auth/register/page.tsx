@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, forwardRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -8,8 +8,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 import { Building2, ArrowLeft, Mail, User, Lock, Sparkles, Verified, ChevronDown, Search } from 'lucide-react';
+import { RegisterInput } from '@saudi-re/shared';
 import { motion, AnimatePresence } from 'framer-motion';
-import { isValidPhoneNumber, getCountryCallingCode, parsePhoneNumber } from 'react-phone-number-input';
+import { isValidPhoneNumber, getCountryCallingCode } from 'react-phone-number-input';
 import type { Country } from 'react-phone-number-input';
 
 type CountryCode = Country;
@@ -183,7 +184,6 @@ function PhoneSelector({ country, phoneNumber, onCountryChange, onPhoneChange, p
                 <div className="px-4 py-6 text-center text-sm text-gray-400">No countries found</div>
               ) : (
                 filtered.map((c, i) => {
-                  const isTopEnd = !search && i === TOP_COUNTRIES.length - 1;
                   const isAll = !search && i === TOP_COUNTRIES.length;
                   return (
                     <div key={c}>
@@ -235,9 +235,6 @@ function PhoneSelector({ country, phoneNumber, onCountryChange, onPhoneChange, p
   );
 }
 
-// ────────────────────────────────────────────────────────
-// Register Page
-// ────────────────────────────────────────────────────────
 export default function RegisterPage({ params: { locale } }: { params: { locale: string } }) {
   const t = useTranslations('auth');
   const tCommon = useTranslations('common');
@@ -255,10 +252,8 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
     setLoading(true);
     setError(null);
 
-    // Build E.164 phone number for validation
     let fullPhone: string | undefined;
     if (rawPhone.trim()) {
-      // Strip spaces/dashes and prepend dial code if not already there
       const digits = rawPhone.replace(/\D/g, '');
       const dialCode = getCountryCallingCode(phoneCountry);
       const e164 = `+${dialCode}${digits}`;
@@ -271,13 +266,13 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
       fullPhone = e164;
     }
 
-    const payload: any = {
+    const payload: RegisterInput = {
       email: formData.email,
       password: formData.password,
       name: formData.name,
       role: 'BUYER',
+      phone: fullPhone,
     };
-    if (fullPhone) payload.phone = fullPhone;
 
     const result = await api.register(payload);
     if (result.success) {

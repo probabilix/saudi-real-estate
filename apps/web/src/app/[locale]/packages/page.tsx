@@ -4,10 +4,8 @@ import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { Check, Wallet, Crown, Shield } from 'lucide-react';
 
-export default function PackagesPage({ params: { locale } }: { params: { locale: string } }) {
+export default function PackagesPage() {
   const t = useTranslations('packages');
-  const tCommon = useTranslations('common');
-  const isRTL = locale === 'ar';
 
   const packages = [
     {

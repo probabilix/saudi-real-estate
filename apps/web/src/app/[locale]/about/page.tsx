@@ -3,7 +3,6 @@
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { Building2, Globe, Sparkles, TrendingUp, ShieldCheck, Map, Users } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
 
 export default function AboutPage({ params: { locale } }: { params: { locale: string } }) {
   const t = useTranslations('about');

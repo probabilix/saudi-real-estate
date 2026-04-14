@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { 
   Building, 
   ChevronLeft, 
@@ -22,7 +22,9 @@ export default function BrokerProfilePage({ params: { locale, id } }: { params: 
   const tCommon = useTranslations('common');
   const isRTL = locale === 'ar';
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [brokerData, setBrokerData] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -42,6 +44,7 @@ export default function BrokerProfilePage({ params: { locale, id } }: { params: 
         const listingsRes = await api.getListings(`ownerId=${id}&limit=20`);
         
         if (listingsRes.success && listingsRes.data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setListings((listingsRes.data as any).items || []);
         }
       } catch (err) {

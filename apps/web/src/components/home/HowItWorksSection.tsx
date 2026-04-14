@@ -84,12 +84,12 @@ export default function HowItWorksSection() {
                   <h3
                     className={`text-xl font-bold text-charcoal mb-4 ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}
                   >
-                    {t(`${step.key}Title` as any)}
+                    {t(`${step.key}Title` as 'step1Title' | 'step2Title' | 'step3Title')}
                   </h3>
                   <p
                     className={`text-sm text-charcoal-muted leading-relaxed max-w-xs mx-auto ${locale === 'ar' ? 'font-arabic' : ''}`}
                   >
-                    {t(`${step.key}Desc` as any)}
+                    {t(`${step.key}Desc` as 'step1Desc' | 'step2Desc' | 'step3Desc')}
                   </p>
                 </div>
               </motion.div>

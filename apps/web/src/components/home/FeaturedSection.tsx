@@ -6,10 +6,10 @@ import { useTranslations, useLocale } from 'next-intl';
 import { motion, useInView } from 'framer-motion';
 import { ArrowRight, Star } from 'lucide-react';
 import ListingCard from '@/components/listings/ListingCard';
-import type { ListingWithOwner } from '@saudi-re/shared';
+import type { Listing } from '@saudi-re/shared';
 
 interface FeaturedSectionProps {
-  listings: ListingWithOwner[];
+  listings: Listing[];
 }
 
 export default function FeaturedSection({ listings }: FeaturedSectionProps) {

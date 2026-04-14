@@ -1,14 +1,14 @@
 'use client';
-
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { User, LoginInput, RegisterInput, BrokerWithProfile } from '@saudi-re/shared';
 import { api } from '@/lib/api';
 
 type AuthContextType = {
-  user: any | null;
+  user: User | BrokerWithProfile | null;
   loading: boolean;
-  login: (data: any) => Promise<boolean>;
-  register: (data: any) => Promise<boolean>;
+  login: (data: LoginInput) => Promise<boolean>;
+  register: (data: RegisterInput) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
 };
@@ -16,7 +16,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<User | BrokerWithProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  const login = async (credentials: any) => {
+  const login = async (credentials: LoginInput) => {
     const result = await api.login(credentials);
     if (result.success && result.data) {
       localStorage.setItem('accessToken', result.data.accessToken);
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const register = async (data: any) => {
+  const register = async (data: RegisterInput) => {
     const result = await api.register(data);
     if (result.success && result.data) {
       if (result.data.accessToken && result.data.user) {

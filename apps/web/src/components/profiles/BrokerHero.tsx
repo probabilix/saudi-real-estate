@@ -3,8 +3,6 @@
 import React from 'react';
 import Image from 'next/image';
 import { 
-  CheckCircle2, 
-  MapPin, 
   Phone, 
   Mail, 
   MessageCircle,
@@ -39,7 +37,6 @@ interface BrokerHeroProps {
 export default function BrokerHero({ broker }: BrokerHeroProps) {
   const t = useTranslations('profiles');
   const locale = useLocale();
-  const isRTL = locale === 'ar';
 
   const title = locale === 'ar' ? broker.profile?.titleAr : broker.profile?.titleEn;
   const languages = broker.profile?.languages || [];

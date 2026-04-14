@@ -6,10 +6,10 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Bed, Bath, Square, MapPin, Eye, Star, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatPriceCompact } from '@saudi-re/shared';
-import type { ListingWithOwner } from '@saudi-re/shared';
+import type { Listing } from '@saudi-re/shared';
 
 interface ListingCardProps {
-  listing: ListingWithOwner;
+  listing: Listing;
   index?: number;
 }
 

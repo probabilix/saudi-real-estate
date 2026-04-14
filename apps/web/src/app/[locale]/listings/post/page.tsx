@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/use-auth';
 export default function PostListingPage({ params: { locale } }: { params: { locale: string } }) {
   const t = useTranslations('listings');
   const tCommon = useTranslations('common');
-  const { user, isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
   // 🛡️ Security Gate: Redirect unauthenticated users

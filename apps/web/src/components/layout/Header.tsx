@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Globe, Building2, User, LogOut, LayoutDashboard, ChevronDown, Smartphone, Phone, Download, Sparkles, PlusCircle, Heart, History } from 'lucide-react';
+import { Menu, X, Globe, Building2, User, LogOut, LayoutDashboard, ChevronDown, Phone, Download, Sparkles, PlusCircle, Heart, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -88,10 +88,9 @@ export default function Header({ locale }: HeaderProps) {
       </div>
 
       {/* ── Main Navigation ── */}
-      <header 
-        className={`w-full transition-all duration-500 bg-white border-b border-gray-100 ${
-          scrolled ? 'shadow-[0_4px_30px_rgba(0,0,0,0.03)] py-1.5' : 'py-3'
-        }`}
+      <header
+        className={`w-full transition-all duration-500 bg-white border-b border-gray-100 ${scrolled ? 'shadow-[0_4px_30px_rgba(0,0,0,0.03)] py-1.5' : 'py-3'
+          }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Logo */}
@@ -103,7 +102,7 @@ export default function Header({ locale }: HeaderProps) {
               {tCommon('appName')}
             </span>
           </Link>
-  
+
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-4">
             {navLinks.filter(l => l.href !== `/${locale}/dashboard`).map((link) => {
@@ -112,31 +111,30 @@ export default function Header({ locale }: HeaderProps) {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${
-                    isActive
-                      ? 'text-primary-700 bg-primary-50'
-                      : 'text-gray-500 hover:text-primary-600 hover:bg-gray-50'
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
+                    ? 'text-primary-700 bg-primary-50'
+                    : 'text-gray-500 hover:text-primary-600 hover:bg-gray-50'
+                    }`}
                 >
                   {link.label}
                 </Link>
               );
             })}
           </nav>
-  
-          {/* Actions */}
+
+          {/* Actions */}i
           <div className="flex items-center gap-4">
-            <Link 
+            <Link
               href={`/${locale}/listings/post`}
               className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-primary-600/20 hover:bg-primary-500 transition-all active:scale-[0.98]"
             >
               <PlusCircle className="w-4 h-4" />
               {tCommon('postListing')}
             </Link>
-  
+
             {isAuthenticated ? (
               <div className="relative group">
-                <button 
+                <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 p-1 ps-3 border border-gray-100 rounded-full hover:bg-gray-50 transition-all"
                 >
@@ -149,10 +147,10 @@ export default function Header({ locale }: HeaderProps) {
                   </div>
                   <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${userMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
-                
+
                 <AnimatePresence>
                   {userMenuOpen && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -162,10 +160,10 @@ export default function Header({ locale }: HeaderProps) {
                         <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">{tCommon('signedInAs')}</p>
                         <p className="text-sm font-bold truncate text-gray-900">{user?.email}</p>
                       </div>
-                      {['ADMIN', 'AGENT', 'FIRM', 'SOLO_BROKER', 'OWNER', 'BUYER'].includes(user?.role) && (
+                      {user?.role && ['ADMIN', 'AGENT', 'FIRM', 'SOLO_BROKER', 'OWNER', 'BUYER'].includes(user.role as string) && (
                         <>
-                          <Link 
-                            href={`/${locale}/dashboard`} 
+                          <Link
+                            href={`/${locale}/dashboard`}
                             onClick={() => setUserMenuOpen(false)}
                             className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
                           >
@@ -175,7 +173,7 @@ export default function Header({ locale }: HeaderProps) {
                           <hr className="my-1 border-gray-50" />
                         </>
                       )}
-                      <button 
+                      <button
                         onClick={() => {
                           logout();
                           setUserMenuOpen(false);
@@ -207,7 +205,7 @@ export default function Header({ locale }: HeaderProps) {
         {/* Mobile Nav */}
         <AnimatePresence>
           {mobileOpen && (
-            <motion.div 
+            <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -215,8 +213,8 @@ export default function Header({ locale }: HeaderProps) {
             >
               <div className="p-4 flex flex-col gap-2">
                 {navLinks.map((link) => (
-                  <Link 
-                    key={link.href} 
+                  <Link
+                    key={link.href}
                     href={link.href}
                     className="block px-4 py-3 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50"
                     onClick={() => setMobileOpen(false)}
@@ -225,15 +223,15 @@ export default function Header({ locale }: HeaderProps) {
                   </Link>
                 ))}
                 <div className="pt-4 border-t border-gray-100 space-y-3">
-                  <Link 
+                  <Link
                     href={`/${locale}/listings/post`}
                     onClick={() => setMobileOpen(false)}
                     className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-primary-600 text-white font-bold"
                   >
                     {tCommon('postListing')}
                   </Link>
-                  {['ADMIN', 'AGENT', 'FIRM', 'SOLO_BROKER', 'OWNER', 'BUYER'].includes(user?.role) && (
-                    <Link 
+                  {user?.role && ['ADMIN', 'AGENT', 'FIRM', 'SOLO_BROKER', 'OWNER', 'BUYER'].includes(user.role as string) && (
+                    <Link
                       href={`/${locale}/dashboard`}
                       onClick={() => setMobileOpen(false)}
                       className="flex items-center justify-center gap-2 w-full py-4 rounded-xl border-2 border-primary-600 text-primary-600 font-bold"

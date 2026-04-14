@@ -7,6 +7,7 @@ import CTASection from '@/components/home/CTASection';
 import ChatWidget from '@/components/chat/ChatWidget';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import { API_BASE_URL } from '@/lib/api';
+import { Listing } from '@saudi-re/shared';
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'metadata' });
@@ -23,7 +24,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
   unstable_setRequestLocale(locale);
 
   // Fetch first 3 featured listings for the featured section
-  let featuredListings: any[] = [];
+  let featuredListings: Listing[] = [];
   try {
     const res = await fetch(`${API_BASE_URL}/listings?limit=3&isFeatured=true`, {
       next: { revalidate: 3600 },
@@ -31,7 +32,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
     
     if (res.ok) {
       const json = await res.json();
-      featuredListings = json?.items || json?.data?.items || [];
+      featuredListings = json?.data?.items || json?.items || [];
     } else {
       const errorText = await res.text();
       console.error(`[HomePage] Fetch failed: ${res.status} ${res.statusText}`, errorText);

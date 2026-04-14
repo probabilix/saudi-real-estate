@@ -1,21 +1,20 @@
 'use client';
-
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Bed, Bath, Square, MapPin, Eye, Shield, Globe, Star,
-  Heart, Share2, ChevronLeft, ChevronRight, X, ChevronUp,
+  Bed, Bath, Square, MapPin, Eye, Shield,
+  Heart, Share2, ChevronLeft, ChevronRight, X,
   CheckCircle, Phone, MessageSquare, ArrowLeft,
-  Calendar, Building2, ShieldCheck, ClipboardCheck,
-  Maximize2, Zap, Droplets, Car, Smartphone, Fingerprint,
-  Info, History, Calculator, Map as MapIcon, ChevronDown,
-  ExternalLink, Check, Mail, Sparkles, TrendingUp
+  ShieldCheck,
+  Maximize2, Zap,
+  Info, Calculator, Map as MapIcon,
+  Mail, TrendingUp, Loader2
 } from 'lucide-react';
-import { formatPrice, formatPriceCompact, ListingWithOwner } from '@saudi-re/shared';
+import { formatPrice, formatPriceCompact, ListingWithOwner, Listing, PropertyHistoryEvent } from '@saudi-re/shared';
 import { api } from '@/lib/api';
 import ListingCard from '@/components/listings/ListingCard';
 import ChatWidget from '@/components/chat/ChatWidget';
@@ -24,7 +23,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const t = useTranslations('listing');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('navigation');
-  const tTypes = useTranslations('propertyTypes');
 
   const [listing, setListing] = useState<ListingWithOwner | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,8 +34,8 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const [mortgageType, setMortgageType] = useState<'resident' | 'expat'>('resident');
   const [isQualified, setIsQualified] = useState(false);
 
-  // Additional State & Refs (Must be at the top)
-  const [similarListings, setSimilarListings] = useState<any[]>([]);
+  // Additional State & Refs
+  const [similarListings, setSimilarListings] = useState<Listing[]>([]);
   const [loanAmount, setLoanAmount] = useState(0);
   const [loanPeriod, setLoanPeriod] = useState(15);
   
@@ -54,7 +52,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
       try {
         const res = await api.getListingById(id);
         if (res.success && res.data) {
-          setListing(res.data);
+          setListing(res.data as ListingWithOwner);
         } else {
           setListing(null);
         }
@@ -74,9 +72,9 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         const query = `city=${listing?.city}&type=${listing?.type}&limit=3`;
         const res = await api.getListings(query);
         if (res.success && res.data) {
-          setSimilarListings((res.data as any).items?.filter((item: any) => item.id !== listing?.id) || []);
+          setSimilarListings(res.data.items?.filter((item) => item.id !== listing?.id) || []);
         }
-      } catch (err) {
+      } catch {
         console.log('Similar fetch failed silently');
       }
     }
@@ -86,13 +84,13 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!lightboxOpen || !listing?.photos) return;
-      if (e.key === 'ArrowRight') setActivePhoto((p) => (p + 1) % listing.photos.length);
-      if (e.key === 'ArrowLeft') setActivePhoto((p) => (p - 1 + listing.photos.length) % listing.photos.length);
+      if (e.key === 'ArrowRight') setActivePhoto((p) => (p + 1) % (listing.photos?.length || 1));
+      if (e.key === 'ArrowLeft') setActivePhoto((p) => (p - 1 + (listing.photos?.length || 1)) % (listing.photos?.length || 1));
       if (e.key === 'Escape') setLightboxOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxOpen, listing?.photos?.length]);
+  }, [lightboxOpen, listing?.photos]);
 
   useEffect(() => {
     if (listing?.price) {
@@ -103,21 +101,21 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-        <div className="w-16 h-16 border-4 border-primary-100 border-t-primary-600 rounded-full animate-spin mb-4" />
-        <p className="text-charcoal-muted font-bold font-serif uppercase tracking-widest">{tCommon('loading') || 'Loading Property...'}</p>
+        <Loader2 className="w-16 h-16 text-primary-600 animate-spin mb-4" />
+        <p className="text-charcoal-muted font-bold font-serif uppercase tracking-widest">{tCommon('loading')}</p>
       </div>
     );
   }
 
   if (!listing) notFound();
-  const l = listing as ListingWithOwner;
+  const l = listing;
 
   const title = locale === 'ar' ? l.arTitle : (l.enTitle ?? l.arTitle);
   const description = descLang === 'ar' ? l.arDescription : (l.enDescription || l.arDescription);
 
-  const scrollToSection = (id: keyof typeof sectionRefs) => {
-    sectionRefs[id].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setActiveTab(id);
+  const scrollToSection = (sectionId: keyof typeof sectionRefs) => {
+    sectionRefs[sectionId].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveTab(sectionId);
   };
 
   const areaSqFt = l.areaSqm ? Math.round(Number(l.areaSqm) * 10.764) : null;
@@ -156,10 +154,9 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         </div>
       </div>
 
-      {/* 2. Hero Image Gallery - NO GAP, NO HOVER */}
+      {/* 2. Hero Image Gallery */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-0 h-auto md:h-[600px] overflow-hidden rounded-2xl shadow-xl border border-surface-100">
-          {/* Main Photo */}
           <button className="col-span-1 md:col-span-8 relative aspect-[4/3] md:aspect-auto group overflow-hidden" onClick={() => setLightboxOpen(true)}>
             {l?.photos?.[0] && <Image src={l.photos[0]} alt={title} fill className="object-cover" priority unoptimized />}
             <div className="absolute inset-0 bg-black/10" />
@@ -176,7 +173,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             </div>
           </button>
 
-          {/* Secondary Photos Stack */}
           <div className="col-span-1 md:col-span-4 grid grid-cols-2 md:grid-cols-1 md:grid-rows-2 gap-0 h-40 md:h-full">
             <button className="relative group overflow-hidden border-s border-surface-100" onClick={() => { setActivePhoto(1); setLightboxOpen(true); }}>
               {l?.photos?.[1] && <Image src={l.photos[1]} alt="" fill className="object-cover" unoptimized />}
@@ -207,7 +203,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => scrollToSection(tab.id as any)}
+              onClick={() => scrollToSection(tab.id as keyof typeof sectionRefs)}
               className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-full border-b-4 transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-charcoal-muted hover:text-charcoal'}`}
             >
               <tab.icon className="w-4 h-4" />
@@ -219,12 +215,9 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="grid lg:grid-cols-3 gap-16">
-          {/* MAIN CONTENT AREA */}
           <div className="lg:col-span-2 space-y-24">
-
             {/* Overview Section */}
             <div ref={sectionRefs.overview} className="space-y-12 scroll-mt-40">
-              {/* Primary Details Row */}
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
                 <div className="space-y-4 flex-1">
                   <div className="flex items-center gap-2 text-charcoal-muted font-medium">
@@ -239,8 +232,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                   <h1 className={`text-4xl lg:text-5xl font-bold text-charcoal leading-[1.1] ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
                     {locale === 'ar' ? listing.arTitle : (listing.enTitle ?? listing.arTitle)}
                   </h1>
-                  
-                  {/* Views & ID */}
                   <div className="flex items-center gap-6 text-[10px] uppercase tracking-[0.2em] font-bold text-charcoal-muted">
                     <div className="flex items-center gap-2">
                       <Eye className="w-3.5 h-3.5" />
@@ -253,7 +244,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 <div className="flex flex-col items-start md:items-end gap-2 bg-white p-6 rounded-2xl border border-surface-200 shadow-sm min-w-[240px]">
                   <div className="flex items-baseline gap-2">
                     <span className={`text-4xl font-bold text-primary-600 tracking-tight ${locale === 'ar' ? 'font-arabic' : ''}`}>
-                      {formatPriceCompact(listing.price, locale as any)}
+                      {formatPriceCompact(listing.price, locale as 'en' | 'ar')}
                     </span>
                   </div>
                   <div className="text-xs font-bold uppercase tracking-widest text-charcoal-muted flex items-center gap-2">
@@ -263,7 +254,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 </div>
               </div>
 
-              {/* Main Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-10 border-y border-surface-100">
                 <div className="flex items-center gap-4 group">
                   <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 shadow-sm transition-transform group-hover:-translate-y-1"><Bed className="w-7 h-7" /></div>
@@ -283,7 +273,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 </div>
               </div>
 
-              {/* Narrative Content */}
               <div className="space-y-8 bg-surface-50 rounded-3xl p-8 lg:p-12 border border-surface-100">
                 <div className="flex items-center justify-between pb-6 border-b border-surface-200/60 flex-row-reverse md:flex-row">
                   <h3 className="text-2xl font-bold font-serif text-charcoal">{t('narrative')}</h3>
@@ -330,13 +319,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                     <div className="text-[10px] font-black text-white/30 uppercase tracking-widest">{t('expiryDate')}</div>
                     <p className="text-base font-bold">{listing.regaLicenseExpiryDate ? new Date(listing.regaLicenseExpiryDate).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'}</p>
                   </div>
-                  <div className="col-span-2 pt-6">
-                    <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">{t('recordIntegrity')}</div>
-                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold bg-emerald-400/10 w-fit px-3 py-1.5 rounded-full border border-emerald-400/20">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      {t('verifiedActive')}
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -348,7 +330,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 <div className="h-px flex-1 bg-surface-200" />
               </div>
               <div className="relative pl-12 space-y-16 before:absolute before:left-[15px] before:top-4 before:bottom-4 before:w-0.5 before:bg-surface-100">
-                {l?.history?.map((event, idx: number) => (
+                {l?.history?.map((event: PropertyHistoryEvent, idx: number) => (
                   <div key={idx} className="relative group">
                     <div className="absolute -left-[45px] top-1.5 w-6 h-6 rounded-full border-4 border-white bg-primary-600 shadow-lg group-hover:scale-125 transition-transform duration-300 z-10" />
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-10 pb-16 last:pb-0">
@@ -356,7 +338,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                         <div className="flex items-center gap-6 flex-wrap">
                           <span className="text-4xl font-bold text-charcoal/20 font-serif italic leading-none">{event.year.toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US', { useGrouping: false })}</span>
                           <span className="bg-primary-50 text-primary-700 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-primary-100 shadow-sm">{t('transaction')}</span>
-                          <span className="text-3xl font-bold text-charcoal leading-none ml-auto">{formatPrice(event.price, locale as any)}</span>
+                          <span className="text-3xl font-bold text-charcoal leading-none ml-auto">{formatPrice(event.price, locale as 'en' | 'ar')}</span>
                         </div>
                         <p className="text-lg text-charcoal-muted font-medium">
                           {t('recordedOn', { date: new Date(event.date).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) })} {event.agencyName ? t('brokeredBy', { agency: event.agencyName }) : ''}
@@ -389,7 +371,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
                 <div className="grid lg:grid-cols-2 gap-16 items-center">
                   <div className="space-y-12">
-                    <div className="space-y-6">
+                     <div className="space-y-6">
                       <div className="flex justify-between items-center px-1"><label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted">{t('loanPrincipal')}</label><span className="text-xl font-bold text-charcoal">{loanAmount.toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')} {tCommon('sar')}</span></div>
                       <input type="range" min="0" max={listing.price} value={loanAmount} onChange={(e) => setLoanAmount(Number(e.target.value))} className="w-full h-2 bg-surface-200 rounded-full appearance-none cursor-pointer accent-primary-600" />
                     </div>
@@ -403,18 +385,13 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                         onChange={(e) => setLoanPeriod(Number(e.target.value))}
                         className="w-full h-2 bg-surface-200 rounded-full appearance-none cursor-pointer accent-primary-600"
                       />
-                      <p className="text-[10px] text-charcoal-muted italic">{t('maxTermFor', { type: mortgageType === 'resident' ? t('saudiResident') : t('nonResident'), years: maxTerm })}</p>
                     </div>
                   </div>
                   <div className="bg-white rounded-3xl p-10 text-center space-y-8 shadow-xl border border-surface-100">
                     <div className="space-y-2">
                       <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-charcoal-muted">{t('monthlyInstallment')}</p>
                       <h4 className="text-5xl font-bold text-primary-600 tracking-tight font-serif">{tCommon('sar')} {Math.round(monthlyPayment).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}</h4>
-                      <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 w-fit mx-auto px-3 py-1 rounded-full border border-emerald-100">
-                        {t('fixedRate', { rate })}
-                      </p>
                     </div>
-                    <button className="w-full py-5 rounded-xl bg-charcoal text-white font-bold text-sm shadow-xl hover:bg-black transition-all active:scale-[0.98]">{t('requestQuote')}</button>
                   </div>
                 </div>
               </div>
@@ -424,11 +401,10 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             <div className="space-y-12 pt-12 border-t border-surface-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-3xl font-bold text-charcoal font-serif">{t('eliteNeighborhood')}</h3>
-                <Link href={`/${locale}/listings`} className="text-sm font-bold text-primary-600 hover:underline">{t('viewAllMatches')}</Link>
               </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {similarListings.map((item: any, idx: number) => (
-                  <ListingCard key={item.id} listing={item} index={idx} />
+                {similarListings.map((item, idx) => (
+                  <ListingCard key={item.id} listing={item as Listing} index={idx} />
                 ))}
               </div>
             </div>
@@ -451,34 +427,30 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                   <Link href={`/${locale}/${l.owner.role === 'FIRM' ? 'firms' : 'brokers'}/${l.owner.id}`} className="hover:text-primary-600 transition-colors">
                     <h5 className="text-xl font-bold text-charcoal leading-tight font-serif">{l.owner.name}</h5>
                   </Link>
-                  <p className="text-[10px] font-black text-primary-600 uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3 h-3" />
-                    {t('authorizedBroker')}
-                  </p>
                 </div>
               </div>
 
-              {/* AI Qualification Logic */}
               <div className="bg-surface-50 rounded-2xl p-8 space-y-6 relative border border-surface-100">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20"><Sparkles className="w-5 h-5 text-white" /></div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-700">{t('digitalHandshake')}</span>
-                  </div>
-                  <h4 className="text-xl font-bold text-charcoal font-serif">{t('buyerVerification')}</h4>
-                  <p className="text-sm font-medium text-charcoal-muted leading-relaxed">{t('verifySubtitle')}</p>
+                <div className="absolute -top-3 -right-3 w-12 h-12 bg-accent-500 text-white rounded-full flex items-center justify-center shadow-lg transform rotate-12">
+                   <Shield className="w-6 h-6" />
                 </div>
                 <button
                   onClick={() => setIsQualified(true)}
-                  className={`w-full py-5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg ${isQualified ? 'bg-surface-200 text-charcoal-muted cursor-default' : 'bg-primary-600 text-white hover:bg-primary-700 hover:shadow-primary-600/30'}`}
+                   className={`w-full py-5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg ${isQualified ? 'bg-surface-200 text-charcoal-muted cursor-default' : 'bg-primary-600 text-white hover:bg-primary-700 hover:shadow-primary-600/30'}`}
                 >
                   {isQualified ? <CheckCircle className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
                   {isQualified ? t('identityConfirmed') : t('unlockAccess')}
                 </button>
               </div>
 
-              {/* Contact Actions */}
               <div className="space-y-4">
+                <button
+                  disabled={!isQualified}
+                  className={`w-full py-4 rounded-xl border-2 flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-sm ${isQualified ? 'border-primary-600 text-primary-600 hover:bg-primary-50 active:scale-95' : 'border-surface-100 text-surface-200 cursor-not-allowed'}`}
+                >
+                  <Mail className="w-5 h-5" />
+                  {t('email')}
+                </button>
                 <button
                   disabled={!isQualified}
                   className={`w-full py-4 rounded-xl border-2 flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-sm ${isQualified ? 'border-emerald-500 text-emerald-600 hover:bg-emerald-50 active:scale-95' : 'border-surface-100 text-surface-200 cursor-not-allowed'}`}
@@ -491,17 +463,8 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                   className={`w-full py-4 rounded-xl border-2 flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-sm ${isQualified ? 'border-charcoal text-charcoal hover:bg-surface-50 active:scale-95' : 'border-surface-100 text-surface-200 cursor-not-allowed'}`}
                 >
                   <Phone className="w-5 h-5" />
-                  {isQualified ? ((listing.owner as any).phone || '+966 50 XXX XXXX') : t('callPrivate')}
+                  {isQualified ? (l.owner.phone || '+966 50 XXX XXXX') : t('callPrivate')}
                 </button>
-              </div>
-
-              {/* Safety Footer */}
-              <div className="pt-8 border-t border-surface-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-glow-accent" />
-                  <span className="text-[10px] font-black text-charcoal-muted uppercase tracking-widest">{t('safetyShield')}</span>
-                </div>
-                <ShieldCheck className="w-5 h-5 text-emerald-500" />
               </div>
             </div>
 
@@ -512,7 +475,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 {[`Rentals in ${listing.district}`, `Villas for sale in ${listing.city}`, `New Projects in ${listing.city}`, `Commercial Spaces`].map((item, idx) => (
                   <Link key={idx} href="#" className="flex items-center justify-between group">
                     <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item}</span>
-                    <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight className={`w-4 h-4 text-surface-300 transition-transform ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
                   </Link>
                 ))}
               </div>
@@ -525,7 +488,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 {['Luxury Penthouses', 'Family Sized Apartments', 'REGA Verified Projects', 'Near KAFD Financial District'].map((item, idx) => (
                   <Link key={idx} href="#" className="flex items-center justify-between group">
                     <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item}</span>
-                    <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight className={`w-4 h-4 text-surface-300 transition-transform ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
                   </Link>
                 ))}
               </div>
@@ -560,7 +523,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             className="fixed inset-0 z-[110] bg-black/95 flex flex-col backdrop-blur-xl"
             onClick={() => setLightboxOpen(false)}
           >
-            {/* 1. Header Area (Close Button) */}
             <div className="flex-shrink-0 flex justify-end p-6 md:p-10">
               <button
                 className="p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all z-[60] backdrop-blur-md border border-white/10"
@@ -570,17 +532,14 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               </button>
             </div>
 
-            {/* 2. Main Content Area (Image + Sidebar Navigation Overlays) */}
             <div className="flex-1 relative flex items-center justify-center min-h-0 px-4 group" onClick={(e) => e.stopPropagation()}>
-              {/* Prev Button - Absolute Overlay */}
               <button
                 className="absolute left-4 md:left-10 p-4 md:p-6 rounded-full bg-black/40 text-white hover:bg-black/60 transition-all z-20 backdrop-blur-sm border border-white/5 opacity-40 group-hover:opacity-100"
-                onClick={() => listing?.photos && setActivePhoto((p) => (p - 1 + listing.photos.length) % listing.photos.length)}
+                onClick={() => l?.photos && setActivePhoto((p) => (p - 1 + l.photos.length) % l.photos.length)}
               >
                 <ChevronLeft className="w-8 h-8 md:w-10 md:h-10" />
               </button>
 
-              {/* Central Viewing Window */}
               <motion.div
                 key={activePhoto}
                 initial={{ opacity: 0, scale: 0.98 }}
@@ -588,22 +547,20 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 className="w-full h-full flex items-center justify-center pointer-events-none"
               >
                 <div className="relative w-full h-full max-h-[75vh] flex items-center justify-center">
-                   {listing?.photos?.[activePhoto] && (
-                     <Image src={listing.photos[activePhoto]} alt="" fill className="object-contain pointer-events-auto" unoptimized />
+                   {l?.photos?.[activePhoto] && (
+                     <Image src={l.photos[activePhoto]} alt="" fill className="object-contain pointer-events-auto" unoptimized />
                    )}
                 </div>
               </motion.div>
 
-              {/* Next Button - Absolute Overlay */}
               <button
                 className="absolute right-4 md:right-10 p-4 md:p-6 rounded-full bg-black/40 text-white hover:bg-black/60 transition-all z-20 backdrop-blur-sm border border-white/5 opacity-40 group-hover:opacity-100"
-                onClick={() => listing?.photos && setActivePhoto((p) => (p + 1) % listing.photos.length)}
+                onClick={() => l?.photos && setActivePhoto((p) => (p + 1) % l.photos.length)}
               >
                 <ChevronRight className="w-8 h-8 md:w-10 md:h-10" />
               </button>
             </div>
 
-            {/* 3. Bottom Thumbnail Strip (Panel) */}
             <div className="flex-shrink-0 w-full bg-black/40 backdrop-blur-2xl border-t border-white/10 py-6 md:py-8" onClick={(e) => e.stopPropagation()}>
                <div className="max-w-screen-xl mx-auto px-6">
                   <div className="flex items-center justify-center gap-4 overflow-x-auto no-scrollbar pb-2">

@@ -1,6 +1,15 @@
-import { RegisterInput, LoginInput } from '@saudi-re/shared';
+import {
+  RegisterInput,
+  LoginInput,
+  User,
+  BrokerWithProfile,
+  Listing,
+  ListingWithOwner,
+  PaginatedResponse,
+  BrokerProfile
+} from '@saudi-re/shared';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://saudi-real-estate-api.vercel.app/api/v1';
 
 export type ApiResponse<T> = {
   success: boolean;
@@ -17,7 +26,6 @@ class ApiClient {
     const url = `${API_BASE_URL}${endpoint}`;
 
     // Auto-inject Authorization header if token exists in localStorage
-    // Note: We use cookies for refreshToken, but accessToken is typically stored in memory/localStorage
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
     const headers: Record<string, string> = {
@@ -31,7 +39,7 @@ class ApiClient {
 
     try {
       const response = await fetch(url, { ...options, headers });
-      const result = await response.json();
+      const result = (await response.json()) as { message?: string;[key: string]: unknown };
 
       if (!response.ok) {
         return {
@@ -53,59 +61,58 @@ class ApiClient {
   // ── Auth Endpoints ──
 
   async register(data: RegisterInput) {
-    return this.fetcher<{ userId: string; accessToken?: string; user?: any }>('/auth/register', {
+    return this.fetcher<{ userId: string; accessToken?: string; user?: User }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async login(data: LoginInput) {
-    return this.fetcher<{ accessToken: string; user: any }>('/auth/login', {
+    return this.fetcher<{ accessToken: string; user: User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async getMe() {
-    return this.fetcher<{ user: any }>('/auth/me', {
+    return this.fetcher<{ user: User }>('/auth/me', {
       method: 'GET',
     });
   }
 
   async logout() {
-    // Also clear refreshToken cookie via backend
     return this.fetcher('/auth/logout', {
       method: 'POST',
     });
   }
 
-  // ── Listings Endpoints (Placeholders) ──
+  // ── Listings Endpoints ──
 
   async getListings(params: string) {
-    return this.fetcher<any[]>(`/listings?${params}`);
+    return this.fetcher<PaginatedResponse<Listing>>(`/listings?${params}`);
   }
 
   async getListingById(id: string) {
-    return this.fetcher<any>(`/listings/${id}`);
+    return this.fetcher<ListingWithOwner>(`/listings/${id}`);
   }
 
   // ── User & Profile Endpoints ──
 
   async getPublicBroker(id: string) {
-    return this.fetcher<any>(`/user/public-broker/${id}`);
+    return this.fetcher<BrokerWithProfile>(`/user/public-broker/${id}`);
   }
 
   async getPublicFirm(id: string) {
-    return this.fetcher<any>(`/user/public-firm/${id}`);
+    return this.fetcher<User>(`/user/public-firm/${id}`);
   }
 
   async getProfile() {
-    return this.fetcher<{ user: any; profile: any }>('/user/profile', {
+    return this.fetcher<{ user: User; profile: BrokerProfile }>('/user/profile', {
       method: 'GET',
     });
   }
 
-  async updateProfile(data: any) {
+  async updateProfile(data: Partial<BrokerProfile>) {
     return this.fetcher('/user/profile', {
       method: 'PATCH',
       body: JSON.stringify(data),

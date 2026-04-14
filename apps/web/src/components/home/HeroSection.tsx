@@ -5,16 +5,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
-import { Search, MapPin, Building2, ChevronDown, Sparkles } from 'lucide-react';
+import { MapPin, ChevronDown, Sparkles } from 'lucide-react';
 import ChatWidget from '@/components/chat/ChatWidget';
 import PriceDropdown from '@/components/search/PriceDropdown';
 import PropertyTypeDropdown from '@/components/search/PropertyTypeDropdown';
-import { LISTING_TYPES, CITIES } from '@saudi-re/shared';
+import { CITIES } from '@saudi-re/shared';
 
 export default function HeroSection() {
   const t = useTranslations('hero');
   const tSearch = useTranslations('search');
-  const tTypes = useTranslations('propertyTypes');
   const locale = useLocale();
   const router = useRouter();
 

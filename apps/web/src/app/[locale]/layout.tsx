@@ -4,10 +4,9 @@ import { NextIntlClientProvider } from 'next-intl';
 import { unstable_setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { locales } from '@/i18n';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
 import { AuthProvider } from '@/hooks/use-auth';
 import NavWrapper from '@/components/layout/NavWrapper';
+import type { Locale } from '@/i18n';
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -56,7 +55,7 @@ export default async function LocaleLayout({
   children: React.ReactNode;
   params: { locale: string };
 }) {
-  if (!locales.includes(locale as any)) {
+  if (!locales.includes(locale as Locale)) {
     notFound();
   }
 

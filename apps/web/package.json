@@ -1,0 +1,41 @@
+{
+  "name": "@saudi-re/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "clean": "rm -rf .next"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.9.0",
+    "@saudi-re/shared": "workspace:*",
+    "@tanstack/react-query": "^5.60.0",
+    "clsx": "^2.1.0",
+    "framer-motion": "^11.11.0",
+    "libphonenumber-js": "^1.12.41",
+    "lucide-react": "^0.460.0",
+    "next": "14.2.21",
+    "next-intl": "^3.25.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.53.0",
+    "react-phone-number-input": "^3.4.16",
+    "zod": "^3.23.0",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.21",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.15",
+    "tailwindcss-rtl": "^0.9.0",
+    "typescript": "^5.4.0"
+  }
+}

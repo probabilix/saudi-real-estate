@@ -2,43 +2,49 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/hooks/use-auth';
 import {
-  Bed, Bath, Square, MapPin, Eye, Shield,
-  Heart, Share2, ChevronLeft, ChevronRight, X,
+  Bed, Bath, Square, MapPin, Eye,
+  Heart, Share2, ChevronRight, X,
   CheckCircle, Phone, MessageSquare, ArrowLeft,
   ShieldCheck,
   Maximize2, Zap,
   Info, Calculator, Map as MapIcon,
-  Mail, TrendingUp, Loader2
+  Mail, Loader2
 } from 'lucide-react';
 import { formatPrice, formatPriceCompact, ListingWithOwner, Listing, PropertyHistoryEvent } from '@saudi-re/shared';
 import { api } from '@/lib/api';
 import ListingCard from '@/components/listings/ListingCard';
+import MediaModal from '@/components/listings/MediaModal';
 import ChatWidget from '@/components/chat/ChatWidget';
 
 export default function ListingDetailPage({ params: { id, locale } }: { params: { id: string; locale: string } }) {
   const t = useTranslations('listing');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('navigation');
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [listing, setListing] = useState<ListingWithOwner | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activePhoto, setActivePhoto] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [shortlisted, setShortlisted] = useState(false);
   const [descLang, setDescLang] = useState<'ar' | 'en'>(locale as 'ar' | 'en');
   const [activeTab, setActiveTab] = useState('overview');
   const [mortgageType, setMortgageType] = useState<'resident' | 'expat'>('resident');
+  const [amenitiesModalOpen, setAmenitiesModalOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isQualified, setIsQualified] = useState(false);
 
   // Additional State & Refs
   const [similarListings, setSimilarListings] = useState<Listing[]>([]);
   const [loanAmount, setLoanAmount] = useState(0);
   const [loanPeriod, setLoanPeriod] = useState(15);
-  
+  const [isToggling, setIsToggling] = useState(false);
+
   const sectionRefs = {
     overview: useRef<HTMLDivElement>(null),
     rega: useRef<HTMLDivElement>(null),
@@ -52,7 +58,9 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
       try {
         const res = await api.getListingById(id);
         if (res.success && res.data) {
-          setListing(res.data as ListingWithOwner);
+          const l = res.data as ListingWithOwner & { isFavorited?: boolean };
+          setListing(l);
+          setShortlisted(!!l.isFavorited);
         } else {
           setListing(null);
         }
@@ -64,6 +72,36 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
     }
     fetchDetail();
   }, [id]);
+
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated) {
+      router.push(`/${locale}/auth/login?returnTo=${pathname}`);
+      return;
+    }
+
+    if (isToggling) return;
+
+    setIsToggling(true);
+    // Optimistic update
+    const prev = shortlisted;
+    setShortlisted(!prev);
+
+    try {
+      const res = await api.toggleFavorite(id);
+      if (!res.success) {
+        setShortlisted(prev);
+      } else {
+        setShortlisted(!!res.data?.isFavorited);
+      }
+    } catch {
+      setShortlisted(prev);
+    } finally {
+      setIsToggling(false);
+    }
+  };
 
   useEffect(() => {
     if (!listing) return;
@@ -81,16 +119,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
     fetchSimilar();
   }, [listing]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!lightboxOpen || !listing?.photos) return;
-      if (e.key === 'ArrowRight') setActivePhoto((p) => (p + 1) % (listing.photos?.length || 1));
-      if (e.key === 'ArrowLeft') setActivePhoto((p) => (p - 1 + (listing.photos?.length || 1)) % (listing.photos?.length || 1));
-      if (e.key === 'Escape') setLightboxOpen(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxOpen, listing?.photos]);
 
   useEffect(() => {
     if (listing?.price) {
@@ -125,26 +153,48 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
   return (
     <div className="min-h-screen bg-white text-charcoal pb-32">
-      {/* 1. Sub-Header Toolbar */}
-      <div className="bg-white/95 backdrop-blur-md border-b border-surface-200 py-4 sticky top-0 z-40">
+
+      {/* MOBILE-ONLY MINIMAL HEADER: Back Arrow | Save & Share */}
+      <div className="md:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-surface-100 px-4 py-3 flex items-center justify-between">
+        <Link href={`/${locale}/listings`} className="p-2 rounded-full hover:bg-surface-50 transition-colors">
+          <ArrowLeft className={`w-5 h-5 text-charcoal ${locale === 'ar' ? 'rotate-180' : ''}`} />
+        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleFavorite}
+            className={`p-2 rounded-full border transition-all ${shortlisted ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50'}`}
+          >
+            <Heart className={`w-5 h-5 ${shortlisted ? 'fill-current' : ''}`} />
+          </button>
+          <button className="p-2 rounded-full border border-surface-200 hover:bg-surface-50 transition-all">
+            <Share2 className="w-5 h-5 text-charcoal-muted" />
+          </button>
+        </div>
+      </div>
+
+      {/* DESKTOP HEADER: Full breadcrumb + save/share */}
+      <div className="hidden md:block bg-white/95 backdrop-blur-md border-b border-surface-200 py-4 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <Link href={`/${locale}/listings`} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-charcoal-muted hover:text-primary-600 transition-colors">
               <ArrowLeft className={`w-4 h-4 ${locale === 'ar' ? 'rotate-180' : ''}`} />
               {t('backToListings')}
             </Link>
-            <div className="h-4 w-px bg-surface-200 hidden sm:block" />
-            <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold text-charcoal-muted uppercase tracking-widest">
-              <span>{listing.city}</span>
-              <ChevronRight className="w-3 h-3" />
-              <span>{listing.district}</span>
+            <div className="h-4 w-px bg-surface-200" />
+            <div className="flex items-center gap-2 text-[10px] font-bold text-charcoal-muted uppercase tracking-widest">
+              <span>{tCommon('cities.' + listing.city)}</span>
+              {(listing.arDistrict || listing.district) && (
+                <>
+                  <ChevronRight className={`w-3 h-3 ${locale === 'ar' ? 'rotate-180' : ''}`} />
+                  <span>{locale === 'ar' ? (listing.arDistrict || listing.district) : (listing.district || listing.arDistrict)}</span>
+                </>
+              )}
+              <ChevronRight className={`w-3 h-3 ${locale === 'ar' ? 'rotate-180' : ''}`} />
+              <span className="text-primary-600 truncate max-w-[200px]">{title}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShortlisted(!shortlisted)}
-              className={`p-2.5 rounded-xl border transition-all ${shortlisted ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50'}`}
-            >
+            <button onClick={handleToggleFavorite} className={`p-2.5 rounded-xl border transition-all ${shortlisted ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50'}`}>
               <Heart className={`w-5 h-5 ${shortlisted ? 'fill-current' : ''}`} />
             </button>
             <button className="p-2.5 rounded-xl border border-surface-200 hover:bg-surface-50 transition-all">
@@ -154,137 +204,213 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         </div>
       </div>
 
-      {/* 2. Hero Image Gallery */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-0 h-auto md:h-[600px] overflow-hidden rounded-2xl shadow-xl border border-surface-100">
-          <button className="col-span-1 md:col-span-8 relative aspect-[4/3] md:aspect-auto group overflow-hidden" onClick={() => setLightboxOpen(true)}>
-            {l?.photos?.[0] && <Image src={l.photos[0]} alt={title} fill className="object-cover" priority unoptimized />}
-            <div className="absolute inset-0 bg-black/10" />
-            <div className="absolute top-6 left-6 flex gap-3 flex-row-reverse md:flex-row">
-              <span className="bg-primary-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-5 py-2.5 rounded-lg shadow-lg">
-                {t('premiumProperty')}
-              </span>
-              {l?.verified && (
-                <span className="bg-white/95 backdrop-blur-md text-charcoal text-[10px] font-black uppercase tracking-[0.2em] px-5 py-2.5 flex items-center gap-2 rounded-lg border border-surface-200 shadow-sm">
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  {t('regaOfficial')}
+      {/* PHOTO GRID */}
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 h-auto md:h-[550px] overflow-hidden rounded-2xl">
+          {/* Main Feature Photo */}
+          <button className="col-span-1 md:col-span-8 relative aspect-[4/3] md:aspect-auto group overflow-hidden rounded-xl border border-surface-100 shadow-sm" onClick={() => setLightboxOpen(true)}>
+            {l?.photos?.[0] && <Image src={l.photos[0]} alt={title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" priority unoptimized />}
+            <div className="absolute top-4 left-4 flex gap-2">
+              {l?.truCheckVerified && (
+                <span className="bg-white/95 backdrop-blur-md text-charcoal text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1.5 flex items-center gap-1.5 rounded-lg border border-surface-200 shadow-xl">
+                  <ShieldCheck className="w-3.5 h-3.5 text-primary-500" />
+                  TruCheck™
                 </span>
               )}
             </div>
+            <div className="absolute bottom-4 left-4 flex gap-2 z-10">
+              <button onClick={(e) => { e.stopPropagation(); setActiveTab('video'); setLightboxOpen(true); }} className="bg-charcoal/50 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full border border-white/20 flex items-center gap-2 hover:bg-charcoal/70 transition-all">
+                <Zap className="w-3.5 h-3.5" />{t('seeVideo')}
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); setActiveTab('location'); setLightboxOpen(true); }} className="bg-charcoal/50 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full border border-white/20 flex items-center gap-2 hover:bg-charcoal/70 transition-all">
+                <MapIcon className="w-3.5 h-3.5" />{t('map')}
+              </button>
+            </div>
           </button>
-
-          <div className="col-span-1 md:col-span-4 grid grid-cols-2 md:grid-cols-1 md:grid-rows-2 gap-0 h-40 md:h-full">
-            <button className="relative group overflow-hidden border-s border-surface-100" onClick={() => { setActivePhoto(1); setLightboxOpen(true); }}>
-              {l?.photos?.[1] && <Image src={l.photos[1]} alt="" fill className="object-cover" unoptimized />}
+          {/* Secondary Photo Stack: exactly 2 photos stacked */}
+          <div className="hidden md:flex md:col-span-4 flex-col gap-3 h-full">
+            <button className="relative group overflow-hidden rounded-xl border border-surface-100 shadow-sm flex-1" onClick={() => setLightboxOpen(true)}>
+              {l?.photos?.[1] && <Image src={l.photos[1]} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />}
             </button>
-            <button className="relative group overflow-hidden bg-charcoal border-s border-t border-surface-100" onClick={() => { setActivePhoto(2); setLightboxOpen(true); }}>
-              {l?.photos && (
-                <Image src={l.photos[l.photos.length - 1] || l.photos[0]} alt="" fill className="object-cover opacity-60" unoptimized />
-              )}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4 text-center">
-                <span className="text-3xl font-black">{Math.max(0, (l?.photos?.length || 0) - 2)}+</span>
-                <span className="text-[10px] font-black uppercase tracking-[0.15em] mt-2 opacity-80">
-                  {t('photos')}
-                </span>
+            <button className="relative group overflow-hidden bg-charcoal rounded-xl border border-surface-100 shadow-sm flex-1" onClick={() => setLightboxOpen(true)}>
+              {l?.photos?.[2] && <Image src={l.photos[2]} alt="" fill className="object-cover opacity-50" unoptimized />}
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                <span className="text-2xl font-black">+{Math.max(0, (l?.photos?.length || 0) - 2)}</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Photos</span>
               </div>
             </button>
           </div>
         </div>
       </div>
 
-      {/* 3. Section Navigation */}
-      <div className="sticky top-[73px] z-30 bg-white/90 backdrop-blur-xl border-y border-surface-200">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center gap-10 overflow-x-auto no-scrollbar">
+      {/* DESKTOP SECTION NAV */}
+      <div className="hidden md:block sticky top-[73px] z-30 bg-white/90 backdrop-blur-xl border-y border-surface-200">
+        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-10 overflow-x-auto no-scrollbar">
           {[
             { id: 'overview', label: t('tabOverview'), icon: Info },
             { id: 'rega', label: t('tabCompliance'), icon: ShieldCheck },
             { id: 'calculator', label: t('tabMortgage'), icon: Calculator },
             { id: 'location', label: t('tabLocation'), icon: MapIcon },
           ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => scrollToSection(tab.id as keyof typeof sectionRefs)}
-              className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-full border-b-4 transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-charcoal-muted hover:text-charcoal'}`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
+            <button key={tab.id} onClick={() => scrollToSection(tab.id as keyof typeof sectionRefs)}
+              className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-full border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-charcoal-muted hover:text-charcoal'}`}>
+              <tab.icon className="w-3.5 h-3.5" />{tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-16">
-        <div className="grid lg:grid-cols-3 gap-16">
-          <div className="lg:col-span-2 space-y-24">
-            {/* Overview Section */}
-            <div ref={sectionRefs.overview} className="space-y-12 scroll-mt-40">
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-                <div className="space-y-4 flex-1">
-                  <div className="flex items-center gap-2 text-charcoal-muted font-medium">
-                    <MapPin className="w-4 h-4 text-primary-500" />
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-16">
+        <div className="grid lg:grid-cols-3 gap-8 lg:gap-12">
+          <div className="lg:col-span-2 space-y-12 md:space-y-24">
+            {/* ── SECTION 1: Primary Details ── */}
+            <div ref={sectionRefs.overview} className="space-y-6 scroll-mt-40">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-3 flex-1">
+                  <span className={`text-4xl md:text-5xl font-black text-charcoal tracking-tight ${locale === 'ar' ? 'font-arabic' : ''}`}>
+                    {formatPriceCompact(listing.price, locale as 'en' | 'ar')}
+                  </span>
+                  <div className="flex items-center gap-2 text-charcoal-muted font-bold text-sm pt-1">
+                    <MapPin className="w-4 h-4 text-primary-500 shrink-0" />
                     <span className={locale === 'ar' ? 'font-arabic' : ''}>
-                      {locale === 'ar' 
-                        ? `${listing.arDistrict ? listing.arDistrict + '، ' : ''}${listing.arCity}`
-                        : `${listing.district ? listing.district + ', ' : ''}${listing.city}`
-                      }
+                      {(() => {
+                        const dist = listing.arDistrict || listing.district || '';
+                        const city = listing.arCity || listing.city || '';
+                        return dist ? `${dist}، ${city}` : city;
+                      })()}
                     </span>
                   </div>
-                  <h1 className={`text-4xl lg:text-5xl font-bold text-charcoal leading-[1.1] ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
-                    {locale === 'ar' ? listing.arTitle : (listing.enTitle ?? listing.arTitle)}
-                  </h1>
-                  <div className="flex items-center gap-6 text-[10px] uppercase tracking-[0.2em] font-bold text-charcoal-muted">
-                    <div className="flex items-center gap-2">
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>{listing.viewsCount.toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')} {t('views')}</span>
+                </div>
+                {/* Desktop-only save/share here; mobile has them in header */}
+                <div className="hidden md:flex items-center gap-3">
+                  <button onClick={handleToggleFavorite} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 font-bold text-sm transition-all ${shortlisted ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50 text-charcoal-muted'}`}>
+                    <Heart className={`w-4 h-4 ${shortlisted ? 'fill-current' : ''}`} />{shortlisted ? t('saved') : t('save')}
+                  </button>
+                  <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-surface-200 hover:bg-surface-50 text-charcoal-muted font-bold text-sm transition-all">
+                    <Share2 className="w-4 h-4" />{t('share')}
+                  </button>
+                </div>
+              </div>
+              <h1 className={`text-2xl lg:text-3xl font-bold text-charcoal leading-tight ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
+                {title}
+              </h1>
+
+              {/* Stats bar: Views + Property ID */}
+              <div className="flex items-center gap-4 text-[11px] font-bold text-charcoal-muted uppercase tracking-widest">
+                <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" />{l.viewsCount ?? 0} {t('views')}</span>
+                <span className="text-surface-300">•</span>
+                <span>{t('propertyId')}: <span className="text-primary-600 font-black">{l.shortId || l.id.slice(0, 8).toUpperCase()}</span></span>
+              </div>
+
+              {/* Beds / Baths / Area stats */}
+              <div className="flex flex-wrap gap-4 pt-2">
+                {l.bedrooms != null && (
+                  <div className="flex items-center gap-3 bg-primary-50 rounded-2xl px-5 py-3 border border-primary-100">
+                    <Bed className="w-5 h-5 text-primary-600" />
+                    <div>
+                      <p className="text-xl font-black text-charcoal leading-none">{l.bedrooms}</p>
+                      <p className="text-[10px] font-bold text-charcoal-muted uppercase tracking-widest mt-0.5">{t('beds')}</p>
                     </div>
-                    <div>{t('propertyId')}: {listing.id}</div>
                   </div>
-                </div>
+                )}
+                {l.bathrooms != null && (
+                  <div className="flex items-center gap-3 bg-primary-50 rounded-2xl px-5 py-3 border border-primary-100">
+                    <Bath className="w-5 h-5 text-primary-600" />
+                    <div>
+                      <p className="text-xl font-black text-charcoal leading-none">{l.bathrooms}</p>
+                      <p className="text-[10px] font-bold text-charcoal-muted uppercase tracking-widest mt-0.5">{t('baths')}</p>
+                    </div>
+                  </div>
+                )}
+                {l.areaSqm != null && (
+                  <div className="flex items-center gap-3 bg-primary-50 rounded-2xl px-5 py-3 border border-primary-100">
+                    <Square className="w-5 h-5 text-primary-600" />
+                    <div>
+                      <p className="text-xl font-black text-charcoal leading-none">{Number(l.areaSqm).toFixed(0)}</p>
+                      <p className="text-[10px] font-bold text-charcoal-muted uppercase tracking-widest mt-0.5">{tCommon('sqm')}</p>
+                    </div>
+                  </div>
+                )}
+                {areaSqFt != null && (
+                  <div className="flex items-center gap-3 bg-primary-50 rounded-2xl px-5 py-3 border border-primary-100">
+                    <Maximize2 className="w-5 h-5 text-primary-600" />
+                    <div>
+                      <p className="text-xl font-black text-charcoal leading-none">{areaSqFt.toLocaleString()}</p>
+                      <p className="text-[10px] font-bold text-charcoal-muted uppercase tracking-widest mt-0.5">{tCommon('sqft')}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-                <div className="flex flex-col items-start md:items-end gap-2 bg-white p-6 rounded-2xl border border-surface-200 shadow-sm min-w-[240px]">
-                  <div className="flex items-baseline gap-2">
-                    <span className={`text-4xl font-bold text-primary-600 tracking-tight ${locale === 'ar' ? 'font-arabic' : ''}`}>
-                      {formatPriceCompact(listing.price, locale as 'en' | 'ar')}
-                    </span>
-                  </div>
-                  <div className="text-xs font-bold uppercase tracking-widest text-charcoal-muted flex items-center gap-2">
-                    <TrendingUp className="w-3.5 h-3.5 text-accent-500" />
-                    {t('valuationTrending')}
-                  </div>
+            {/* ── SECTION 2: Narrative (Description) ── */}
+            <div className="space-y-6 bg-surface-50 rounded-3xl p-6 md:p-10 border border-surface-100">
+              <div className="flex items-center justify-between flex-wrap gap-4 pb-5 border-b border-surface-200/60">
+                <h3 className="text-xl md:text-2xl font-bold font-serif text-charcoal">{t('narrative')}</h3>
+                <div className="flex bg-white p-1 rounded-full shadow-sm border border-surface-200">
+                  <button onClick={() => setDescLang('en')} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${descLang === 'en' ? 'bg-primary-600 text-white shadow-md' : 'text-charcoal-muted hover:text-charcoal'}`}>{tNav('switchToEnglish')}</button>
+                  <button onClick={() => setDescLang('ar')} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${descLang === 'ar' ? 'bg-primary-600 text-white shadow-md' : 'text-charcoal-muted hover:text-charcoal'}`}>{tNav('switchToArabic')}</button>
                 </div>
               </div>
+              <p className={`text-charcoal-muted leading-relaxed text-base md:text-lg font-medium ${descLang === 'ar' ? 'font-arabic text-right' : ''}`} dir={descLang === 'ar' ? 'rtl' : 'ltr'}>
+                {description}
+              </p>
+            </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-10 border-y border-surface-100">
-                <div className="flex items-center gap-4 group">
-                  <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 shadow-sm transition-transform group-hover:-translate-y-1"><Bed className="w-7 h-7" /></div>
-                  <div><span className="font-bold text-2xl leading-none block text-charcoal">{listing.bedrooms}</span><span className="text-[10px] font-bold text-charcoal-muted uppercase tracking-[0.1em] mt-1">{t('statsBeds')}</span></div>
-                </div>
-                <div className="flex items-center gap-4 group">
-                  <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 shadow-sm transition-transform group-hover:-translate-y-1"><Bath className="w-7 h-7" /></div>
-                  <div><span className="font-bold text-2xl leading-none block text-charcoal">{listing.bathrooms}</span><span className="text-[10px] font-bold text-charcoal-muted uppercase tracking-[0.1em] mt-1">{t('statsBaths')}</span></div>
-                </div>
-                <div className="flex items-center gap-4 group">
-                  <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 shadow-sm transition-transform group-hover:-translate-y-1"><Square className="w-7 h-7" /></div>
-                  <div><span className="font-bold text-2xl leading-none block text-charcoal">{listing.areaSqm}</span><span className="text-[10px] font-bold text-charcoal-muted uppercase tracking-[0.1em] mt-1">{t('statsSqm')}</span></div>
-                </div>
-                <div className="flex items-center gap-4 group">
-                  <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 shadow-sm transition-transform group-hover:-translate-y-1"><Maximize2 className="w-7 h-7" /></div>
-                  <div><span className="font-bold text-2xl leading-none block text-charcoal">{areaSqFt}</span><span className="text-[10px] font-bold text-charcoal-muted uppercase tracking-[0.1em] mt-1">{t('statsSqft')}</span></div>
-                </div>
+            {/* ── SECTION 3: Amenities ── */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-charcoal">{t('amenities')}</h3>
+                {Object.values(l.amenities || {}).filter(Boolean).length > 8 && (
+                  <button onClick={() => setAmenitiesModalOpen(true)} className="text-[10px] font-black text-primary-600 uppercase tracking-widest hover:underline">
+                    {t('viewAllAmenities')}
+                  </button>
+                )}
               </div>
-
-              <div className="space-y-8 bg-surface-50 rounded-3xl p-8 lg:p-12 border border-surface-100">
-                <div className="flex items-center justify-between pb-6 border-b border-surface-200/60 flex-row-reverse md:flex-row">
-                  <h3 className="text-2xl font-bold font-serif text-charcoal">{t('narrative')}</h3>
-                  <div className="flex bg-white p-1.5 rounded-full shadow-sm border border-surface-200">
-                    <button onClick={() => setDescLang('en')} className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${descLang === 'en' ? 'bg-primary-600 text-white shadow-md' : 'text-charcoal-muted hover:text-charcoal'}`}>{tNav('switchToEnglish')}</button>
-                    <button onClick={() => setDescLang('ar')} className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${descLang === 'ar' ? 'bg-primary-600 text-white shadow-md' : 'text-charcoal-muted hover:text-charcoal'}`}>{tNav('switchToArabic')}</button>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {Object.entries(l.amenities || {}).filter(([, val]) => val).slice(0, 8).map(([key], idx) => (
+                  <div key={idx} className="bg-surface-50 p-3 md:p-4 rounded-xl border border-surface-200 flex items-center gap-2.5 group hover:bg-white hover:shadow-md transition-all">
+                    <CheckCircle className="w-4 h-4 text-primary-500 shrink-0" />
+                    <span className="text-[10px] md:text-xs font-bold uppercase tracking-wide text-charcoal-muted leading-tight">{key.replace(/_/g, ' ')}</span>
                   </div>
-                </div>
-                <p className={`text-charcoal-muted leading-relaxed text-xl font-medium ${descLang === 'ar' ? 'font-arabic text-right' : ''}`} dir={descLang === 'ar' ? 'rtl' : 'ltr'}>
-                  {description}
-                </p>
+                ))}
               </div>
+              {Object.values(l.amenities || {}).filter(Boolean).length > 8 && (
+                <button
+                  onClick={() => setAmenitiesModalOpen(true)}
+                  className="w-full py-3 rounded-xl border-2 border-dashed border-primary-200 text-primary-600 font-bold text-sm hover:bg-primary-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <span>+{Object.values(l.amenities || {}).filter(Boolean).length - 8} {t('amenities')}</span>
+                  <span className="text-[10px] uppercase tracking-widest">— {t('viewAllAmenities')}</span>
+                </button>
+              )}
+            </div>
+
+            {/* ── SECTION 4: Property Information Table ── */}
+            <div className="space-y-6">
+              <h3 className="text-xl font-bold text-charcoal">{t('propertyDetails')}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
+                {[
+                  { label: t('type'), value: l.type ? (l.type.charAt(0) + l.type.slice(1).toLowerCase()) : 'N/A' },
+                  { label: t('purpose'), value: l.purpose === 'SALE' ? t('purposeSALE') : t('purposeRENT') },
+                  { label: t('propertyId'), value: l.shortId || l.id.slice(0, 8).toUpperCase(), highlight: true },
+                  { label: t('residenceType'), value: l.residenceType ? (l.residenceType.charAt(0) + l.residenceType.slice(1).toLowerCase()) : 'N/A' },
+                  { label: t('completion'), value: l.completionStatus ? l.completionStatus.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'N/A' },
+                  { label: t('furnishing'), value: l.furnishingStatus ? l.furnishingStatus.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'N/A' },
+                  { label: t('addedOn'), value: new Date(l.createdAt).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) },
+                  { label: t('propertyAge'), value: l.propertyAge ? `${l.propertyAge} ${t('years')}` : t('new') },
+                ].map((spec, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-3 border-b border-surface-100 last:border-0">
+                    <span className="text-xs font-bold text-charcoal-muted uppercase tracking-widest">{spec.label}</span>
+                    <span className={`text-sm font-bold ${spec.highlight ? 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded' : 'text-charcoal'}`}>{spec.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── MOBILE ONLY: Agent Card after Property Info ── */}
+            <div className="lg:hidden">
+              <AgentContactCard l={l} t={t} locale={locale} setIsQualified={setIsQualified} />
             </div>
 
             {/* REGA Compliance Card */}
@@ -341,7 +467,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                           <span className="text-3xl font-bold text-charcoal leading-none ml-auto">{formatPrice(event.price, locale as 'en' | 'ar')}</span>
                         </div>
                         <p className="text-lg text-charcoal-muted font-medium">
-                          {t('recordedOn', { date: new Date(event.date).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) })} {event.agencyName ? t('brokeredBy', { agency: event.agencyName }) : ''}
+                          {t('recordedOn', { date: new Date(event.dateDisplay || event.date).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) })} {event.agencyName ? t('brokeredBy', { agency: event.agencyName }) : ''}
                         </p>
                       </div>
                       {event.thumbnailUrl && (
@@ -369,29 +495,38 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                   </div>
                 </div>
 
-                <div className="grid lg:grid-cols-2 gap-16 items-center">
-                  <div className="space-y-12">
-                     <div className="space-y-6">
-                      <div className="flex justify-between items-center px-1"><label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted">{t('loanPrincipal')}</label><span className="text-xl font-bold text-charcoal">{loanAmount.toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')} {tCommon('sar')}</span></div>
-                      <input type="range" min="0" max={listing.price} value={loanAmount} onChange={(e) => setLoanAmount(Number(e.target.value))} className="w-full h-2 bg-surface-200 rounded-full appearance-none cursor-pointer accent-primary-600" />
+                <div className="grid lg:grid-cols-2 gap-12 items-center">
+                  <div className="space-y-10">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted">{t('loanPrincipal')}</label>
+                        <span className="text-lg font-bold text-charcoal">{loanAmount.toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')} {tCommon('sar')}</span>
+                      </div>
+                      <div className="relative h-2">
+                        <div className="absolute inset-0 bg-surface-200 rounded-full" />
+                        <div className="absolute left-0 top-0 h-full bg-primary-600 rounded-full transition-all" style={{ width: `${listing.price > 0 ? (loanAmount / listing.price) * 100 : 0}%` }} />
+                        <input type="range" min="0" max={listing.price} value={loanAmount} onChange={(e) => setLoanAmount(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                      </div>
                     </div>
-                    <div className="space-y-6">
-                      <div className="flex justify-between items-center px-1"><label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted">{t('tenurePeriod')}</label><span className="text-xl font-bold text-charcoal">{loanPeriod.toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')} {t('years')}</span></div>
-                      <input
-                        type="range"
-                        min="5"
-                        max={maxTerm}
-                        value={loanPeriod}
-                        onChange={(e) => setLoanPeriod(Number(e.target.value))}
-                        className="w-full h-2 bg-surface-200 rounded-full appearance-none cursor-pointer accent-primary-600"
-                      />
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted">{t('tenurePeriod')}</label>
+                        <span className="text-lg font-bold text-charcoal">{loanPeriod} {t('years')}</span>
+                      </div>
+                      <div className="relative h-2">
+                        <div className="absolute inset-0 bg-surface-200 rounded-full" />
+                        <div className="absolute left-0 top-0 h-full bg-primary-600 rounded-full transition-all" style={{ width: `${((loanPeriod - 5) / (maxTerm - 5)) * 100}%` }} />
+                        <input type="range" min="5" max={maxTerm} value={loanPeriod} onChange={(e) => setLoanPeriod(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                      </div>
                     </div>
+                    <p className="text-[11px] font-bold text-charcoal-muted uppercase tracking-widest">
+                      {t('fixedRate', { rate: rate })}
+                    </p>
                   </div>
-                  <div className="bg-white rounded-3xl p-10 text-center space-y-8 shadow-xl border border-surface-100">
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-charcoal-muted">{t('monthlyInstallment')}</p>
-                      <h4 className="text-5xl font-bold text-primary-600 tracking-tight font-serif">{tCommon('sar')} {Math.round(monthlyPayment).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}</h4>
-                    </div>
+                  <div className="bg-white rounded-3xl p-8 text-center space-y-3 shadow-xl border border-surface-100">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-charcoal-muted">{t('monthlyInstallment')}</p>
+                    <h4 className="text-4xl font-bold text-primary-600 tracking-tight font-serif">{tCommon('sar')} {Math.round(monthlyPayment).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}</h4>
+                    <p className="text-xs text-charcoal-muted font-bold">{rate}% APR • {loanPeriod} {t('years')}</p>
                   </div>
                 </div>
               </div>
@@ -408,70 +543,58 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 ))}
               </div>
             </div>
-          </div>
 
-          {/* SIDEBAR ACTION PANEL */}
-          <div className="space-y-8">
-            <div className="bg-white border border-surface-200 rounded-3xl p-10 space-y-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)]">
-              <div className="flex items-center gap-5">
-                <Link href={`/${locale}/${l.owner.role === 'FIRM' ? 'firms' : 'brokers'}/${l.owner.id}`} className="relative w-20 h-20 rounded-2xl border border-surface-100 overflow-hidden shadow-md bg-surface-50 flex items-center justify-center hover:scale-105 transition-transform group">
-                  {l.owner.avatarUrl ? (
-                    <Image src={l.owner.avatarUrl} alt="" fill className="object-cover" unoptimized />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-primary-600 text-white text-2xl font-bold">
-                      {l.owner.name?.charAt(0)}
-                    </div>
-                  )}
-                </Link>
-                <div>
-                  <Link href={`/${locale}/${l.owner.role === 'FIRM' ? 'firms' : 'brokers'}/${l.owner.id}`} className="hover:text-primary-600 transition-colors">
-                    <h5 className="text-xl font-bold text-charcoal leading-tight font-serif">{l.owner.name}</h5>
-                  </Link>
+            {/* MOBILE ONLY: Links after Similar Properties */}
+            <div className="lg:hidden space-y-4 pt-4">
+              <div className="bg-white border border-surface-200 p-5 space-y-4 shadow-sm rounded-2xl">
+                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('popularAreas')}</h4>
+                <div className="grid gap-3">
+                  {[`Rentals in ${listing.district}`, `Villas for sale in ${listing.city}`, `New Projects in ${listing.city}`, `Commercial Spaces`].map((item, idx) => (
+                    <Link key={idx} href="#" className="flex items-center justify-between group">
+                      <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item}</span>
+                      <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  ))}
                 </div>
               </div>
-
-              <div className="bg-surface-50 rounded-2xl p-8 space-y-6 relative border border-surface-100">
-                <div className="absolute -top-3 -right-3 w-12 h-12 bg-accent-500 text-white rounded-full flex items-center justify-center shadow-lg transform rotate-12">
-                   <Shield className="w-6 h-6" />
+              <div className="bg-white border border-surface-200 p-5 space-y-4 shadow-sm rounded-2xl">
+                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('relatedCollections')}</h4>
+                <div className="grid gap-3">
+                  {['Luxury Penthouses', 'Family Sized Apartments', 'REGA Verified Projects', 'Near KAFD Financial District'].map((item, idx) => (
+                    <Link key={idx} href="#" className="flex items-center justify-between group">
+                      <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item}</span>
+                      <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  ))}
                 </div>
-                <button
-                  onClick={() => setIsQualified(true)}
-                   className={`w-full py-5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg ${isQualified ? 'bg-surface-200 text-charcoal-muted cursor-default' : 'bg-primary-600 text-white hover:bg-primary-700 hover:shadow-primary-600/30'}`}
-                >
-                  {isQualified ? <CheckCircle className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
-                  {isQualified ? t('identityConfirmed') : t('unlockAccess')}
-                </button>
               </div>
-
-              <div className="space-y-4">
-                <button
-                  disabled={!isQualified}
-                  className={`w-full py-4 rounded-xl border-2 flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-sm ${isQualified ? 'border-primary-600 text-primary-600 hover:bg-primary-50 active:scale-95' : 'border-surface-100 text-surface-200 cursor-not-allowed'}`}
-                >
-                  <Mail className="w-5 h-5" />
-                  {t('email')}
-                </button>
-                <button
-                  disabled={!isQualified}
-                  className={`w-full py-4 rounded-xl border-2 flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-sm ${isQualified ? 'border-emerald-500 text-emerald-600 hover:bg-emerald-50 active:scale-95' : 'border-surface-100 text-surface-200 cursor-not-allowed'}`}
-                >
-                  <MessageSquare className="w-5 h-5" />
-                  {t('whatsappContact')}
-                </button>
-                <button
-                  disabled={!isQualified}
-                  className={`w-full py-4 rounded-xl border-2 flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-sm ${isQualified ? 'border-charcoal text-charcoal hover:bg-surface-50 active:scale-95' : 'border-surface-100 text-surface-200 cursor-not-allowed'}`}
-                >
-                  <Phone className="w-5 h-5" />
-                  {isQualified ? (l.owner.phone || '+966 50 XXX XXXX') : t('callPrivate')}
-                </button>
+              <div className="bg-white border border-surface-200 p-5 space-y-4 shadow-sm rounded-2xl">
+                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('investmentInsights')}</h4>
+                <div className="grid gap-3">
+                  {[
+                    { label: t('marketGuide') },
+                    { label: t('roiProjections') },
+                    { label: t('legalChecklist') },
+                    { label: t('taxExplained') }
+                  ].map((item, idx) => (
+                    <Link key={idx} href="#" className="flex items-center justify-between group">
+                      <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item.label}</span>
+                      <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-2 transition-transform" />
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
+          </div>
 
-            {/* Recommendations Block 1: Popular Areas */}
-            <div className="bg-white border border-surface-200 p-8 space-y-6 shadow-sm rounded-3xl">
+          {/* ── RIGHT SIDEBAR (Desktop only) ── */}
+          <div className="hidden lg:block space-y-6">
+            <AgentContactCard l={l} t={t} locale={locale} setIsQualified={setIsQualified} />
+
+            {/* Popular Areas */}
+            <div className="bg-white border border-surface-200 p-6 space-y-4 shadow-sm rounded-2xl">
               <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('popularAreas')}</h4>
-              <div className="grid gap-4">
+              <div className="grid gap-3">
                 {[`Rentals in ${listing.district}`, `Villas for sale in ${listing.city}`, `New Projects in ${listing.city}`, `Commercial Spaces`].map((item, idx) => (
                   <Link key={idx} href="#" className="flex items-center justify-between group">
                     <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item}</span>
@@ -481,10 +604,10 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               </div>
             </div>
 
-            {/* Recommendations Block 2: Related Collections */}
-            <div className="bg-white border border-surface-200 p-8 space-y-6 shadow-sm rounded-3xl">
+            {/* Related Collections */}
+            <div className="bg-white border border-surface-200 p-6 space-y-4 shadow-sm rounded-2xl">
               <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('relatedCollections')}</h4>
-              <div className="grid gap-4">
+              <div className="grid gap-3">
                 {['Luxury Penthouses', 'Family Sized Apartments', 'REGA Verified Projects', 'Near KAFD Financial District'].map((item, idx) => (
                   <Link key={idx} href="#" className="flex items-center justify-between group">
                     <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item}</span>
@@ -494,15 +617,15 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               </div>
             </div>
 
-            {/* Recommendations Block 3: Investment Insights */}
-            <div className="bg-white border border-surface-200 p-8 space-y-6 shadow-sm rounded-3xl">
+            {/* Investment Insights */}
+            <div className="bg-white border border-surface-200 p-6 space-y-4 shadow-sm rounded-2xl">
               <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('investmentInsights')}</h4>
-              <div className="grid gap-5">
+              <div className="grid gap-3">
                 {[
-                  { label: t('marketGuide'), key: 'marketGuide' },
-                  { label: t('roiProjections'), key: 'roiProjections' },
-                  { label: t('legalChecklist'), key: 'legalChecklist' },
-                  { label: t('taxExplained'), key: 'taxExplained' }
+                  { label: t('marketGuide') },
+                  { label: t('roiProjections') },
+                  { label: t('legalChecklist') },
+                  { label: t('taxExplained') }
                 ].map((item, idx) => (
                   <Link key={idx} href="#" className="flex items-center justify-between group">
                     <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item.label}</span>
@@ -515,77 +638,128 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         </div>
       </div>
 
-      {/* Lightbox Gallery */}
-      <AnimatePresence>
-        {lightboxOpen && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] bg-black/95 flex flex-col backdrop-blur-xl"
-            onClick={() => setLightboxOpen(false)}
-          >
-            <div className="flex-shrink-0 flex justify-end p-6 md:p-10">
-              <button
-                className="p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all z-[60] backdrop-blur-md border border-white/10"
-                onClick={() => setLightboxOpen(false)}
-              >
-                <X className="w-8 h-8" />
+      {/* Amenities Modal */}
+      {amenitiesModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center" onClick={() => setAmenitiesModalOpen(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-t-3xl md:rounded-3xl p-6 md:p-10 w-full md:max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-charcoal">{t('allAmenities')}</h3>
+              <button onClick={() => setAmenitiesModalOpen(false)} className="p-2 rounded-full hover:bg-surface-100 transition-colors">
+                <X className="w-5 h-5 text-charcoal-muted" />
               </button>
             </div>
-
-            <div className="flex-1 relative flex items-center justify-center min-h-0 px-4 group" onClick={(e) => e.stopPropagation()}>
-              <button
-                className="absolute left-4 md:left-10 p-4 md:p-6 rounded-full bg-black/40 text-white hover:bg-black/60 transition-all z-20 backdrop-blur-sm border border-white/5 opacity-40 group-hover:opacity-100"
-                onClick={() => l?.photos && setActivePhoto((p) => (p - 1 + l.photos.length) % l.photos.length)}
-              >
-                <ChevronLeft className="w-8 h-8 md:w-10 md:h-10" />
-              </button>
-
-              <motion.div
-                key={activePhoto}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="w-full h-full flex items-center justify-center pointer-events-none"
-              >
-                <div className="relative w-full h-full max-h-[75vh] flex items-center justify-center">
-                   {l?.photos?.[activePhoto] && (
-                     <Image src={l.photos[activePhoto]} alt="" fill className="object-contain pointer-events-auto" unoptimized />
-                   )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {Object.entries(l.amenities || {}).filter(([, val]) => val).map(([key], idx) => (
+                <div key={idx} className="flex items-center gap-2.5 p-3 bg-surface-50 rounded-xl border border-surface-100">
+                  <CheckCircle className="w-4 h-4 text-primary-500 shrink-0" />
+                  <span className="text-xs font-bold text-charcoal capitalize">{key.replace(/_/g, ' ')}</span>
                 </div>
-              </motion.div>
-
-              <button
-                className="absolute right-4 md:right-10 p-4 md:p-6 rounded-full bg-black/40 text-white hover:bg-black/60 transition-all z-20 backdrop-blur-sm border border-white/5 opacity-40 group-hover:opacity-100"
-                onClick={() => l?.photos && setActivePhoto((p) => (p + 1) % l.photos.length)}
-              >
-                <ChevronRight className="w-8 h-8 md:w-10 md:h-10" />
-              </button>
+              ))}
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="flex-shrink-0 w-full bg-black/40 backdrop-blur-2xl border-t border-white/10 py-6 md:py-8" onClick={(e) => e.stopPropagation()}>
-               <div className="max-w-screen-xl mx-auto px-6">
-                  <div className="flex items-center justify-center gap-4 overflow-x-auto no-scrollbar pb-2">
-                    {l?.photos?.map((photo: string, i: number) => (
-                      <button
-                        key={i}
-                        onClick={() => setActivePhoto(i)}
-                        className={`relative w-20 h-14 md:w-28 md:h-20 shrink-0 rounded-xl overflow-hidden transition-all border-2 ${i === activePhoto ? 'border-primary-500 scale-110 shadow-[0_0_20px_rgba(13,115,119,0.5)] z-10' : 'border-white/10 opacity-40 hover:opacity-100'}`}
-                      >
-                        <Image src={photo} alt="" fill className="object-cover" unoptimized />
-                      </button>
-                    ))}
-                  </div>
-                  <div className="text-center mt-4">
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
-                      {activePhoto + 1} / {l?.photos?.length || 0}
-                    </span>
-                  </div>
-               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Unified Media Modal */}
+      <MediaModal
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        photos={l.photos}
+        youtubeUrl={l.youtubeUrl}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        initialTab={activeTab as any}
+        agent={{
+          name: l.owner.name || '',
+          avatarUrl: l.owner.avatarUrl,
+          role: l.owner.role
+        }}
+      />
+
+      {/* MOBILE STICKY CONTACT BAR */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-surface-200 px-6 py-4 md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="relative w-10 h-10 rounded-full overflow-hidden border border-surface-100">
+            {l.owner.avatarUrl ? <Image src={l.owner.avatarUrl} alt="" fill className="object-cover" unoptimized /> : <div className="w-full h-full bg-primary-600 border border-primary-500 rounded-full" />}
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-primary-600 uppercase tracking-widest leading-none">Agent</p>
+            <p className="text-sm font-bold text-charcoal truncate max-w-[120px]">{l.owner.name}</p>
+          </div>
+        </div>
+        <div className="flex gap-2 flex-1 justify-end">
+          <button className="p-3 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-600/20"><Phone className="w-5 h-5" /></button>
+          <button className="px-5 py-3 bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" />
+            WhatsApp
+          </button>
+        </div>
+      </div>
 
       <ChatWidget floating />
+    </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function AgentContactCard({ l, t, locale, setIsQualified }: { l: ListingWithOwner; t: any; locale: string; setIsQualified: (v: boolean) => void }) {
+  return (
+    <div className="bg-white border border-surface-200 rounded-2xl p-6 space-y-6 shadow-sm">
+      <div className="flex items-center gap-4">
+        <Link href={`/${locale}/${l.owner.role === 'FIRM' ? 'firms' : 'brokers'}/${l.owner.id}`}
+          className="relative w-16 h-16 rounded-full border-2 border-surface-100 overflow-hidden shadow-lg bg-surface-50 flex items-center justify-center hover:scale-105 transition-transform shrink-0">
+          {l.owner.avatarUrl ? (
+            <Image src={l.owner.avatarUrl} alt="" fill className="object-cover" unoptimized />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-primary-600 text-white text-xl font-bold">
+              {l.owner.name?.charAt(0)}
+            </div>
+          )}
+        </Link>
+        <div className="flex-1 min-w-0">
+          <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">TruBroker™</span>
+          <Link href={`/${locale}/${l.owner.role === 'FIRM' ? 'firms' : 'brokers'}/${l.owner.id}`}
+            className="hover:text-primary-600 transition-colors block">
+            <h5 className="text-base font-bold text-charcoal leading-tight truncate">{l.owner.name}</h5>
+          </Link>
+          <p className="text-xs text-charcoal-muted font-medium mt-0.5">
+            {l.owner.role === 'FIRM' ? t('management') : (l.owner.brokerProfile?.titleEn || t('professionalAgent'))}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-bold text-emerald-700">{t('agentOnline')}</span>
+        </div>
+        <ShieldCheck className="w-4 h-4 text-emerald-500" />
+      </div>
+
+      <div className="space-y-2.5">
+        <button onClick={() => setIsQualified(true)}
+          className="w-full py-3 rounded-xl flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm bg-primary-600 text-white hover:bg-primary-700 active:scale-95">
+          <Mail className="w-4 h-4" />
+          {t('emailAgent')}
+        </button>
+        <button className="w-full py-3 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm border-charcoal text-charcoal hover:bg-surface-50 active:scale-95">
+          <Phone className="w-4 h-4" />
+          {t('callPrivate')}
+        </button>
+        <button className="w-full py-3 rounded-xl flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95">
+          <MessageSquare className="w-4 h-4" />
+          {t('whatsappContact')}
+        </button>
+      </div>
+
+      <div className="pt-3 border-t border-surface-100">
+        <Link href={`/${locale}/firms/${l.owner.id}`} className="flex items-center justify-between group">
+          <span className="text-xs font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">
+            {l.owner.name || 'View Agency Profile'}
+          </span>
+          <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
+        </Link>
+      </div>
     </div>
   );
 }

@@ -15,6 +15,20 @@
       "when": 1775552599619,
       "tag": "0001_polite_hitman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776407315901,
+      "tag": "0002_tan_omega_red",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776862400220,
+      "tag": "0003_harsh_purifiers",
+      "breakpoints": true
     }
   ]
 }

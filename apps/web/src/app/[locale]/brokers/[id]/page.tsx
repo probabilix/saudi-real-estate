@@ -40,12 +40,13 @@ export default function BrokerProfilePage({ params: { locale, id } }: { params: 
           setBrokerData(userRes.data);
         }
 
-        // Fetch broker's listings
+        // Fetch broker's listings - ensure we get all active ones
         const listingsRes = await api.getListings(`ownerId=${id}&limit=20`);
         
         if (listingsRes.success && listingsRes.data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setListings((listingsRes.data as any).items || []);
+          const fetchedItems = (listingsRes.data as any).items || [];
+          setListings(fetchedItems);
         }
       } catch (err) {
         console.error('Failed to fetch broker profile:', err);

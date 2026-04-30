@@ -7,6 +7,7 @@ node_modules
 dist
 out
 .turbo
+apps/api/api/
 
 # Environment
 .env
@@ -32,3 +33,7 @@ coverage
 
 # Misc
 *.tsbuildinfo
+*.txt
+*.log
+audit_listings.ts
+seed-news.ts

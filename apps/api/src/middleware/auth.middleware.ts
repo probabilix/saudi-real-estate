@@ -28,6 +28,22 @@ export const authenticateJWT = async (request: FastifyRequest, reply: FastifyRep
 };
 
 /**
+ * Middleware: Verify JWT and attach user to request (Optional)
+ */
+export const optionalAuthenticateJWT = async (request: FastifyRequest, _reply: FastifyReply) => {
+  try {
+    const authHeader = request.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const payload = AuthService.verifyToken(token);
+      request.user = payload;
+    }
+  } catch (err) {
+    // Silent fail for optional auth
+  }
+};
+
+/**
  * Middleware Factory: RBAC check
  */
 export const requireRole = (roles: UserRole | UserRole[]) => {

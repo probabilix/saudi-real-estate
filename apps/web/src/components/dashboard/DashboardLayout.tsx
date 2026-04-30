@@ -11,7 +11,8 @@ import {
   LogOut, 
   ChevronRight,
   ShieldCheck,
-  Building
+  Building,
+  Users,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
@@ -24,7 +25,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children, locale }: DashboardLayoutProps) {
   const tDashboard = useTranslations('dashboard');
-  const { user, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -44,6 +45,12 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
       roles: ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER']
     },
     {
+      title: tDashboard('menu.brokers'),
+      href: `/${locale}/dashboard/brokers`,
+      icon: Users,
+      roles: ['FIRM', 'ADMIN']
+    },
+    {
       title: tDashboard('menu.verifications'),
       href: `/${locale}/admin/verifications`,
       icon: ShieldCheck,
@@ -57,7 +64,10 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
     }
   ];
 
-  const filteredMenu = menuItems.filter(item => user && item.roles.includes(user.role));
+  // Ensure menu is only visible when user is fully loaded
+  const filteredMenu = (user && !authLoading) 
+    ? menuItems.filter(item => item.roles.includes(user.role))
+    : [];
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-white/80 backdrop-blur-xl border-inline-end border-gray-100 shadow-xl shadow-gray-200/20">
@@ -66,7 +76,7 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
 
       {/* Profile Summary */}
       <div className="px-6 mb-8">
-        <div className="p-4 rounded-2xl bg-gray-50/50 border border-gray-100">
+        <div className="p-4 rounded-2xl bg-white border border-gray-200/60 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center border border-primary-100 text-primary-600 font-bold overflow-hidden shrink-0">
               {user?.avatarUrl ? (
@@ -133,9 +143,9 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
   );
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-full bg-gray-50/50" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-80 shrink-0 z-10 border-inline-end border-gray-200">
+      <aside className="hidden lg:block w-80 shrink-0 border-r border-gray-200 bg-white sticky top-[82px] h-[calc(100vh-82px)] overflow-y-auto custom-scrollbar z-20">
         <SidebarContent />
       </aside>
 
@@ -148,14 +158,14 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] lg:hidden"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] lg:hidden"
             />
             <motion.aside
               initial={{ x: isRTL ? '100%' : '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: isRTL ? '100%' : '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`fixed ${isRTL ? 'right-0' : 'left-0'} top-0 bottom-0 w-80 z-[70] lg:hidden`}
+              className={`fixed ${isRTL ? 'right-0' : 'left-0'} top-0 bottom-0 w-80 z-[110] lg:hidden`}
             >
               <SidebarContent />
             </motion.aside>
@@ -165,8 +175,34 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Dashboard Quick Navigation (Practical Grid) */}
+        {!authLoading && filteredMenu.length > 0 && (
+          <div className="lg:hidden p-4 bg-white border-b border-gray-100">
+             <div className="grid grid-cols-2 gap-3" dir={isRTL ? 'rtl' : 'ltr'}>
+                {filteredMenu.map((item) => {
+                  const isActive = pathname === item.href;
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex flex-col items-center justify-center py-4 rounded-2xl transition-all border-2 text-[10px] font-black uppercase tracking-widest gap-2 shadow-sm ${
+                        isActive 
+                          ? 'bg-primary-50 border-primary-600 text-primary-600' 
+                          : 'bg-gray-50/50 border-gray-100 text-gray-400'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {item.title}
+                    </Link>
+                  );
+                })}
+             </div>
+          </div>
+        )}
+
         {/* Content */}
-        <main className="flex-1 p-6 md:p-10">
+        <main className="flex-1 px-4 pb-4 md:px-10 md:pb-10 pt-0">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>

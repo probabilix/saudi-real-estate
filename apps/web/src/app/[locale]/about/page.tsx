@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Building2, Globe, Sparkles, TrendingUp, ShieldCheck, Map, Users } from 'lucide-react';
 
@@ -38,9 +39,10 @@ export default function AboutPage({ params: { locale } }: { params: { locale: st
           transition={{ delay: 0.1 }}
           className="w-full h-[400px] md:h-[500px] rounded-[40px] overflow-hidden shadow-2xl relative"
         >
-          <img
+          <Image
             src="https://assets.hrewards.com/assets/jpg.large_23_422de58a6a.jpg?optimize"
             alt="Saudi Skyline"
+            fill
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />

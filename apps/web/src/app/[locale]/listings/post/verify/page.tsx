@@ -17,7 +17,7 @@ function VerifyListingContent({ locale }: { locale: string }) {
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success] = useState(false);
 
   const isDaily = type === 'daily';
 
@@ -27,8 +27,7 @@ function VerifyListingContent({ locale }: { locale: string }) {
 
     // Simulate API call to save permit/license
     await new Promise(resolve => setTimeout(resolve, 1500));
-    setSuccess(true);
-    setLoading(false);
+    router.push(`/${locale}/listings/post/create?type=${type}&ref=${value}`);
   };
 
   if (success) {

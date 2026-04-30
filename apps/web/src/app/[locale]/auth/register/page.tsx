@@ -11,9 +11,7 @@ import { Building2, ArrowLeft, Mail, User, Lock, Sparkles, Verified, ChevronDown
 import { RegisterInput } from '@saudi-re/shared';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isValidPhoneNumber, getCountryCallingCode } from 'react-phone-number-input';
-import type { Country } from 'react-phone-number-input';
-
-type CountryCode = Country;
+import type { CountryCode } from 'libphonenumber-js';
 
 // ────────────────────────────────────────────────────────
 // Country Data – top countries pinned, rest alphabetical

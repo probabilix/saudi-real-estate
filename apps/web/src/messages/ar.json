@@ -16,10 +16,12 @@
     "contactUs": "اتصل بنا",
     "loading": "جاري التحميل...",
     "error": "حدث خطأ ما",
+    "serverUnreachable": "الخادم غير متاح حالياً. يرجى المحاولة مرة أخرى لاحقاً.",
     "retry": "إعادة المحاولة",
     "continue": "متابعة",
     "save": "حفظ",
     "back": "رجوع",
+    "backToSearch": "العودة للبحث",
     "manageListings": "إدارة العقارات",
     "postListing": "أضف عقارك",
     "cancel": "إلغاء",
@@ -57,7 +59,11 @@
       "Urdu": "الأوردو",
       "Hindi": "الهندية",
       "French": "الفرنسية"
-    }
+    },
+    "successfullyAllocatedCredits": "تمت معالجة {amount} رصيد لـ {name} بنجاح.",
+    "agentHasInsufficientCredits": "{name} لديه {amount} رصيد متبقي فقط.",
+    "savedProperties": "العقارات المحفوظة",
+    "status": "الحالة"
   },
   "listings": {
     "postTitle": "أضف عقاراً",
@@ -119,6 +125,7 @@
     "search": "بحث",
     "city": "المدينة",
     "allCities": "كل المدن",
+    "searchPlaceholder": "ابحث عن مدينة...",
     "propertyType": "نوع العقار",
     "allTypes": "كل الأنواع",
     "purpose": "الغرض",
@@ -230,7 +237,34 @@
     "views": "مشاهدات",
     "propertyId": "رقم العقار",
     "backToListings": "العودة للعقارات",
-    "phonePlaceholder": "+966 50 XXX XXXX"
+    "phonePlaceholder": "+966 50 XXX XXXX",
+    "type": "النوع",
+    "purpose": "الغرض",
+    "purposeSALE": "للبيع",
+    "purposeRENT": "للإيجار",
+    "residenceType": "نوع السكن",
+    "completion": "حالة الإنجاز",
+    "furnishing": "التأثيث",
+    "addedOn": "تاريخ الإضافة",
+    "propertyAge": "عمر العقار",
+    "new": "جديد",
+    "save": "حفظ",
+    "saved": "محفوظ",
+    "emailAgent": "مراسلة الوسيط",
+    "agentOnline": "الوسيط متاح",
+    "viewAllAmenities": "عرض كل المرافق",
+    "allAmenities": "جميع المرافق",
+    "seeVideo": "شاهد الفيديو",
+    "map": "الخريطة",
+    "video": "فيديو",
+    "tabLocationNearby": "الموقع والمناطق القريبة",
+    "regaVerifiedInfo": "معلومات موثقة من الهيئة العقارية",
+    "reportProperty": "الإبلاغ عن هذا العقار",
+    "usefulLinks": "روابط مفيدة",
+    "otherNearbyAreas": "مناطق قريبة أخرى بـ {type}",
+    "nearArea": "قرب {area}",
+    "management": "الإدارة",
+    "professionalAgent": "وسيط عقاري محترف"
   },
   "propertyTypes": {
     "APARTMENT": "شقة",
@@ -405,6 +439,7 @@
       "myListings": "عقاراتي",
       "favorites": "المفضلة",
       "savedSearches": "الأبحاث المحفوظة",
+      "brokers": "إدارة الوسطاء",
       "verifications": "توثيقات الإدارة",
       "settings": "إعدادات الحساب",
       "logout": "تسجيل الخروج"
@@ -431,6 +466,14 @@
     "verifyIdentity": "توثيق الهوية",
     "aiTranslateNote": "ملاحظة: ترجمة الذكاء الاصطناعي تتطلب مفتاح Gemini في ملف البيئة (GEMINI_API_KEY).",
     "aiInstruction": "الترجمة التلقائية عبر Gemini نشطة.",
+    "subheadingAgents": "إدارة ومراقبة أداء فريقك وتوزيع العقارات.",
+    "searchBrokers": "ابحث عن وسطاء بالاسم أو البريد الإلكتروني...",
+    "addBroker": "إضافة وسيط",
+    "agentInfo": "معلومات الوسيط",
+    "inventory": "المخزون",
+    "performance": "الأداء",
+    "creditsLabel": "الرصيد",
+    "status": "الحالة",
     "roles": {
       "BUYER": "مشتري عقار",
       "AGENT": "وسيط عقاري",
@@ -439,6 +482,35 @@
       "ADMIN": "مدير المنصة",
       "OWNER": "مالك عقار"
     },
+    "noBrokersFound": "لم يتم العثور على وسطاء",
+    "noBrokersFoundDesc": "ابدأ ببناء فريقك عن طريق إضافة أول وسيط عقاري لك.",
+    "allocateCreditsTitle": "تخصيص الرصيد",
+    "reclaimCreditsTitle": "استرداد الرصيد",
+    "transferSuccessTitle": "تم التحويل بنجاح",
+    "reclaimSuccessTitle": "تم استرداد الرصيد",
+    "insufficientBalanceTitle": "رصيد غير كافٍ",
+    "agentBalanceLowTitle": "رصيد الوكيل منخفض",
+    "buyCreditsCTA": "استكشف باقات الرصيد",
+    "maybeLater": "ربما لاحقاً",
+    "great": "رائع!",
+    "dismiss": "إغلاق",
+    "confirmTransfer": "تأكيد التحويل",
+    "withdrawCredits": "سحب الرصيد",
+    "noListingsFound": "لم يتم العثور على عقارات.",
+    "noListingsFoundDesc": "لم تقم بنشر أي عقارات بعد. ابدأ بإضافة عقارك الأول الآن.",
+    "live": "نشط",
+    "standard": "عادي",
+    "managed": "مدار",
+    "globalRating": "التقييم العام",
+    "basedOnReviews": "بناءً على {count} مراجعة",
+    "firmCreditsLabel": "رصيد الشركة",
+    "needMoreCredits": "هل تحتاج المزيد من الرصيد؟",
+    "topUpAccount": "شحن الحساب",
+    "reclaimCreditDesc": "سحب رصيد الإدراج من ",
+    "allocateCreditDesc": "نقل رصيد الإدراج إلى ",
+    "insufficientBalanceDesc": "ليس لديك رصيد كافٍ لإكمال هذا التخصيص. يرجى شحن حسابك.",
+    "transferFailed": "فشل التحويل",
+    "reclaimFailed": "فشل الاسترداد",
     "tabs": {
       "active": "نشط",
       "draft": "مسودة",
@@ -446,6 +518,12 @@
       "removed": "محذوف",
       "license": "تراخيص الإعلانات"
     },
+    "broker": {
+      "performance": "أداء المخزون العقاري",
+      "activeListings": "نسبة العقارات النشطة"
+    },
+    "creditsTransferred": "تم تحويل الرصيد بنجاح!",
+    "errorTransferring": "حدث خطأ أثناء محاولة التحويل.",
     "overview": {
       "exploreTitle": "استكشف العقارات",
       "exploreDesc": "تصفح عقارات موثقة 100% في جميع المدن السعودية الكبرى.",
@@ -606,6 +684,26 @@
     "ourAgents": "وسطاؤنا المتخصصون",
     "activeProperties": "العقارات المتاحة",
     "viewOnMap": "عرض على الخارطة",
-    "backToListings": "العودة إلى القائمة"
+    "backToListings": "العودة إلى القائمة",
+    "gender": "الجنس"
+  },
+  "residenceType": {
+    "FAMILY": "عائلي",
+    "BACHELOR": "عزاب",
+    "RESIDENTIAL": "سكني",
+    "COMMERCIAL": "تجاري",
+    "MIXED": "استخدام مختلط"
+  },
+  "completionStatus": {
+    "READY": "جاهز",
+    "OFF_PLAN": "على الخارطة",
+    "UNDER_CONSTRUCTION": "تحت الإنشاء"
+  },
+  "furnishingStatus": {
+    "FURNISHED": "مؤثث",
+    "UNFURNISHED": "غير مؤثث",
+    "SEMI_FURNISHED": "مؤثث جزئياً",
+    "PARTLY_FURNISHED": "مؤثث جزئياً",
+    "FULLY_FURNISHED": "مؤثث بالكامل"
   }
 }

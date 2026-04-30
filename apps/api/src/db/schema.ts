@@ -25,7 +25,7 @@ export const listingTypeEnum = pgEnum('listing_type', [
   'FARM', 'AGRICULTURE_PLOT', 'COMPLEX', 'HOTEL', 'WORKSHOP', 'FACTORY', 
   'SCHOOL', 'HEALTH_CENTER', 'GAS_STATION', 'SHOWROOM'
 ]);
-export const listingStatusEnum = pgEnum('listing_status', ['ACTIVE', 'SOLD', 'RENTED', 'DRAFT', 'FLAGGED']);
+export const listingStatusEnum = pgEnum('listing_status', ['ACTIVE', 'SOLD', 'RENTED', 'DRAFT', 'FLAGGED', 'REMOVED']);
 export const listingPurposeEnum = pgEnum('listing_purpose', ['SALE', 'RENT', 'LEASE']);
 export const translationStatusEnum = pgEnum('translation_status', ['PENDING', 'DONE', 'FAILED']);
 export const leadStatusEnum = pgEnum('lead_status', ['NEW', 'VIEWED', 'CONTACTED', 'CLOSED_WON', 'CLOSED_LOST']);
@@ -59,6 +59,9 @@ export const users = pgTable('users', {
   avatarUrl: text('avatar_url'),
   verificationStatus: verificationStatusEnum('verification_status').default('UNVERIFIED'),
   isActive: boolean('is_active').default(true),
+  creditsBalance: integer('credits_balance').default(0),
+  rating: decimal('rating', { precision: 3, scale: 2 }).default('0'),
+  reviewCount: integer('review_count').default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
@@ -124,6 +127,8 @@ export const listings = pgTable('listings', {
   
   // Media & Extras
   photos: text('photos').array().notNull(),
+  youtubeUrl: varchar('youtube_url', { length: 255 }),
+  videoUrl: text('video_url'), // Cloudinary video link
   amenities: jsonb('amenities').default({}),
   history: jsonb('history').default([]),
   foreignerEligible: boolean('foreigner_eligible').default(false),
@@ -147,9 +152,13 @@ export const listings = pgTable('listings', {
   isFeatured: boolean('is_featured').default(false),
   featuredUntil: timestamp('featured_until', { withTimezone: true }),
   verified: boolean('verified').default(false),
+  truCheckVerified: boolean('tru_check_verified').default(false),
   mandateDocUrl: text('mandate_doc_url'),
   viewsCount: integer('views_count').default(0),
   searchVector: tsvector('search_vector'), // Full text search
+  
+  // Custom Identity
+  shortId: varchar('short_id', { length: 20 }).unique(),
   
   // Timestamps
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -157,6 +166,7 @@ export const listings = pgTable('listings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 }, (table) => ({
   searchVectorIdx: index('search_vector_idx').using('gin', table.searchVector),
+  shortIdIdx: index('short_id_idx').on(table.shortId),
 }));
 
 // ── Buyer Profiles Table ──
@@ -220,6 +230,45 @@ export const featuredPlacements = pgTable('featured_placements', {
   isActive: boolean('is_active').default(true),
 });
 
+// ── System Settings Table ──
+export const systemSettings = pgTable('system_settings', {
+  key: varchar('key', { length: 255 }).primaryKey(),
+  value: text('value').notNull(),
+  description: text('description'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+
+// ── News Table ──
+export const news = pgTable('news', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  titleEn: varchar('title_en', { length: 500 }).notNull(),
+  titleAr: varchar('title_ar', { length: 500 }).notNull(),
+  slug: varchar('slug', { length: 500 }).unique().notNull(),
+  contentEn: text('content_en').notNull(),
+  contentAr: text('content_ar').notNull(),
+  excerptEn: text('excerpt_en'),
+  excerptAr: text('excerpt_ar'),
+  featuredImage: text('featured_image'),
+  authorId: uuid('author_id').references(() => users.id),
+  isPublished: boolean('is_published').default(false),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+
+// ── Favorites Table ──
+export const favorites = pgTable('favorites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  listingId: uuid('listing_id').references(() => listings.id).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  userListingIdx: index('user_listing_idx').on(table.userId, table.listingId),
+}));
+
+
 // ── Relations ──
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -239,6 +288,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   leads: many(leads),
   subscriptions: many(subscriptions),
   featuredPlacements: many(featuredPlacements),
+  favorites: many(favorites),
 }));
 
 export const brokerProfilesRelations = relations(brokerProfiles, ({ one }) => ({
@@ -255,6 +305,18 @@ export const listingsRelations = relations(listings, ({ one, many }) => ({
   }),
   leads: many(leads),
   featuredPlacements: many(featuredPlacements),
+  favorites: many(favorites),
+}));
+
+export const favoritesRelations = relations(favorites, ({ one }) => ({
+  user: one(users, {
+    fields: [favorites.userId],
+    references: [users.id],
+  }),
+  listing: one(listings, {
+    fields: [favorites.listingId],
+    references: [listings.id],
+  }),
 }));
 
 export const leadsRelations = relations(leads, ({ one }) => ({
@@ -297,3 +359,20 @@ export const featuredPlacementsRelations = relations(featuredPlacements, ({ one 
     references: [users.id],
   }),
 }));
+
+export const newsRelations = relations(news, ({ one }) => ({
+  author: one(users, {
+    fields: [news.authorId],
+    references: [users.id],
+  }),
+}));
+
+export const legalPages = pgTable('legal_pages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  slug: varchar('slug', { length: 100 }).notNull().unique(),
+  titleEn: varchar('title_en', { length: 500 }).notNull(),
+  titleAr: varchar('title_ar', { length: 500 }).notNull(),
+  contentEn: text('content_en').notNull(),
+  contentAr: text('content_ar').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});

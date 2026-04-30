@@ -4,12 +4,15 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SlidersHorizontal, Map, Grid3X3, X, ChevronDown, Loader2, Search } from 'lucide-react';
+import { SlidersHorizontal, Map, Grid3X3, X, Loader2, Search } from 'lucide-react';
 import ListingCard from '@/components/listings/ListingCard';
 import ChatWidget from '@/components/chat/ChatWidget';
 import PriceDropdown from '@/components/search/PriceDropdown';
 import PropertyTypeDropdown from '@/components/search/PropertyTypeDropdown';
-import { CITIES, Listing } from '@saudi-re/shared';
+import CityDropdown from '@/components/search/CityDropdown';
+import PurposeDropdown from '@/components/search/PurposeDropdown';
+import BedsDropdown from '@/components/search/BedsDropdown';
+import { Listing } from '@saudi-re/shared';
 import { api } from '@/lib/api';
 
 function ListingsContent() {
@@ -96,35 +99,13 @@ function ListingsContent() {
           {/* Filter Bar */}
           <div className="flex flex-wrap items-center gap-4">
             {/* City */}
-            <div className="relative">
-              <select
-                value={city}
-                onChange={(e) => updateFilter('city', e.target.value)}
-                className="appearance-none bg-white border border-surface-200 rounded-xl px-5 py-3 pe-10 text-sm text-charcoal font-medium outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all cursor-pointer shadow-sm"
-              >
-                <option value="">{t('allCities')}</option>
-                {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <ChevronDown className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-muted pointer-events-none" />
-            </div>
+              <CityDropdown city={city} onChange={(val) => updateFilter('city', val)} />
 
             {/* Type */}
             <PropertyTypeDropdown type={type} onChange={(val) => updateFilter('type', val)} />
 
             {/* Purpose */}
-            <div className="relative">
-              <select
-                value={purpose}
-                onChange={(e) => updateFilter('purpose', e.target.value)}
-                className="appearance-none bg-white border border-surface-200 rounded-xl px-5 py-3 pe-10 text-sm text-charcoal font-medium outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all cursor-pointer shadow-sm"
-              >
-                <option value="">{t('allPurposes')}</option>
-                <option value="SALE">{t('sale')}</option>
-                <option value="RENT">{t('rent')}</option>
-                <option value="LEASE">{t('lease')}</option>
-              </select>
-              <ChevronDown className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-muted pointer-events-none" />
-            </div>
+              <PurposeDropdown purpose={purpose} onChange={(val) => updateFilter('purpose', val)} />
 
             {/* Price Range */}
             <div className="z-20">
@@ -199,19 +180,7 @@ function ListingsContent() {
                   <div className="space-y-1.5 hidden flex-none"></div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{t('bedrooms')}</label>
-                    <div className="relative">
-                      <select
-                        value={bedrooms || ''}
-                        onChange={(e) => updateFilter('bedrooms', e.target.value)}
-                        className="appearance-none w-44 bg-white border border-surface-200 rounded-xl px-4 py-3 pe-10 text-sm text-charcoal font-medium outline-none focus:border-primary-500 shadow-sm cursor-pointer"
-                      >
-                        <option value="">{t('anyBedrooms')}</option>
-                        {[1, 2, 3, 4, 5, 6].map((n) => (
-                          <option key={n} value={n}>{n}+ {t('beds')}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-muted pointer-events-none" />
-                    </div>
+                    <BedsDropdown value={bedrooms} onChange={(val) => updateFilter('bedrooms', val)} />
                   </div>
                 </div>
               </motion.div>

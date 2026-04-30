@@ -89,7 +89,13 @@ export default async function authRoutes(app: FastifyInstance) {
         data: { 
           userId: newUser.id,
           accessToken: tokens?.accessToken,
-          user: tokens ? { id: newUser.id, name: newUser.name, role: newUser.role, email: newUser.email } : undefined
+          user: tokens ? { 
+            id: newUser.id, 
+            name: newUser.name, 
+            role: newUser.role, 
+            email: newUser.email,
+            creditsBalance: newUser.creditsBalance
+          } : undefined
         } 
       });
 
@@ -156,7 +162,13 @@ export default async function authRoutes(app: FastifyInstance) {
         success: true, 
         data: { 
           accessToken, 
-          user: { id: user.id, name: user.name, role: user.role, email: user.email } 
+          user: { 
+            id: user.id, 
+            name: user.name, 
+            role: user.role, 
+            email: user.email,
+            creditsBalance: user.creditsBalance
+          } 
         } 
       });
 
@@ -238,12 +250,50 @@ export default async function authRoutes(app: FastifyInstance) {
 
       return reply.send({ 
         success: true, 
-        data: { user: { id: user.id, name: user.name, role: user.role, email: user.email, regaVerified: user.regaVerified } } 
+        data: { 
+          user: { 
+            id: user.id, 
+            name: user.name, 
+            role: user.role, 
+            email: user.email, 
+            regaVerified: user.regaVerified,
+            creditsBalance: user.creditsBalance
+          } 
+        } 
       });
 
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  /**
+   * POST /api/v1/auth/refresh
+   * Issue new access token using refresh token from cookie
+   */
+  app.post('/refresh', async (request, reply) => {
+    const refreshToken = request.cookies.refreshToken;
+
+    if (!refreshToken) {
+      return reply.code(401).send({ success: false, message: 'Refresh token missing' });
+    }
+
+    try {
+      const payload = AuthService.verifyToken(refreshToken);
+      
+      // Issue ONLY new access token
+      const accessToken = AuthService.generateAccessToken({ 
+        userId: payload.userId, 
+        role: payload.role 
+      });
+
+      return reply.send({ 
+        success: true, 
+        data: { accessToken } 
+      });
+    } catch (err) {
+      return reply.code(401).send({ success: false, message: 'Invalid or expired refresh token' });
     }
   });
 

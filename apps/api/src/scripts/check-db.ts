@@ -2,12 +2,15 @@ import 'dotenv/config';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 
-async function check() {
+async function checkTable() {
   try {
-    const res = await db.execute(sql`SELECT column_name FROM information_schema.columns WHERE table_name = 'listings' AND column_name = 'history'`);
-    console.log('History column check:', res.rows.length > 0 ? 'FOUND' : 'NOT FOUND');
+    const result = await db.execute(sql`SELECT to_regclass('public.favorites')`);
+    process.stdout.write('Table existence check: ' + JSON.stringify(result) + '\n');
+    process.exit(0);
   } catch (err) {
-    console.error('Check failed:', err);
+    process.stderr.write('Error checking table: ' + err + '\n');
+    process.exit(1);
   }
 }
-check();
+
+checkTable();

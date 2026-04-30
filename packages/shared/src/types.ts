@@ -35,6 +35,7 @@ export interface User {
   subscriptionTier: SubscriptionTier;
   subscriptionUntil: string | null;
   avatarUrl: string | null;
+  creditsBalance: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -113,12 +114,17 @@ export interface Listing {
   furnishingStatus: FurnishingStatus | null;
   completionStatus: CompletionStatus | null;
   residenceType: 'FAMILY' | 'BACHELOR' | null;
+  truCheckVerified: boolean;
   truCheckTimestamp: string | null;
   addedOn: string;
   bayutId: string | null;
   history: PropertyHistoryEvent[];
   mandateDocUrl: string | null;
+  shortId: string | null;
+  youtubeUrl: string | null;
+  videoUrl: string | null;
   viewsCount: number;
+  isFavorited?: boolean;
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -126,7 +132,10 @@ export interface Listing {
 
 // Listing with owner details
 export interface ListingWithOwner extends Listing {
-  owner: Pick<User, 'id' | 'name' | 'avatarUrl' | 'phone' | 'role' | 'regaVerified'>;
+  owner: User & {
+    brokerProfile: BrokerProfile | null;
+    firm: User | null;
+  };
 }
 
 // ── Buyer Profile ──

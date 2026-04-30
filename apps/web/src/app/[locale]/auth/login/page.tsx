@@ -1,21 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { API_BASE_URL } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { Building2, ArrowLeft, Mail, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function LoginPage({ params: { locale } }: { params: { locale: string } }) {
+function LoginContent({ locale }: { locale: string }) {
   const t = useTranslations('auth');
   const tCommon = useTranslations('common');
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +35,11 @@ export default function LoginPage({ params: { locale } }: { params: { locale: st
       setError(t('invalidCredentials'));
       setLoading(false);
     } else {
-      router.push(`/${locale}`);
+      if (returnTo) {
+        router.push(returnTo);
+      } else {
+        router.push(`/${locale}`);
+      }
     }
   };
 
@@ -238,5 +244,17 @@ export default function LoginPage({ params: { locale } }: { params: { locale: st
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage({ params: { locale } }: { params: { locale: string } }) {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-white">
+        <div className="w-10 h-10 border-4 border-primary-100 border-t-primary-600 rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginContent locale={locale} />
+    </Suspense>
   );
 }

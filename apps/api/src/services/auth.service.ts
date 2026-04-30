@@ -31,10 +31,17 @@ export class AuthService {
    * Generate Access and Refresh tokens
    */
   static generateTokens(payload: TokenPayload) {
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+    const accessToken = this.generateAccessToken(payload);
     const refreshToken = jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
     
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * Generate a new access token
+   */
+  static generateAccessToken(payload: TokenPayload): string {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
   }
 
   /**

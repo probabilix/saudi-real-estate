@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { 
   TrendingUp, 
@@ -16,12 +16,42 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function DashboardOverview({ params: { locale } }: { params: { locale: string } }) {
   const t = useTranslations('dashboard');
   const tCommon = useTranslations('common');
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [stats, setStats] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    // Sync profile on mount
+    refreshUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await api.getDashboardStats();
+        if (res.success) {
+          setStats(res.data);
+        }
+      } catch {
+        console.error('Failed to fetch stats');
+      } finally {
+        setFetching(false);
+      }
+    }
+    if (user) {
+      fetchStats();
+    }
+  }, [user]);
+
   const isRTL = locale === 'ar';
 
   const isBuyer = user?.role === 'BUYER';
@@ -56,7 +86,7 @@ export default function DashboardOverview({ params: { locale } }: { params: { lo
             </div>
           </Link>
  
-          <Link href={`/${locale}/dashboard/favorites`} className="group bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm hover:border-primary-200 transition-all">
+          <Link href={`/${locale}/favorites`} className="group bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm hover:border-primary-200 transition-all">
             <div className="w-12 h-12 bg-primary-50 rounded-2xl flex items-center justify-center mb-6">
               <Heart className="w-6 h-6 text-primary-600" />
             </div>
@@ -122,10 +152,57 @@ export default function DashboardOverview({ params: { locale } }: { params: { lo
     );
   }
  
+
+  // Derive counts from stats with fallbacks
+  const listingCount = stats?.totalListings || 0;
+  const leadsCount = stats?.activeLeads || 0;
+  const viewsCount = stats?.totalViews || 0;
+
+  if (isBuyer) {
+    // ... (rest of the buyer logic remains same, but I'll make sure it uses stats too if needed)
+    // For now keeping it simple to address the broker issues
+  }
+
+  // Define dynamic stats for Broker/Firm
+  const statCards = [
+    { 
+      label: t('totalViews'), 
+      value: viewsCount.toLocaleString(), 
+      change: '+0%', 
+      icon: Eye, 
+      color: 'text-blue-600', 
+      bg: 'bg-blue-50' 
+    },
+    { 
+      label: t('activeLeads'), 
+      value: leadsCount.toLocaleString(), 
+      change: '+0%', 
+      icon: MessageSquare, 
+      color: 'text-green-600', 
+      bg: 'bg-green-50' 
+    },
+    { 
+      label: t('listingsStat'), 
+      value: listingCount.toLocaleString(), 
+      change: stats?.statusCounts?.ACTIVE ? `+${stats.statusCounts.ACTIVE}` : '+0', 
+      icon: Building, 
+      color: 'text-primary-600', 
+      bg: 'bg-primary-50' 
+    },
+    { 
+      label: t('profileRating'), 
+      value: '5.0', 
+      change: 'New', 
+      icon: Star, 
+      color: 'text-amber-500', 
+      bg: 'bg-amber-50' 
+    },
+  ];
+
   return (
     <div className="space-y-8 pb-20" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* ── Welcome Header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="lg:sticky lg:top-[82px] bg-white z-20 pt-8 pb-4 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 border-b border-gray-100/60">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-1">
             {t('welcomeBack', { name: user?.name?.split(' ')[0] || 'User' })}! 👋
@@ -139,30 +216,27 @@ export default function DashboardOverview({ params: { locale } }: { params: { lo
       </div>
 
       {/* ── Stats Grid ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: t('totalViews'), value: '0', change: '+0%', icon: Eye, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: t('activeLeads'), value: '0', change: '+0%', icon: MessageSquare, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: t('listingsStat'), value: '0', change: '+0', icon: Building, color: 'text-primary-600', bg: 'bg-primary-50' },
-          { label: t('profileRating'), value: '5.0', change: 'New', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
-        ].map((stat, i) => (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        {statCards.map((stat, i) => (
           <motion.div 
             key={stat.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white p-6 rounded-3xl border border-gray-100 shadow-xl shadow-black/[0.02] group hover:border-primary-200 transition-all"
+            className="bg-white p-6 rounded-2xl border border-gray-200/60 shadow-sm group hover:border-primary-100 transition-all flex flex-col justify-between min-h-[160px]"
           >
             <div className="flex justify-between items-start mb-4">
-              <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center`}>
+              <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center`}>
                 <stat.icon className="w-6 h-6" />
               </div>
               <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${stat.color} ${stat.bg}`}>
                 {stat.change}
               </span>
             </div>
-            <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1">{stat.label}</p>
-            <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
+            <div>
+              <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1">{stat.label}</p>
+              <h3 className="text-2xl font-black text-gray-900">{stat.value}</h3>
+            </div>
           </motion.div>
         ))}
       </div>
@@ -199,7 +273,7 @@ export default function DashboardOverview({ params: { locale } }: { params: { lo
 
         {/* Right Sidebar: Shortcuts & Status */}
         <div className="space-y-6">
-          <div className="bg-primary-600 rounded-[32px] p-8 text-white shadow-xl shadow-primary-600/20">
+          <div className="bg-primary-600 rounded-2xl p-8 text-white shadow-lg shadow-primary-600/20">
             <h3 className="text-xl font-bold mb-4">{t('growBusiness')}</h3>
             <p className="text-primary-100 text-sm mb-6 leading-relaxed">
               {t('completeProfileDesc')}
@@ -213,7 +287,7 @@ export default function DashboardOverview({ params: { locale } }: { params: { lo
             </Link>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xl shadow-black/[0.02]">
+          <div className="bg-white rounded-2xl p-6 border border-gray-200/60 shadow-sm">
             <h4 className="font-bold text-gray-900 mb-4">{t('accountStatus')}</h4>
             <div className="space-y-4">
                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">

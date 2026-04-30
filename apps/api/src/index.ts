@@ -81,7 +81,7 @@ const bootstrap = async () => {
 
     // 3. Rate Limit
     await app.register(rateLimit, {
-      max: 100,
+      max: isProduction ? 100 : 1000,
       timeWindow: '1 minute',
     });
 

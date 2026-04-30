@@ -29,6 +29,7 @@ export default function Header({ locale }: HeaderProps) {
   }, []);
 
   const pathname = usePathname();
+  const isDashboard = pathname.includes('/dashboard');
   const isRTL = locale === 'ar';
   const otherLocale = locale === 'en' ? 'ar' : 'en';
   const switchLabel = locale === 'en' ? t('switchToArabic') : t('switchToEnglish');
@@ -37,7 +38,9 @@ export default function Header({ locale }: HeaderProps) {
   const navLinks = [
     { href: `/${locale}`, label: t('home') },
     { href: `/${locale}/listings`, label: t('listings') },
-    ...(isAuthenticated ? [{ href: `/${locale}/dashboard`, label: tCommon('manageListings') }] : []),
+    ...(isAuthenticated ? [
+      { href: `/${locale}/dashboard`, label: tCommon('manageListings') },
+    ] : []),
     { href: `/${locale}/packages`, label: t('packages') },
     { href: `/${locale}/about`, label: t('about') },
     { href: `/${locale}/contact`, label: t('contact') },
@@ -53,17 +56,17 @@ export default function Header({ locale }: HeaderProps) {
               <Download className="w-3 h-3" />
               {tCommon('downloadApp')}
             </span>
-            <span className="flex items-center gap-1.5 hover:text-primary-600 transition-colors cursor-pointer border-inline-start border-gray-100 ps-6">
-              <Sparkles className="w-3 h-3 text-gold" />
+            <Link href={`/${locale}/news`} className="flex items-center gap-1.5 hover:text-primary-600 transition-colors border-inline-start border-gray-100 ps-6 group/news">
+              <Sparkles className="w-3 h-3 text-amber-500 group-hover/news:scale-110 transition-transform" />
               {tCommon('realEstateNews')}
-            </span>
+            </Link>
             {isAuthenticated && (
               <>
                 <Link href={`/${locale}/dashboard`} className="flex items-center gap-1.5 hover:text-primary-600 transition-colors border-inline-start border-gray-100 ps-6">
                   <LayoutDashboard className="w-3 h-3" />
                   {tCommon('manageListings')}
                 </Link>
-                <Link href={`/${locale}/dashboard/listings`} className="flex items-center gap-1.5 hover:text-primary-600 transition-colors border-inline-start border-gray-100 ps-6">
+                <Link href={`/${locale}/favorites`} className="flex items-center gap-1.5 hover:text-primary-600 transition-colors border-inline-start border-gray-100 ps-6">
                   <Heart className="w-3 h-3" />
                   {tDashboard('menu.favorites')}
                 </Link>
@@ -89,7 +92,7 @@ export default function Header({ locale }: HeaderProps) {
 
       {/* ── Main Navigation ── */}
       <header
-        className={`w-full transition-all duration-500 bg-white border-b border-gray-100 ${scrolled ? 'shadow-[0_4px_30px_rgba(0,0,0,0.03)] py-1.5' : 'py-3'
+        className={`w-full transition-all duration-500 bg-white border-b border-gray-100 ${(scrolled || isDashboard) ? 'shadow-[0_4px_30px_rgba(0,0,0,0.03)] py-1.5' : 'py-3'
           }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
@@ -122,7 +125,7 @@ export default function Header({ locale }: HeaderProps) {
             })}
           </nav>
 
-          {/* Actions */}i
+          {/* Actions */}
           <div className="flex items-center gap-4">
             <Link
               href={`/${locale}/listings/post`}
@@ -169,6 +172,14 @@ export default function Header({ locale }: HeaderProps) {
                           >
                             <LayoutDashboard className="w-4 h-4 text-primary-600" />
                             {tCommon('manageListings')}
+                          </Link>
+                          <Link
+                            href={`/${locale}/favorites`}
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
+                          >
+                            <Heart className="w-4 h-4 text-red-500" />
+                            {tDashboard('menu.favorites')}
                           </Link>
                           <hr className="my-1 border-gray-50" />
                         </>

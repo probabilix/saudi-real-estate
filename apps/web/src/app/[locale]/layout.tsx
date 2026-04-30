@@ -32,12 +32,7 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-export async function generateMetadata({
-  params: { locale },
-}: {
-  params: { locale: string };
-}): Promise<Metadata> {
-  console.log('Generating metadata for locale:', locale);
+export async function generateMetadata(): Promise<Metadata> {
   return {
     alternates: {
       languages: {

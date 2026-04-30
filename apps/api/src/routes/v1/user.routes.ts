@@ -61,6 +61,34 @@ export default async function userRoutes(app: FastifyInstance) {
   });
 
   /**
+   * GET /api/v1/user/dashboard-stats
+   * Consolidated metrics for the dashboard overview and listings page
+   */
+  app.get('/dashboard-stats', { preHandler: [authenticateJWT] }, async (request, reply) => {
+    const userId = request.user?.userId;
+    const userRole = request.user?.role;
+
+    try {
+      const isFirm = userRole === 'FIRM';
+      const stats = await ListingService.getDashboardStats(
+        isFirm ? { firmId: userId } : { ownerId: userId }
+      );
+
+      return reply.send({
+        success: true,
+        data: stats
+      });
+    } catch (err: any) {
+      console.error('Dashboard stats error:', err);
+      return reply.status(500).send({ 
+        success: false, 
+        message: 'Failed to fetch dashboard stats',
+        error: err.message
+      });
+    }
+  });
+
+  /**
    * GET /api/v1/user/profile
    * Comprehensive user profile with verification status
    */

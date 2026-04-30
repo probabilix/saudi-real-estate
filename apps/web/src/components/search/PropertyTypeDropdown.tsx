@@ -58,33 +58,43 @@ export default function PropertyTypeDropdown({ type, onChange }: PropertyTypeDro
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="absolute top-full start-0 mt-2 w-[400px] max-w-[90vw] bg-white rounded-2xl shadow-xl border border-surface-200 p-4 z-50 pointer-events-auto"
-          >
-            {/* Tabs */}
-            <div className="flex border-b border-surface-200 mb-4">
-              <button
-                type="button"
-                className={`flex-1 pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'residential' ? 'border-primary-600 text-primary-600' : 'border-transparent text-charcoal-muted hover:text-charcoal'}`}
-                onClick={() => setActiveTab('residential')}
-              >
-                Residential
-              </button>
-              <button
-                type="button"
-                className={`flex-1 pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'commercial' ? 'border-primary-600 text-primary-600' : 'border-transparent text-charcoal-muted hover:text-charcoal'}`}
-                onClick={() => setActiveTab('commercial')}
-              >
-                Commercial
-              </button>
-            </div>
+          <>
+            {/* Mobile Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsOpen(false)}
+              className="fixed inset-0 bg-charcoal/40 backdrop-blur-sm z-[999] md:hidden"
+            />
 
-            {/* Content list */}
-            <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-              <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-surface-50 rounded-lg group">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="fixed inset-x-4 top-[20%] md:absolute md:top-full md:start-0 md:inset-x-auto md:mt-2 md:w-[360px] bg-white rounded-2xl shadow-xl border border-surface-200 p-4 z-[1000] pointer-events-auto"
+            >
+              {/* Tabs */}
+              <div className="flex w-full border-b border-surface-200 mb-4">
+                <button
+                  type="button"
+                  className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-colors px-2 ${activeTab === 'residential' ? 'border-primary-600 text-primary-600' : 'border-transparent text-charcoal-muted hover:text-charcoal'}`}
+                  onClick={() => setActiveTab('residential')}
+                >
+                  Residential
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-colors px-2 ${activeTab === 'commercial' ? 'border-primary-600 text-primary-600' : 'border-transparent text-charcoal-muted hover:text-charcoal'}`}
+                  onClick={() => setActiveTab('commercial')}
+                >
+                  Commercial
+                </button>
+              </div>
+
+              {/* Content list */}
+              <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-surface-50 rounded-lg group">
                   <input 
                     type="radio" 
                     name="property_type" 
@@ -93,26 +103,26 @@ export default function PropertyTypeDropdown({ type, onChange }: PropertyTypeDro
                     className="w-4 h-4 text-primary-600 border-surface-300 focus:ring-primary-500" 
                   />
                   <span className={`text-sm ${type === '' ? 'text-primary-700 font-bold' : 'text-charcoal group-hover:text-primary-600'}`}>All</span>
-              </label>
+                </label>
 
-              {(activeTab === 'residential' ? RESIDENTIAL_TYPES : COMMERCIAL_TYPES).map((pt) => {
-                const ptName = tTypes(pt as never) || pt;
-                return (
-                  <label key={pt} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-surface-50 rounded-lg group">
-                    <input 
-                      type="radio" 
-                      name="property_type"
-                      checked={type === pt}
-                      onChange={() => { onChange(pt); setIsOpen(false); }}
-                      className="w-4 h-4 text-primary-600 border-surface-300 focus:ring-primary-500" 
-                    />
-                    <span className={`text-sm leading-tight ${type === pt ? 'text-primary-700 font-bold' : 'text-charcoal group-hover:text-primary-600'} whitespace-normal`}>{ptName}</span>
-                  </label>
-                );
-              })}
-            </div>
-
-          </motion.div>
+                {(activeTab === 'residential' ? RESIDENTIAL_TYPES : COMMERCIAL_TYPES).map((pt) => {
+                  const ptName = tTypes(pt as never) || pt;
+                  return (
+                    <label key={pt} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-surface-50 rounded-lg group">
+                      <input 
+                        type="radio" 
+                        name="property_type" 
+                        checked={type === pt}
+                        onChange={() => { onChange(pt); setIsOpen(false); }}
+                        className="w-4 h-4 text-primary-600 border-surface-300 focus:ring-primary-500" 
+                      />
+                      <span className={`text-sm ${type === pt ? 'text-primary-700 font-bold' : 'text-charcoal group-hover:text-primary-600'}`}>{ptName}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

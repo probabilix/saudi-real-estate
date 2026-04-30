@@ -5,11 +5,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
-import { MapPin, ChevronDown, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import ChatWidget from '@/components/chat/ChatWidget';
 import PriceDropdown from '@/components/search/PriceDropdown';
 import PropertyTypeDropdown from '@/components/search/PropertyTypeDropdown';
-import { CITIES } from '@saudi-re/shared';
+import CityDropdown from '@/components/search/CityDropdown';
+import PurposeDropdown from '@/components/search/PurposeDropdown';
 
 export default function HeroSection() {
   const t = useTranslations('hero');
@@ -78,7 +79,7 @@ export default function HeroSection() {
             </p>
 
             {/* Search Form Panel */}
-            <div className="max-w-xl w-full">
+            <div className="max-w-xl w-full relative z-30">
               <motion.form
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -87,37 +88,12 @@ export default function HeroSection() {
                 className="bg-white/95 backdrop-blur-xl rounded-2xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.2)] space-y-4 border border-white"
               >
                 <div className="space-y-4">
-                  <div className="relative">
-                    <MapPin className="absolute start-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-600 pointer-events-none" />
-                    <select
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      suppressHydrationWarning
-                      className="w-full bg-surface-50 border border-surface-100 rounded-xl ps-12 pe-4 py-4 text-sm text-charcoal appearance-none outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-semibold"
-                    >
-                      <option value="">{tSearch('allCities')}</option>
-                      {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <ChevronDown className="absolute end-4 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-muted pointer-events-none" />
-                  </div>
+                  <CityDropdown city={city} onChange={setCity} className="w-full" />
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <PropertyTypeDropdown type={type} onChange={setType} />
 
-                    <div className="relative">
-                      <select
-                        value={purpose}
-                        onChange={(e) => setPurpose(e.target.value)}
-                        suppressHydrationWarning
-                        className="w-full bg-surface-50 border border-surface-100 rounded-xl px-5 py-4 text-sm text-charcoal appearance-none outline-none focus:border-primary-500 transition-all font-semibold"
-                      >
-                        <option value="">{tSearch('allPurposes')}</option>
-                        <option value="SALE">{tSearch('sale')}</option>
-                        <option value="RENT">{tSearch('rent')}</option>
-                        <option value="LEASE">{tSearch('lease')}</option>
-                      </select>
-                      <ChevronDown className="absolute end-4 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-muted pointer-events-none" />
-                    </div>
+                    <PurposeDropdown purpose={purpose} onChange={setPurpose} className="w-full" />
 
                     <div className="md:col-span-1 col-span-2">
                       <PriceDropdown minPrice={minPrice} maxPrice={maxPrice} onChange={(min, max) => { setMinPrice(min); setMaxPrice(max); }} />

@@ -11,13 +11,13 @@ interface NavWrapperProps {
 
 export default function NavWrapper({ children, locale }: NavWrapperProps) {
   const pathname = usePathname();
-  
+
   // Hide header/footer on auth and legal pages to maintain the "perfectly sorted" UI
-  const isMinimalPage = pathname.includes('/login') || 
-                       pathname.includes('/register') || 
-                       pathname.includes('/verify') ||
-                       pathname.includes('/post-property') ||
-                       pathname.includes('/edit-property');
+  const isMinimalPage = pathname.includes('/login') ||
+    pathname.includes('/register') ||
+    pathname.includes('/verify') ||
+    pathname.includes('/post-property') ||
+    pathname.includes('/edit-property');
 
   if (isMinimalPage) {
     return <main className="flex-1">{children}</main>;
@@ -28,7 +28,7 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
   return (
     <>
       <Header locale={locale} />
-      <main className="flex-1 pt-[110px]">
+      <main className="flex-1 pt-[70px] md:pt-[110px]">
         {children}
       </main>
       {!isDashboardPage && <Footer />}

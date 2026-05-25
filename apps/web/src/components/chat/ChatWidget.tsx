@@ -3,7 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, Sparkles, X, MessageSquare } from 'lucide-react';
+import { Send, Bot, User, Sparkles, X, MessageSquare, Lock, LogIn } from 'lucide-react';
+import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -13,45 +16,101 @@ interface Message {
 
 interface ChatWidgetProps {
   floating?: boolean;
+  showBubble?: boolean;
+  mode?: 'general' | 'qualification';
+  context?: any; // For listing details
+  onQualified?: () => void;
+  open?: boolean;
+  setOpen?: (open: boolean) => void;
 }
 
 const WELCOME_DELAY = 800;
 
-export default function ChatWidget({ floating = false }: ChatWidgetProps) {
+export default function ChatWidget({ 
+  floating = false, 
+  showBubble = true,
+  mode = 'general', 
+  context, 
+  onQualified,
+  open: controlledOpen,
+  setOpen: controlledSetOpen
+}: ChatWidgetProps) {
   const t = useTranslations('chat');
   const locale = useLocale();
-  const [open, setOpen] = useState(!floating);
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  const [internalOpen, setInternalOpen] = useState(!floating);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = controlledSetOpen ?? setInternalOpen;
+
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Show welcome message
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    e.target.style.height = '38px'; // Reset to default line height
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`; // Auto-grow to fits scroll height (capped at 120px)
+  };
+
+  // Show welcome message if there is no persistent history loaded
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMessages([
-        {
-          role: 'assistant',
-          content: t('welcome'),
-          timestamp: new Date(),
-        },
-      ]);
-    }, WELCOME_DELAY);
-    return () => clearTimeout(timer);
-  }, [t]);
+    if (messages.length === 0) {
+      const timer = setTimeout(() => {
+        setMessages([
+          {
+            role: 'assistant',
+            content: mode === 'qualification' 
+              ? (locale === 'ar' ? 'مرحباً! أنا مساعدك العقاري. هل ترغب في معرفة المزيد عن هذا العقار؟' : 'Hello! I am your real estate assistant. Would you like to know more about this property?')
+              : (locale === 'ar' ? 'مرحباً! أنا مساعدك في منصة عقارات السعودية. كيف يمكنني مساعدتك في استكشاف العقارات أو الإجابة على استفساراتك؟' : 'Welcome! I am your Saudi RE assistant. How can I help you explore properties or answer questions about our platform?'),
+            timestamp: new Date(),
+          },
+        ]);
+      }, WELCOME_DELAY);
+      return () => clearTimeout(timer);
+    }
+  }, [t, mode, locale, messages.length]);
+
+  // Load chat history if authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      async function loadHistory() {
+        try {
+          const res = await api.getChatHistory();
+          if (res.success && res.data && Array.isArray(res.data.history)) {
+            if (res.data.history.length > 0) {
+              setMessages(res.data.history.map((m: any) => ({
+                role: m.role as 'user' | 'assistant',
+                content: m.content,
+                timestamp: new Date(m.timestamp)
+              })));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load persistent chat history:', err);
+        }
+      }
+      loadHistory();
+    }
+  }, [isAuthenticated]);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages]);
 
-  // Focus input when opened (Only for User-triggered floating chat)
+  // Focus input when opened
   useEffect(() => {
-    if (open && floating) {
+    if (open) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [open, floating]);
+  }, [open]);
 
   async function sendMessage() {
     if (!input.trim() || loading) return;
@@ -64,32 +123,47 @@ export default function ChatWidget({ floating = false }: ChatWidgetProps) {
 
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    if (inputRef.current) {
+      inputRef.current.style.height = '38px';
+    }
     setLoading(true);
 
-    // Mock AI response for now
-    await new Promise((r) => setTimeout(r, 1200));
+    try {
+      const history = messages.map(m => ({ role: m.role, content: m.content }));
+      
+      const res = await api.chatProxy({
+        mode,
+        message: userMsg.content,
+        history,
+        locale,
+        context: mode === 'qualification' ? context : undefined
+      });
 
-    const responses = locale === 'ar' ? [
-      'شكراً! ما هي المدينة التي تفضلها؟ الرياض أم جدة أم الدمام؟',
-      'ممتاز! وما هو نوع العقار الذي تبحث عنه؟ شقة، فيلا، أو أرض؟',
-      'رائع! وما هو غرضك من الشراء؟ للسكن الخاص أم للاستثمار؟',
-      'شكراً على المعلومات. سأبحث لك عن أفضل العقارات المناسبة الآن...',
-    ] : [
-      'Great! Which city are you interested in? Riyadh, Jeddah, or Dammam?',
-      'Perfect! What type of property are you looking for? Apartment, Villa, or Land?',
-      'Excellent! Is this for your own use, investment, or rental income?',
-      'Thanks for sharing. Let me find the best matching properties for you...',
-    ];
+      if (!res.success) throw new Error(res.error || 'Failed to connect to AI');
 
-    const randomResp = responses[Math.floor(Math.random() * responses.length)];
+      const data = res.data;
+      const aiContent = typeof data === 'string' ? data : (data.output || data.message || data.text || '...');
 
-    const aiMsg: Message = {
-      role: 'assistant',
-      content: randomResp,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, aiMsg]);
-    setLoading(false);
+      // Check for qualification success flag in the response
+      if (mode === 'qualification' && (aiContent.includes('QUALIFIED_SUCCESS') || data.qualified === true)) {
+        onQualified?.();
+      }
+
+      const aiMsg: Message = {
+        role: 'assistant',
+        content: aiContent.replace('QUALIFIED_SUCCESS', '').trim(),
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (err: any) {
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: `Error: ${err.message || 'Something went wrong'}`,
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -99,7 +173,7 @@ export default function ChatWidget({ floating = false }: ChatWidgetProps) {
     }
   }
 
-  const chatContent = (
+  const chatContent = !isAuthenticated ? (
     <div
       className={`flex flex-col bg-white dark:bg-charcoal overflow-hidden ${floating ? 'h-full' : 'flex-1'}`}
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
@@ -111,7 +185,78 @@ export default function ChatWidget({ floating = false }: ChatWidgetProps) {
             <Sparkles className="w-5 h-5 text-primary-600" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-charcoal">{t('title')}</h3>
+            <h3 className="text-sm font-bold text-charcoal">
+              {mode === 'qualification' 
+                ? (locale === 'ar' ? 'مساعد العقارات' : 'Property Advisor')
+                : (locale === 'ar' ? 'مساعد منصة عقارات السعودية' : 'Saudi RE Assistant')
+              }
+            </h3>
+          </div>
+        </div>
+        {floating && (
+          <button
+            onClick={() => setOpen(false)}
+            className="p-2 rounded-lg text-charcoal-muted hover:bg-surface-50 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Content Gating Area */}
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-surface-50 to-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(#059669_1px,transparent_1px)] [background-size:16px_16px] opacity-[0.03] pointer-events-none z-0" />
+        
+        <div className="w-16 h-16 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-3xl flex items-center justify-center mb-6 shadow-sm relative shrink-0 z-10">
+          <Lock className="w-6 h-6 animate-pulse" />
+          <span className="absolute -top-1 -end-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
+        </div>
+
+        <h3 className="text-lg font-bold text-charcoal mb-3 relative z-10">
+          {locale === 'ar' ? 'تحدث مع مساعدنا العقاري الذكي' : 'Speak with our AI Property Advisor'}
+        </h3>
+        
+        <p className="text-xs text-charcoal-muted leading-relaxed max-w-sm mb-8 font-medium relative z-10">
+          {locale === 'ar' 
+            ? 'سجل دخولك أو أنشئ حساباً جديداً للحصول على تفاصيل الاتصال المباشر بالعقارات.'
+            : 'Sign in or create an account to get direct contact access to properties.'}
+        </p>
+
+        <div className="w-full max-w-xs space-y-3 shrink-0 relative z-10">
+          <button
+            onClick={() => router.push(`/${locale}/auth/login?returnTo=${encodeURIComponent(pathname)}`)}
+            className="w-full py-3.5 bg-primary-600 text-white rounded-2xl flex items-center justify-center gap-2 font-bold text-sm shadow-lg shadow-primary-600/20 hover:bg-primary-700 active:scale-95 transition-all cursor-pointer"
+          >
+            <LogIn className="w-4 h-4" />
+            {locale === 'ar' ? 'تسجيل الدخول' : 'Sign In'}
+          </button>
+          <button
+            onClick={() => router.push(`/${locale}/auth/register?returnTo=${encodeURIComponent(pathname)}`)}
+            className="w-full py-3.5 border-2 border-charcoal text-charcoal rounded-2xl flex items-center justify-center font-bold text-sm hover:bg-surface-50 active:scale-95 transition-all cursor-pointer"
+          >
+            {locale === 'ar' ? 'إنشاء حساب' : 'Create Account'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div
+      className={`flex flex-col bg-white dark:bg-charcoal overflow-hidden ${floating ? 'h-full' : 'flex-1'}`}
+      dir={locale === 'ar' ? 'rtl' : 'ltr'}
+    >
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between p-5 border-b border-surface-100 bg-white">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center border border-primary-100">
+            <Sparkles className="w-5 h-5 text-primary-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-charcoal">
+              {mode === 'qualification' 
+                ? (locale === 'ar' ? 'مساعد العقارات' : 'Property Advisor')
+                : (locale === 'ar' ? 'مساعد منصة عقارات السعودية' : 'Saudi RE Assistant')
+              }
+            </h3>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Online Assistant</span>
@@ -190,15 +335,16 @@ export default function ChatWidget({ floating = false }: ChatWidgetProps) {
       {/* Input */}
       <div className="flex-shrink-0 p-5 border-t border-surface-100 bg-white">
         <div className="flex gap-2 p-1.5 bg-surface-50 border border-surface-200 rounded-2xl focus-within:border-primary-500/50 transition-all">
-          <input
+          <textarea
             ref={inputRef}
-            type="text"
+            rows={1}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder={t('placeholder')}
             disabled={loading}
-            className={`flex-1 bg-transparent px-3 py-2 text-sm text-charcoal placeholder-charcoal-muted outline-none disabled:opacity-50 ${locale === 'ar' ? 'font-arabic text-right' : ''}`}
+            className={`flex-1 bg-transparent px-3 py-1.5 text-sm text-charcoal placeholder-charcoal-muted outline-none disabled:opacity-50 resize-none max-h-32 overflow-y-auto leading-relaxed ${locale === 'ar' ? 'font-arabic text-right' : ''}`}
+            style={{ height: '38px' }}
           />
           <button
             onClick={sendMessage}
@@ -216,7 +362,7 @@ export default function ChatWidget({ floating = false }: ChatWidgetProps) {
     return (
       <>
         <AnimatePresence>
-          {!open && (
+          {(!open && showBubble) && (
             <motion.button
               initial={{ scale: 0, rotate: -20 }}
               animate={{ scale: 1, rotate: 0 }}

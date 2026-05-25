@@ -32,8 +32,16 @@ export default async function legalRoutes(app: FastifyInstance) {
     const { slug } = request.params as { slug: string };
     const body = request.body as any;
     try {
+      const updateData: any = {
+        updatedAt: body.updatedAt ? new Date(body.updatedAt) : new Date()
+      };
+      if (body.titleEn !== undefined) updateData.titleEn = body.titleEn;
+      if (body.titleAr !== undefined) updateData.titleAr = body.titleAr;
+      if (body.contentEn !== undefined) updateData.contentEn = body.contentEn;
+      if (body.contentAr !== undefined) updateData.contentAr = body.contentAr;
+
       const result = await db.update(legalPages)
-        .set({ ...body, updatedAt: new Date() })
+        .set(updateData)
         .where(eq(legalPages.slug, slug))
         .returning();
 

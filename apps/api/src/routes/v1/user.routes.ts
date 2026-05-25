@@ -148,8 +148,9 @@ export default async function userRoutes(app: FastifyInstance) {
 
     try {
       // Upsert logic for broker profile
+      const { avatarUrl: _omit, ...restOfData } = parsed.data;
       const dataToUpdate = {
-        ...parsed.data,
+        ...restOfData,
         userId: userId as string,
         updatedAt: new Date(),
       };

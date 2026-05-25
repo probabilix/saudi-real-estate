@@ -8,7 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import { Building2, ArrowLeft, Mail, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Building2, ArrowLeft, Mail, ShieldCheck, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function LoginContent({ locale }: { locale: string }) {
@@ -24,6 +24,7 @@ function LoginContent({ locale }: { locale: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +53,7 @@ function LoginContent({ locale }: { locale: string }) {
       {/* ── Left Side: Visual/Branding (Hidden on mobile) ── */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 overflow-hidden">
         <Image
-          src="https://images.unsplash.com/photo-1582653280693-eb56d99002bb?w=1200&q=90"
+          src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=90"
           alt="Luxury Property"
           fill
           className="object-cover opacity-60"
@@ -197,14 +198,23 @@ function LoginContent({ locale }: { locale: string }) {
                         {t('forgotPassword')}
                       </Link>
                     </div>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="w-full px-5 py-3.5 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary-600 focus:border-transparent outline-none transition-all placeholder:text-gray-300 font-medium"
-                      placeholder="••••••••"
-                    />
+                    <div className="relative group/pass">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="w-full px-5 py-3.5 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary-600 focus:border-transparent outline-none transition-all placeholder:text-gray-300 font-medium pr-12"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-primary-600 transition-colors p-1"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <button

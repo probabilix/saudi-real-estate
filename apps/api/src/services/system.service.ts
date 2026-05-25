@@ -22,10 +22,35 @@ export class SystemService {
   }
 
   /**
+   * Update or Insert a system setting
+   */
+  static async setSetting(key: string, value: string, description?: string): Promise<void> {
+    try {
+      await db.insert(systemSettings)
+        .values({ key, value, description, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: systemSettings.key,
+          set: { value, description, updatedAt: new Date() }
+        });
+    } catch (err) {
+      console.error(`Error setting system setting [${key}]:`, err);
+      throw err;
+    }
+  }
+
+  /**
    * Get the current cost to publish a listing in credits
    */
   static async getListingCost(): Promise<number> {
     const cost = await this.getSetting('listing_cost_credits', '10');
     return parseInt(cost, 10);
+  }
+
+  static async getQualificationWebhook(): Promise<string> {
+    return this.getSetting('ai_qualification_webhook', '');
+  }
+
+  static async getGeneralAssistantWebhook(): Promise<string> {
+    return this.getSetting('ai_general_assistant_webhook', '');
   }
 }

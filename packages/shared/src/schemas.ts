@@ -96,12 +96,13 @@ export const listingSearchSchema = z.object({
   minPrice: z.preprocess((val) => (val ? parseInt(val as string, 10) : undefined), z.number().int().positive().optional()),
   maxPrice: z.preprocess((val) => (val ? parseInt(val as string, 10) : undefined), z.number().int().positive().optional()),
   bedrooms: z.preprocess((val) => (val ? parseInt(val as string, 10) : undefined), z.number().int().min(0).optional()),
-  foreignerEligible: z.preprocess((val) => val === 'true', z.boolean().optional()),
-  isFeatured: z.preprocess((val) => val === 'true', z.boolean().optional()),
+  foreignerEligible: z.preprocess((val) => (val === undefined || val === null || val === '' ? undefined : val === 'true'), z.boolean().optional()),
+  isFeatured: z.preprocess((val) => (val === undefined || val === null || val === '' ? undefined : val === 'true'), z.boolean().optional()),
   lang: z.enum(['ar', 'en']).default('en'),
   status: z.enum(LISTING_STATUSES).optional(),
   cursor: z.string().optional(),
   limit: z.preprocess((val) => (val ? parseInt(val as string, 10) : 20), z.number().int().min(1).max(100).default(20)),
+  page: z.preprocess((val) => (val ? parseInt(val as string, 10) : 1), z.number().int().min(1).default(1)),
   q: z.string().max(200).optional(), // free text search
 });
 
@@ -132,6 +133,8 @@ export const brokerProfileSchema = z.object({
   nationalShortAddress: z.string().max(255).optional(),
   address: z.string().max(500).optional(),
   avatarUrl: z.string().url().optional().nullable(),
+  nationality: z.string().max(100).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
 });
 
 export const updateBrokerProfileSchema = brokerProfileSchema.partial();

@@ -9,8 +9,10 @@
     "lint": "turbo lint",
     "dev:web": "turbo dev --filter=@saudi-re/web",
     "dev:api": "turbo dev --filter=@saudi-re/api",
+    "dev:admin": "turbo dev --filter=@saudi-re/admin",
     "build:web": "turbo build --filter=@saudi-re/web",
     "build:api": "turbo build --filter=@saudi-re/api",
+    "build:admin": "turbo build --filter=@saudi-re/admin",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {

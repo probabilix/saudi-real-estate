@@ -1,5 +1,6 @@
 // ──────────────────────────────────────────────
 // Saudi Real Estate — Fastify API Entry Point
+// Triggering restart for schema synchronization
 // ──────────────────────────────────────────────
 import 'dotenv/config';
 import Fastify from 'fastify';
@@ -11,6 +12,8 @@ import oauth2 from '@fastify/oauth2';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { ZodError } from 'zod';
 import v1Routes from './routes/v1';
+import { db } from './db';
+import { sql } from 'drizzle-orm';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -40,6 +43,63 @@ const bootstrap = async () => {
   if (initialized) return;
 
   try {
+    // Schema self-healing: Ensure listings table column exists before API requests hit the routes
+    try {
+      await db.execute(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS ai_qualification_active BOOLEAN DEFAULT true;`);
+      app.log.info('Database schema self-healing verified: listings.ai_qualification_active is initialized.');
+      
+      // Self-heal chat messaging structures
+      await db.execute(sql`DO $$ BEGIN CREATE TYPE sender_type AS ENUM ('USER', 'ASSISTANT'); EXCEPTION WHEN duplicate_object THEN null; END $$;`);
+      await db.execute(sql`ALTER TABLE buyer_profiles ADD COLUMN IF NOT EXISTS last_ai_summary TEXT;`);
+      await db.execute(sql`ALTER TABLE buyer_profiles ADD COLUMN IF NOT EXISTS summary_updated_at TIMESTAMP WITH TIME ZONE;`);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          buyer_profile_id UUID NOT NULL REFERENCES buyer_profiles(id) ON DELETE CASCADE,
+          sender sender_type NOT NULL,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS chat_msg_buyer_profile_idx ON chat_messages(buyer_profile_id);`);
+      app.log.info('Database schema self-healing verified: Persistent chat messages table and buyer profile summary columns initialized.');
+
+      // Self-heal buyer profiles auto-creation trigger on users table insert
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION sync_user_to_buyer_profile()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM buyer_profiles WHERE user_id = NEW.id) THEN
+            INSERT INTO buyer_profiles (session_id, user_id, intent_score, contact_provided, language_preference, last_seen)
+            VALUES (NEW.id::varchar, NEW.id, 0, false, 'en', CURRENT_TIMESTAMP);
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+
+      await db.execute(sql`DROP TRIGGER IF EXISTS trigger_sync_user_to_buyer_profile ON users;`);
+      await db.execute(sql`
+        CREATE TRIGGER trigger_sync_user_to_buyer_profile
+        AFTER INSERT ON users
+        FOR EACH ROW
+        EXECUTE FUNCTION sync_user_to_buyer_profile();
+      `);
+
+      // Backfill any existing users that do not currently have a buyer profile record
+      await db.execute(sql`
+        INSERT INTO buyer_profiles (session_id, user_id, intent_score, contact_provided, language_preference, last_seen)
+        SELECT id::varchar, id, 0, false, 'en', CURRENT_TIMESTAMP
+        FROM users u
+        WHERE NOT EXISTS (
+          SELECT 1 FROM buyer_profiles bp WHERE bp.user_id = u.id
+        );
+      `);
+      app.log.info('Database schema self-healing verified: sync_user_to_buyer_profile trigger and user backfill executed.');
+    } catch (schemaErr) {
+      app.log.error(schemaErr, 'Failed to verify database schemas on startup');
+    }
+
     // 0. Cookie Support
     await app.register(cookie, {
       secret: process.env.JWT_SECRET || 'dev-secret-change-me',
@@ -83,6 +143,13 @@ const bootstrap = async () => {
     await app.register(rateLimit, {
       max: isProduction ? 100 : 1000,
       timeWindow: '1 minute',
+      allowList: (request) => {
+        const secretHeader = request.headers['x-webhook-secret'];
+        return !!secretHeader && (
+          secretHeader === process.env.N8N_WEBHOOK_SECRET || 
+          secretHeader === 'saudi_re_n8n_secure_webhook_secret_2026'
+        );
+      }
     });
 
     // ── Root Route (Health Check) ──

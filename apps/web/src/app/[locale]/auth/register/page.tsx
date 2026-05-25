@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-import { Building2, ArrowLeft, Mail, User, Lock, Sparkles, Verified, ChevronDown, Search } from 'lucide-react';
+import { Building2, ArrowLeft, Mail, User, Lock, Sparkles, Verified, ChevronDown, Search, Eye, EyeOff } from 'lucide-react';
 import { RegisterInput } from '@saudi-re/shared';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isValidPhoneNumber, getCountryCallingCode } from 'react-phone-number-input';
@@ -126,6 +126,7 @@ function PhoneSelector({ country, phoneNumber, onCountryChange, onPhoneChange, p
         <input
           type="tel"
           value={phoneNumber}
+          required
           onChange={e => {
             const val = e.target.value;
             // Block completely if they type letters or special chars (allow digits, spaces, plus)
@@ -244,25 +245,30 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    let fullPhone: string | undefined;
-    if (rawPhone.trim()) {
-      const digits = rawPhone.replace(/\D/g, '');
-      const dialCode = getCountryCallingCode(phoneCountry);
-      const e164 = `+${dialCode}${digits}`;
-
-      if (!isValidPhoneNumber(e164)) {
-        setError('Please enter a valid phone number for the selected country.');
-        setLoading(false);
-        return;
-      }
-      fullPhone = e164;
+    if (!rawPhone.trim()) {
+      setError(locale === 'ar' ? 'رقم الهاتف مطلوب.' : 'Phone number is required.');
+      setLoading(false);
+      return;
     }
+
+    let fullPhone: string | undefined;
+    const digits = rawPhone.replace(/\D/g, '');
+    const dialCode = getCountryCallingCode(phoneCountry);
+    const e164 = `+${dialCode}${digits}`;
+
+    if (!isValidPhoneNumber(e164)) {
+      setError('Please enter a valid phone number for the selected country.');
+      setLoading(false);
+      return;
+    }
+    fullPhone = e164;
 
     const payload: RegisterInput = {
       email: formData.email,
@@ -299,7 +305,7 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
       {/* ── Left Side: Visual/Branding ── */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 overflow-hidden">
         <Image
-          src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1200&q=90"
+          src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&q=90"
           alt="Riyadh Skyline"
           fill
           className="object-cover opacity-50"
@@ -467,17 +473,24 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
                   {/* Password */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400 ml-1">{t('password')}</label>
-                    <div className="relative">
+                    <div className="relative group/pass">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                       <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         required
                         minLength={8}
-                        className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all font-bold text-sm placeholder:text-gray-300"
+                        className="w-full pl-11 pr-12 py-3.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all font-bold text-sm placeholder:text-gray-300"
                         placeholder="Min. 8 characters"
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-primary-600 transition-colors p-1"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 

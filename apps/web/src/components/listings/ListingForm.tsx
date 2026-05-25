@@ -20,7 +20,7 @@ import {
   Refrigerator, Shirt, Calendar, TrendingUp, X,
   Building2 as AgencyIcon
 } from 'lucide-react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MediaUpload } from './MediaUpload';
 
@@ -143,6 +143,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
   const { user } = useAuth();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const fromAdmin = searchParams.get('from') === 'admin';
   const locale = params.locale as string || 'en';
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -320,7 +322,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
   });
 
   const userCredits = user?.creditsBalance ?? 0;
-  const hasInsufficientCredits = userCredits < listingCost && !isEdit;
+  const isAdmin = user?.role === 'ADMIN';
+  const hasInsufficientCredits = !isAdmin && userCredits < listingCost && !isEdit;
   const currentType = watch('type');
   const currentPurpose = watch('purpose');
 
@@ -462,13 +465,20 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
     const payload = preparePayload(data);
     console.log('Saving Draft Payload:', payload);
     try {
+      let shortId = initialData?.shortId;
       if (isEdit && initialData?.id) {
-        await api.updateListing(initialData.id, { ...payload, status: 'DRAFT' });
+        const res = await api.updateListing(initialData.id, { ...payload, status: 'DRAFT' });
+        if (res.success && res.data?.shortId) shortId = res.data.shortId;
       } else {
-        await api.createListing({ ...payload, status: 'DRAFT' });
+        const res = await api.createListing({ ...payload, status: 'DRAFT' });
+        if (res.success && res.data?.shortId) shortId = res.data.shortId;
       }
-      router.push(`/${locale}/dashboard/listings`);
-      router.refresh();
+      if (fromAdmin || user?.role === 'ADMIN') {
+        window.location.href = `http://localhost:3002/listings?success=drafted&shortId=${shortId || ''}`;
+      } else {
+        router.push(`/${locale}/dashboard/listings`);
+        router.refresh();
+      }
     } catch (err: unknown) {
       setServerError(err instanceof Error ? err.message : 'Failed to save draft');
     } finally {
@@ -484,33 +494,43 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
     console.log('Publishing/Updating Payload:', payload);
     try {
       let listingId = initialData?.id;
+      let shortId = initialData?.shortId;
       if (isEdit && listingId) {
         const updateRes = await api.updateListing(listingId, payload);
         if (!updateRes.success) throw new Error(updateRes.error || 'Failed to update listing');
+        if (updateRes.data?.shortId) shortId = updateRes.data.shortId;
 
         // Transition to Pending (FLAGGED) only if it's currently a draft
         if (initialData?.status === 'DRAFT') {
           const publishRes = await api.publishListing(listingId);
           if (!publishRes.success) throw new Error(publishRes.error || 'Failed to publish listing');
+          if (publishRes.data?.listing?.shortId) shortId = publishRes.data.listing.shortId;
         }
       } else {
         const createRes = await api.createListing({ ...payload, status: 'DRAFT' });
         if (!createRes.success) throw new Error(createRes.error || 'Failed to create listing');
 
         listingId = createRes.data?.id;
+        if (createRes.data?.shortId) shortId = createRes.data.shortId;
         if (listingId) {
           const publishRes = await api.publishListing(listingId);
           if (!publishRes.success) throw new Error(publishRes.error || 'Failed to publish listing');
+          if (publishRes.data?.listing?.shortId) shortId = publishRes.data.listing.shortId;
         }
       }
 
-      setIsSuccess(true);
-      router.refresh();
+      if (fromAdmin || user?.role === 'ADMIN') {
+        const type = isEdit ? 'updated' : 'created';
+        window.location.href = `http://localhost:3002/listings?success=${type}&shortId=${shortId || ''}`;
+      } else {
+        setIsSuccess(true);
+        router.refresh();
 
-      // Short delay before redirect to show success
-      setTimeout(() => {
-        router.push(`/${locale}/dashboard/listings`);
-      }, 2000);
+        // Short delay before redirect to show success
+        setTimeout(() => {
+          router.push(`/${locale}/dashboard/listings`);
+        }, 2000);
+      }
 
     } catch (err: unknown) {
       setServerError(err instanceof Error ? err.message : 'Failed to process request');
@@ -967,10 +987,9 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                     <EliteSelect
                       label="Furnishing"
                       value={watch('furnishingStatus')}
-                      onChange={(v) => setValue('furnishingStatus', v as "UNFURNISHED" | "PARTLY_FURNISHED" | "FULLY_FURNISHED", { shouldDirty: true, shouldValidate: true })}
+                      onChange={(v) => setValue('furnishingStatus', v as "UNFURNISHED" | "FULLY_FURNISHED", { shouldDirty: true, shouldValidate: true })}
                       options={[
                         { value: 'UNFURNISHED', label: 'Unfurnished' },
-                        { value: 'PARTLY_FURNISHED', label: 'Partly Furnished' },
                         { value: 'FULLY_FURNISHED', label: 'Fully Furnished' }
                       ]}
                     />
@@ -1271,10 +1290,10 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                   ) : (
                     <button 
                       type="button" 
-                      disabled={isSubmitting || (hasInsufficientCredits && (!isEdit || initialData?.status === 'DRAFT'))} 
+                      disabled={isSubmitting || (hasInsufficientCredits && (!isEdit || initialData?.status === 'DRAFT') && !isAdmin)} 
                       onClick={handleSubmit(onPublish)} 
                       className={`px-10 md:px-14 py-4 rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-widest flex items-center gap-3 transition-all shadow-xl ${
-                        (hasInsufficientCredits && (!isEdit || initialData?.status === 'DRAFT')) 
+                        (hasInsufficientCredits && (!isEdit || initialData?.status === 'DRAFT') && !isAdmin) 
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
                           : 'bg-emerald-900 text-white'
                       }`}

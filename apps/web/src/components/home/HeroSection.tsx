@@ -1,22 +1,32 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
-import ChatWidget from '@/components/chat/ChatWidget';
+import { ArrowRight, Phone } from 'lucide-react';
 import PriceDropdown from '@/components/search/PriceDropdown';
 import PropertyTypeDropdown from '@/components/search/PropertyTypeDropdown';
 import CityDropdown from '@/components/search/CityDropdown';
 import PurposeDropdown from '@/components/search/PurposeDropdown';
 
-export default function HeroSection() {
+interface HeroSectionProps {
+  contactPhone?: string;
+}
+
+const TRUST_PILLS = [
+  { en: '200+ Verified Listings', ar: '+200 عقار موثق' },
+  { en: 'Vision 2030 Aligned', ar: 'متوافق مع رؤية 2030' },
+  { en: '100% Direct Ownership', ar: 'ملكية مباشرة 100٪' },
+];
+
+export default function HeroSection({ contactPhone }: HeroSectionProps) {
   const t = useTranslations('hero');
   const tSearch = useTranslations('search');
   const locale = useLocale();
   const router = useRouter();
+  const isRTL = locale === 'ar';
 
   const [city, setCity] = useState('');
   const [type, setType] = useState('');
@@ -36,11 +46,11 @@ export default function HeroSection() {
   }
 
   return (
-    <section className="relative min-h-[90vh] flex items-center bg-surface-50 z-20 overflow-visible">
-      {/* Background Image with Lighter Overlay */}
+    <section className="relative min-h-[92vh] sm:min-h-screen flex items-center z-20 overflow-hidden">
+      {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1600&q=80"
+          src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1920&q=90"
           alt="Saudi Luxury Real Estate"
           fill
           className="object-cover"
@@ -48,79 +58,87 @@ export default function HeroSection() {
           quality={100}
           unoptimized
         />
-        <div className="absolute inset-0 bg-charcoal/30 backdrop-blur-[1px]" />
+        {/* Cinematic gradient — darkest at left for readability, opens right */}
+        <div className="absolute inset-0 bg-gradient-to-r from-charcoal/85 via-charcoal/60 to-charcoal/30" />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 w-full z-10">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-          {/* Left Column: Headline + Search (Col 7) */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            className="lg:col-span-7"
-          >
-            {/* Eyebrow Label */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 mb-8">
-              <Sparkles className="w-3.5 h-3.5 text-accent-400" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">
-                {t('eyebrow')}
-              </span>
-            </div>
+      {/* Gold accent top line */}
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-gold-dark via-gold to-gold-light z-10" />
 
-            {/* Main Headline - Playfair Display */}
-            <h1 className={`text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.1] mb-8 ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
-              {t('title')}
-            </h1>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10 pt-20 pb-16 sm:pt-24 sm:pb-24">
+        <div className={`max-w-3xl ${isRTL ? 'mr-auto' : 'ml-0'}`}>
 
-            {/* Subtext */}
-            <p className="text-lg sm:text-xl text-white/90 leading-relaxed mb-12 max-w-xl font-medium">
-              {t('subtitle')}
-            </p>
-
-            {/* Search Form Panel */}
-            <div className="max-w-xl w-full relative z-30">
-              <motion.form
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.8 }}
-                onSubmit={handleSearch}
-                className="bg-white/95 backdrop-blur-xl rounded-2xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.2)] space-y-4 border border-white"
+          {/* Trust Pills */}
+          <div className="flex flex-wrap gap-2 mb-7">
+            {TRUST_PILLS.map((pill, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white/90 text-[11px] font-semibold tracking-wide"
               >
-                <div className="space-y-4">
-                  <CityDropdown city={city} onChange={setCity} className="w-full" />
+                <span className="w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
+                {isRTL ? pill.ar : pill.en}
+              </span>
+            ))}
+          </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <PropertyTypeDropdown type={type} onChange={setType} />
+          {/* Main Headline */}
+          <h1 className={`text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] mb-5 drop-shadow-sm ${isRTL ? 'font-arabic' : 'font-serif'}`}>
+            {t('title')}
+          </h1>
 
-                    <PurposeDropdown purpose={purpose} onChange={setPurpose} className="w-full" />
+          {/* Subtitle */}
+          <p className="text-base sm:text-lg text-white/80 leading-relaxed mb-8 max-w-xl font-medium">
+            {t('subtitle')}
+          </p>
 
-                    <div className="md:col-span-1 col-span-2">
-                      <PriceDropdown minPrice={minPrice} maxPrice={maxPrice} onChange={(min, max) => { setMinPrice(min); setMaxPrice(max); }} />
-                    </div>
-                  </div>
+          {/* Search Form */}
+          <div className="w-full max-w-2xl">
+            <form
+              onSubmit={handleSearch}
+              className="bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-[0_32px_80px_rgba(0,0,0,0.4)] border border-white/80 border-t-[3px] border-t-primary-500"
+            >
+              <div className="space-y-3">
+                <CityDropdown city={city} onChange={setCity} className="w-full" />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <PropertyTypeDropdown type={type} onChange={setType} />
+                  <PurposeDropdown purpose={purpose} onChange={setPurpose} className="w-full" />
+                  <PriceDropdown minPrice={minPrice} maxPrice={maxPrice} onChange={(min, max) => { setMinPrice(min); setMaxPrice(max); }} />
                 </div>
+              </div>
+
+              <div className="mt-4 flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
-                  className="w-full py-5 rounded-xl bg-primary-600 text-white font-bold text-sm shadow-xl shadow-primary-600/30 hover:bg-primary-700 transition-all active:scale-[0.98]"
+                  className="flex-1 relative overflow-hidden py-3.5 rounded-xl bg-gradient-to-r from-primary-600 via-primary-700 to-primary-800 text-white font-bold text-sm tracking-[0.15em] shadow-lg shadow-primary-600/30 hover:shadow-primary-600/50 hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.98] group flex items-center justify-center gap-2"
                 >
-                  {tSearch('title').toUpperCase()}
+                  <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                  <span className="relative z-10">{tSearch('title').toUpperCase()}</span>
+                  <ArrowRight className={`w-4 h-4 relative z-10 transition-transform duration-300 group-hover:translate-x-1 ${isRTL ? 'rotate-180 group-hover:-translate-x-1' : ''}`} />
                 </button>
-              </motion.form>
-            </div>
-          </motion.div>
+                <Link
+                  href={`/${locale}/listings`}
+                  className="sm:w-auto flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border-2 border-primary-600/30 text-primary-700 font-bold text-sm hover:border-primary-600 hover:bg-primary-50 transition-all duration-200"
+                >
+                  {isRTL ? 'تصفح الكل' : 'Browse All'}
+                </Link>
+              </div>
+            </form>
 
-          {/* Right Column: ChatWidget (Col 5) */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="lg:col-span-5 flex flex-col justify-center"
-          >
-            <div className="bg-white/10 backdrop-blur-md rounded-3xl p-4 border border-white/20 shadow-2xl h-[600px]">
-              <ChatWidget floating={false} />
-            </div>
-          </motion.div>
+            {/* Phone CTA below form */}
+            {contactPhone && (
+              <div className="mt-5 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-white/15 backdrop-blur flex items-center justify-center border border-white/20">
+                  <Phone className="w-3.5 h-3.5 text-white" />
+                </div>
+                <a
+                  href={`tel:${contactPhone.replace(/\s/g, '')}`}
+                  className="text-white/80 hover:text-white text-sm font-semibold transition-colors"
+                >
+                  {isRTL ? `اتصل بنا: ${contactPhone}` : `Call us: ${contactPhone}`}
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>

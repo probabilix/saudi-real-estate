@@ -37,3 +37,4 @@ coverage
 *.log
 audit_listings.ts
 seed-news.ts
+scratch/

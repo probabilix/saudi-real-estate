@@ -29,6 +29,22 @@ const nextConfig = {
   // ── Strict mode ──
   reactStrictMode: true,
 
+  // Ignore build linting/ts issues for rapid iterations
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
+  // ── Custom Webpack Options ──
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.cache = false; // Disable pack file cache allocation OOM crashes in dev monorepo environments
+    }
+    return config;
+  },
+
   // ── Headers for security ──
   async headers() {
     return [

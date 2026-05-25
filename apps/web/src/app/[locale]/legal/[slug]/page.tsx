@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Shield } from 'lucide-react';
+import { ChevronRight, Shield, Loader2 } from 'lucide-react';
+import { api } from '@/lib/api';
 
 const LEGAL_CONTENT: Record<string, {
   en: { title: string; sections: { heading: string; body: string[] }[] };
@@ -66,7 +68,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '7. Contact Us',
           body: [
-            'If you have questions about this Privacy Policy, contact us at: privacy@saudi-re.com or call 920003000.',
+            'If you have questions about this Privacy Policy, contact us at: privacy@saudi-re.com or call +966 53 849 8580.',
           ],
         },
       ],
@@ -127,7 +129,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '7. تواصل معنا',
           body: [
-            'إذا كان لديك أسئلة حول سياسة الخصوصية، تواصل معنا على: privacy@saudi-re.com أو اتصل على 920003000.',
+            'إذا كان لديك أسئلة حول سياسة الخصوصية، تواصل معنا على: privacy@saudi-re.com أو اتصل على +966 53 849 8580.',
           ],
         },
       ],
@@ -323,7 +325,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '8. Contact & Assistance',
           body: [
-            'Our REGA-certified brokers can guide you through every step of the process. Contact us at foreign@saudi-re.com or call 920003000 for dedicated foreign investment support.',
+            'Our REGA-certified brokers can guide you through every step of the process. Contact us at foreign@saudi-re.com or call +966 53 849 8580 for dedicated foreign investment support.',
           ],
         },
       ],
@@ -388,7 +390,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '7. التواصل والدعم',
           body: [
-            'يمكن لوسطائنا المعتمدين من هيئة العقار إرشادك في كل خطوة. تواصل معنا على foreign@saudi-re.com أو اتصل على 920003000.',
+            'يمكن لوسطائنا المعتمدين من هيئة العقار إرشادك في كل خطوة. تواصل معنا على foreign@saudi-re.com أو اتصل على +966 53 849 8580.',
           ],
         },
       ],
@@ -396,10 +398,82 @@ const LEGAL_CONTENT: Record<string, {
   },
 };
 
+function parseMarkdownToSections(markdown: string) {
+  if (!markdown) return [];
+  const lines = markdown.split('\n');
+  const sections: { heading: string; body: string[] }[] = [];
+  let currentSection: { heading: string; body: string[] } | null = null;
+
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+
+    if (line.startsWith('##')) {
+      const heading = line.replace(/^##\s*/, '').trim();
+      currentSection = { heading, body: [] };
+      sections.push(currentSection);
+    } else if (line.startsWith('#')) {
+      const heading = line.replace(/^#+\s*/, '').trim();
+      currentSection = { heading, body: [] };
+      sections.push(currentSection);
+    } else {
+      if (!currentSection) {
+        currentSection = { heading: '', body: [] };
+        sections.push(currentSection);
+      }
+      currentSection.body.push(line);
+    }
+  }
+
+  return sections;
+}
+
 export default function LegalPage({ params: { locale, slug } }: { params: { locale: string; slug: string } }) {
   const isRTL = locale === 'ar';
   const lang = isRTL ? 'ar' : 'en';
-  const content = LEGAL_CONTENT[slug]?.[lang];
+
+  const [content, setContent] = useState<{ title: string; sections: { heading: string; body: string[] }[]; updatedAt?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadContent() {
+      try {
+        const res = await api.getLegalPage(slug);
+        if (res.success && res.data) {
+          const dbTitle = isRTL ? res.data.titleAr : res.data.titleEn;
+          const dbBody = isRTL ? res.data.contentAr : res.data.contentEn;
+          
+          setContent({
+            title: dbTitle,
+            sections: parseMarkdownToSections(dbBody),
+            updatedAt: res.data.updatedAt
+          });
+        } else {
+          // Fallback to static content
+          const fallback = LEGAL_CONTENT[slug]?.[lang];
+          if (fallback) setContent(fallback);
+        }
+      } catch (err) {
+        console.error('Failed to load legal page, using fallback', err);
+        const fallback = LEGAL_CONTENT[slug]?.[lang];
+        if (fallback) setContent(fallback);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadContent();
+  }, [slug, locale]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 animate-pulse">
+          {isRTL ? 'جاري تحميل الصفحة...' : 'Loading Page...'}
+        </p>
+      </div>
+    );
+  }
 
   if (!content) {
     return (
@@ -409,6 +483,12 @@ export default function LegalPage({ params: { locale, slug } }: { params: { loca
       </div>
     );
   }
+
+  const lastUpdatedDate = content?.updatedAt ? new Date(content.updatedAt).toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }) : null;
 
   return (
     <div className={`bg-white min-h-screen ${isRTL ? 'rtl' : 'ltr'}`}>
@@ -433,6 +513,14 @@ export default function LegalPage({ params: { locale, slug } }: { params: { loca
           <h1 className={`text-4xl md:text-6xl font-black text-gray-900 mb-6 tracking-tight leading-tight ${isRTL ? 'font-arabic' : 'font-serif'}`}>
             {content.title}
           </h1>
+          {lastUpdatedDate && (
+            <p className="text-sm text-gray-400 mb-6 flex items-center gap-2 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span>
+                {isRTL ? `آخر تحديث: ${lastUpdatedDate}` : `Last Updated: ${lastUpdatedDate}`}
+              </span>
+            </p>
+          )}
           <div className="w-20 h-1.5 bg-primary-600 rounded-full" />
         </div>
 
@@ -440,15 +528,19 @@ export default function LegalPage({ params: { locale, slug } }: { params: { loca
         <div className="space-y-12">
           {content.sections.map((section, i) => (
             <div key={i} className="border-b border-gray-100 pb-12 last:border-0">
-              <h2 className={`text-xl md:text-2xl font-black text-gray-900 mb-5 ${isRTL ? 'font-arabic' : 'font-serif'}`}>
-                {section.heading}
-              </h2>
+              {section.heading && (
+                <h2 className={`text-xl md:text-2xl font-black text-gray-900 mb-5 ${isRTL ? 'font-arabic' : 'font-serif'}`}>
+                  {section.heading}
+                </h2>
+              )}
               <div className="space-y-3">
                 {section.body.map((para, j) => (
                   <p
                     key={j}
                     className={`text-gray-600 leading-relaxed text-base md:text-lg ${
-                      para.startsWith('•') ? `ps-4 border-s-2 border-primary-200 ${isRTL ? 'font-arabic' : ''}` : ''
+                      (para.startsWith('•') || para.startsWith('-') || para.startsWith('*')) 
+                        ? `ps-4 border-s-2 border-primary-200 ${isRTL ? 'font-arabic' : ''}` 
+                        : ''
                     } ${isRTL ? 'font-arabic' : ''}`}
                   >
                     {para}

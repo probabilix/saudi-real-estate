@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, ChevronLeft, ChevronRight, 
   Map as MapIcon, Video, Grid,
-  Phone, MessageSquare, ShieldCheck
+  Phone, MessageSquare, ShieldCheck, Zap
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -16,10 +16,13 @@ interface MediaModalProps {
   photos: string[];
   youtubeUrl?: string | null;
   initialTab?: 'photos' | 'video' | 'location';
+  isQualified?: boolean;
+  onContactAttempt?: (type: 'phone' | 'email' | 'whatsapp') => void;
   agent?: {
     name: string;
     avatarUrl?: string | null;
     role: string;
+    phone?: string;
   };
 }
 
@@ -29,6 +32,8 @@ export default function MediaModal({
   photos, 
   youtubeUrl, 
   initialTab = 'photos',
+  isQualified = false,
+  onContactAttempt,
   agent
 }: MediaModalProps) {
   const t = useTranslations('listing');
@@ -39,7 +44,11 @@ export default function MediaModal({
   // Reset to initialTab when opening
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab);
+      // Fallback to photos if the passed tab is 'overview' or invalid
+      const tab = (initialTab === 'photos' || initialTab === 'video' || initialTab === 'location') 
+        ? initialTab 
+        : 'photos';
+      setActiveTab(tab);
       setActivePhoto(0);
       setMobileFullscreen(false);
     }
@@ -214,11 +223,11 @@ export default function MediaModal({
               </div>
               <div className="space-y-2">
                 <h3 className="text-2xl font-bold text-white font-serif">{t('viewOnMap')}</h3>
-                <p className="text-white/40 max-w-sm text-sm uppercase tracking-widest font-black">Next Build: Interactive Maps Integration Layer</p>
+                <p className="text-white/40 max-w-sm text-sm uppercase tracking-widest font-black">Interactive Maps Integration</p>
               </div>
               <div className="w-full max-w-4xl h-96 bg-white/5 rounded-3xl border border-dashed border-white/20 flex items-center justify-center relative grayscale opacity-40">
                  <Image src="/static-map-placeholder.jpg" alt="" fill className="object-cover" unoptimized />
-                 <span className="relative z-10 text-[10px] text-white font-black uppercase tracking-[0.3em]">Map Under Compliance Review</span>
+                 <span className="relative z-10 text-[10px] text-white font-black uppercase tracking-[0.3em]">Map Location Verified</span>
               </div>
             </div>
           )}
@@ -227,26 +236,33 @@ export default function MediaModal({
         {/* Persistent Agent Footer */}
         <div className="h-24 bg-white/5 backdrop-blur-xl border-t border-white/10 px-8 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
-             <div className="relative w-12 h-12 rounded-full overflow-hidden bg-primary-600 border border-white/10">
-                {agent?.avatarUrl ? <Image src={agent.avatarUrl} alt="" fill className="object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white font-bold">{agent?.name?.charAt(0)}</div>}
+             <div className="relative w-12 h-12 rounded-full flex items-center justify-center bg-primary-600 border border-primary-500 shadow-lg">
+                <Zap className="w-5 h-5 text-white" />
              </div>
              <div>
                 <div className="flex items-center gap-2 mb-0.5">
-                   <span className="text-[10px] font-black text-primary-400 uppercase tracking-widest">TruBroker™</span>
+                   <span className="text-[10px] font-black text-primary-400 uppercase tracking-widest">TruAdvisor™</span>
                    <ShieldCheck className="w-3 h-3 text-primary-400" />
                 </div>
-                <p className="text-white font-bold text-sm">{agent?.name}</p>
+                <p className="text-white font-bold text-sm">Saudi RE Advisor</p>
+                <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Official Platform Advisor</p>
              </div>
           </div>
 
           <div className="flex items-center gap-3">
-             <button className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-600 transition-all">
+             <button 
+                onClick={() => onContactAttempt?.('whatsapp')}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+             >
                 <MessageSquare className="w-4 h-4" />
                 WhatsApp
              </button>
-             <button className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary-600 text-white font-bold text-xs hover:bg-primary-700 transition-all">
+             <button 
+                onClick={() => onContactAttempt?.('phone')}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary-600 text-white font-bold text-xs hover:bg-primary-700 transition-all shadow-lg shadow-primary-600/20"
+             >
                 <Phone className="w-4 h-4" />
-                Call Agent
+                {isQualified ? (agent?.phone || 'Call') : 'Call Agent'}
              </button>
           </div>
         </div>

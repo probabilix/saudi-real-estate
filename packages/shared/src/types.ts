@@ -61,6 +61,8 @@ export interface BrokerProfile {
   gender: 'MALE' | 'FEMALE' | null;
   nationalShortAddress: string | null;
   address: string | null;
+  nationality: string | null;
+  city: string | null;
   createdAt: string;
   updatedAt: string;
 }

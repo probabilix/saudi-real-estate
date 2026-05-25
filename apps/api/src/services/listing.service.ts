@@ -1,6 +1,6 @@
 import { db } from '../db';
-import { listings, users, leads, favorites } from '../db/schema';
-import { eq, and, gte, lte, or, sql, desc, inArray, InferSelectModel, SQL, isNull } from 'drizzle-orm';
+import { listings, users, leads, favorites, buyerProfiles } from '../db/schema';
+import { eq, and, gte, lte, or, sql, desc, asc, inArray, InferSelectModel, SQL, isNull } from 'drizzle-orm';
 import { ListingSearchInput } from '@saudi-re/shared';
 import { SystemService } from './system.service';
 
@@ -14,6 +14,7 @@ function generateShortId(): string {
   let result = '';
   for (let i = 0; i < 6; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
+
   }
   return `SRE-${result}`;
 }
@@ -26,7 +27,7 @@ export class ListingService {
     const agents = await db.select({ id: users.id })
       .from(users)
       .where(or(eq(users.id, firmId), eq(users.firmId, firmId)));
-    
+
     const agentIds = agents.map(a => a.id);
     return Array.from(new Set([firmId, ...agentIds]));
   }
@@ -35,8 +36,8 @@ export class ListingService {
    * Search and filter listings
    */
   static async searchListings(filters: ListingSearchInput & { ownerId?: string; firmId?: string; status?: string; q?: string; userId?: string }) {
-    const { 
-      city, type, purpose, minPrice, maxPrice, bedrooms, 
+    const {
+      city, type, purpose, minPrice, maxPrice, bedrooms,
       foreignerEligible, isFeatured, ownerId, firmId, status, q, limit = 20, cursor, userId
     } = filters;
 
@@ -78,7 +79,7 @@ export class ListingService {
     } else if (!ownerId && !firmId) {
       conditions.push(eq(listings.status, 'ACTIVE'));
     }
-    
+
     conditions.push(sql`${listings.deletedAt} IS NULL`);
 
     // Get total count
@@ -91,6 +92,7 @@ export class ListingService {
     const results = await db.query.listings.findMany({
       where: and(...conditions),
       limit: limit + 1,
+      offset: (filters.page && filters.page > 1) ? (filters.page - 1) * limit : undefined,
       with: {
         owner: {
           columns: {
@@ -98,11 +100,14 @@ export class ListingService {
             name: true,
             avatarUrl: true,
             role: true,
-            regaVerified: true,
           }
         }
       },
-      orderBy: [desc(listings.createdAt)]
+      orderBy: [
+        desc(listings.isFeatured),
+        asc(listings.featuredOrder),
+        desc(listings.createdAt)
+      ]
     });
 
     // Handle Favorites if userId is provided
@@ -129,12 +134,12 @@ export class ListingService {
     }));
 
     const hasMore = results.length > limit;
-    
+
     const lastItem = items.length > 0 ? items[items.length - 1] : null;
-    const nextCursor = (hasMore && lastItem?.createdAt) 
-      ? (typeof lastItem.createdAt === 'string' ? lastItem.createdAt : lastItem.createdAt.toISOString()) 
+    const nextCursor = (hasMore && lastItem?.createdAt)
+      ? (typeof lastItem.createdAt === 'string' ? lastItem.createdAt : lastItem.createdAt.toISOString())
       : null;
-    
+
     return {
       items,
       total,
@@ -151,6 +156,14 @@ export class ListingService {
       where: and(eq(listings.id, id), sql`${listings.deletedAt} IS NULL`),
       with: {
         owner: {
+          columns: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            role: true,
+            regaVerified: true,
+            firmId: true,
+          },
           with: {
             brokerProfile: true,
             firm: true,
@@ -169,9 +182,10 @@ export class ListingService {
       }
     }
 
-    // Check if favorited by requester
+    // Check if favorited or qualified by requester
     if (requesterId) {
       try {
+        // 1. Check Favorite
         const favorite = await db.query.favorites.findFirst({
           where: and(
             eq(favorites.userId, requesterId),
@@ -179,10 +193,37 @@ export class ListingService {
           )
         });
         (result as any).isFavorited = !!favorite;
+
+        // 2. Check AI Qualification Status
+        // Specific qualification check
+        const qualifiedLeads = await db.select({ id: leads.id })
+          .from(leads)
+          .innerJoin(buyerProfiles, eq(leads.buyerProfileId, buyerProfiles.id))
+          .where(
+            and(
+              eq(buyerProfiles.userId, requesterId),
+              eq(leads.listingId, id),
+              eq(leads.isQualified, true)
+            )
+          )
+          .limit(1);
+
+        if (qualifiedLeads.length > 0) {
+          (result as any).isQualified = true;
+        } else {
+          (result as any).isQualified = false;
+        }
       } catch (err) {
-        console.error('Favorite check failed:', err);
+        console.error('Security check failed:', err);
         (result as any).isFavorited = false;
+        (result as any).isQualified = false;
       }
+    }
+
+    // Direct Toggle Bypass: If AI qualification is explicitly disabled for this listing, auto-reveal for everyone
+    const isAiActive = (result as any).aiQualificationActive ?? true;
+    if (isAiActive === false) {
+      (result as any).isQualified = true;
     }
 
     return result;
@@ -192,29 +233,29 @@ export class ListingService {
    * Get count of listings for a user or firm by status
    */
   static async getListingsCount(params: { ownerId?: string; firmId?: string; status?: string | string[] }) {
-     const { ownerId, firmId, status } = params;
-     const conditions: any[] = [sql`${listings.deletedAt} IS NULL`];
-     
-     if (status) {
-       if (Array.isArray(status)) {
-         conditions.push(inArray(listings.status, status as any));
-       } else {
-         conditions.push(eq(listings.status, status as any));
-       }
-     }
-     
-     if (ownerId) {
-       conditions.push(eq(listings.ownerId, ownerId));
-     } else if (firmId) {
-       const allIds = await this.getFirmCollaboratorIds(firmId);
-       conditions.push(inArray(listings.ownerId, allIds));
-     }
+    const { ownerId, firmId, status } = params;
+    const conditions: any[] = [sql`${listings.deletedAt} IS NULL`];
 
-     const result = await db.select({ count: sql<number>`count(*)` })
-       .from(listings)
-       .where(and(...conditions));
-     
-     return Number(result[0]?.count) || 0;
+    if (status) {
+      if (Array.isArray(status)) {
+        conditions.push(inArray(listings.status, status as any));
+      } else {
+        conditions.push(eq(listings.status, status as any));
+      }
+    }
+
+    if (ownerId) {
+      conditions.push(eq(listings.ownerId, ownerId));
+    } else if (firmId) {
+      const allIds = await this.getFirmCollaboratorIds(firmId);
+      conditions.push(inArray(listings.ownerId, allIds));
+    }
+
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(listings)
+      .where(and(...conditions));
+
+    return Number(result[0]?.count) || 0;
   }
 
   /**
@@ -223,29 +264,29 @@ export class ListingService {
   static async getDashboardStats(params: { ownerId?: string; firmId?: string }) {
     const { ownerId, firmId } = params;
     const conditions: SQL[] = [sql`${listings.deletedAt} IS NULL`];
-    
+
     if (ownerId) {
       conditions.push(eq(listings.ownerId, ownerId));
     } else if (firmId) {
       const allIds = await this.getFirmCollaboratorIds(firmId);
       conditions.push(inArray(listings.ownerId, allIds));
     }
-    
+
     // 1. Get categorized counts
     const statusCounts = await db.select({
       status: listings.status,
       count: sql<number>`count(*)`
     })
-    .from(listings)
-    .where(and(...conditions))
-    .groupBy(listings.status);
+      .from(listings)
+      .where(and(...conditions))
+      .groupBy(listings.status);
 
     // 2. Get total views
     const viewsResult = await db.select({
       totalViews: sql<number>`sum(${listings.viewsCount})`
     })
-    .from(listings)
-    .where(and(...conditions));
+      .from(listings)
+      .where(and(...conditions));
 
     // 3. Get active leads count
     let leadsConditions: SQL | undefined;
@@ -257,7 +298,7 @@ export class ListingService {
       leadsConditions = inArray(leads.brokerId, ids);
     }
 
-    const leadsCount = leadsConditions 
+    const leadsCount = leadsConditions
       ? await db.select({ count: sql<number>`count(*)` }).from(leads).where(leadsConditions)
       : [{ count: 0 }];
 
@@ -281,7 +322,7 @@ export class ListingService {
    */
   static async createListing(requesterId: string, data: any) {
     const shortId = generateShortId();
-    
+
     // Allow Firm Owners to specify a different owner (one of their agents)
     const finalOwnerId = data.ownerId || requesterId;
 
@@ -306,39 +347,48 @@ export class ListingService {
     // 1. Fetch current listing with full owner context
     const current = await db.query.listings.findFirst({
       where: and(eq(listings.id, id), sql`${listings.deletedAt} IS NULL`),
-      with: { 
+      with: {
         owner: {
           columns: {
             id: true,
             firmId: true
           }
-        } 
+        }
       }
     });
 
     if (!current) throw new Error('Listing not found');
 
-    // 2. Permission Check: Owner OR Firm Owner
+    // 2. Permission Check: Owner OR Firm Owner OR Admin
     const isOwner = current.ownerId === requesterId;
     const isFirmOwner = requesterRole === 'FIRM' && (current.owner.firmId === requesterId || current.ownerId === requesterId);
 
-    if (!isOwner && !isFirmOwner) {
+    // Fetch current database role/email to bypass stale JWT issues
+    const [dbUser] = await db.select({ role: users.role, email: users.email }).from(users).where(eq(users.id, requesterId));
+
+    const userEmail = dbUser?.email?.toLowerCase();
+    const isAdmin = dbUser?.role === 'ADMIN' || requesterRole === 'ADMIN';
+
+    console.log(`[AUTH DEBUG] User: ${requesterId}, Role: ${requesterRole}, DB Role: ${dbUser?.role}, Email: ${userEmail}, isAdmin: ${isAdmin}`);
+
+    if (!isOwner && !isFirmOwner && !isAdmin) {
+      console.warn(`[AUTH FAILURE] Unauthorized edit attempt by ${requesterId} (${userEmail}) on listing ${id}`);
       throw new Error('Unauthorized to edit this listing');
     }
 
     // 3. "State-Aware Legal Lock" Logic
     // If listing is already ACTIVE or PENDING review, we LOCK the core identity
     const identityFields = [
-      'type', 
-      'purpose', 
-      'regaAdvertisingLicense', 
-      'regaFalLicense', 
+      'type',
+      'purpose',
+      'regaAdvertisingLicense',
+      'regaFalLicense',
       'propertyAge',
       'locationDescriptionDeedAr'
     ];
 
     const updateData = { ...data };
-    
+
     if (current.status === 'ACTIVE' || current.status === 'FLAGGED') {
       identityFields.forEach(field => {
         if (updateData[field] !== undefined && updateData[field] !== (current as any)[field]) {
@@ -370,21 +420,22 @@ export class ListingService {
       ownerId: listings.ownerId,
       firmId: users.firmId
     })
-    .from(listings)
-    .innerJoin(users, eq(listings.ownerId, users.id))
-    .where(and(eq(listings.id, id), isNull(listings.deletedAt)));
+      .from(listings)
+      .innerJoin(users, eq(listings.ownerId, users.id))
+      .where(and(eq(listings.id, id), isNull(listings.deletedAt)));
 
     if (!current) throw new Error('Listing not found');
 
     const isOwner = current.ownerId === requesterId;
     const isFirmOwner = requesterRole === 'FIRM' && (current.firmId === requesterId || current.ownerId === requesterId);
+    const isAdmin = requesterRole === 'ADMIN';
 
-    if (!isOwner && !isFirmOwner) {
+    if (!isOwner && !isFirmOwner && !isAdmin) {
       throw new Error('Unauthorized to delete this listing');
     }
 
     await db.update(listings)
-      .set({ 
+      .set({
         deletedAt: new Date(),
         status: 'REMOVED' // Ensure status reflects deletion
       })
@@ -399,22 +450,23 @@ export class ListingService {
    */
   static async publishListing(id: string, userId: string) {
     const cost = await SystemService.getListingCost();
-    
+
     // 1. Fetch user and verify balance
-    const [user] = await db.select({ 
-      id: users.id, 
+    const [user] = await db.select({
+      id: users.id,
       creditsBalance: users.creditsBalance,
       regaVerified: users.regaVerified,
       role: users.role
     })
-    .from(users)
-    .where(eq(users.id, userId));
+      .from(users)
+      .where(eq(users.id, userId));
 
     if (!user) throw new Error('User not found');
-    if (!user.regaVerified) throw new Error('Your REGA verification is required before publishing.');
-    
+    const isAdmin = user.role === 'ADMIN';
+    if (!user.regaVerified && !isAdmin) throw new Error('Your REGA verification is required before publishing.');
+
     // 2. Verified balance check
-    if ((user.creditsBalance ?? 0) < cost) {
+    if ((user.creditsBalance ?? 0) < cost && !isAdmin) {
       throw new Error(`Insufficient credits. You need ${cost} credits to publish.`);
     }
 
@@ -429,25 +481,27 @@ export class ListingService {
     const isOwner = currentListing.ownerId === userId;
     const isFirmOwner = user.role === 'FIRM' && currentListing.owner.firmId === userId;
 
-    if (!isOwner && !isFirmOwner) {
+    if (!isOwner && !isFirmOwner && !isAdmin) {
       throw new Error('Unauthorized to publish this listing');
     }
 
     // 4. Update Listing Status & Deduct Credits Sequentially
     // Note: Neon HTTP driver doesn't support db.transaction()
-    
-    // Deduct Credits from the user performing the action
-    await db.update(users)
-      .set({ 
-        creditsBalance: sql`${users.creditsBalance} - ${cost}`,
-        updatedAt: new Date()
-      })
-      .where(eq(users.id, userId));
+
+    // Deduct Credits from the user performing the action (Skip for ADMIN)
+    if (!isAdmin) {
+      await db.update(users)
+        .set({
+          creditsBalance: sql`${users.creditsBalance} - ${cost}`,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId));
+    }
 
     // Update Listing
     const updated = await db.update(listings)
-      .set({ 
-        status: 'FLAGGED', // Pending Admin Review
+      .set({
+        status: isAdmin ? 'ACTIVE' : 'FLAGGED', // Bypass review for ADMIN
         updatedAt: new Date()
       })
       .where(eq(listings.id, id))
@@ -461,6 +515,79 @@ export class ListingService {
       listing: result,
       newBalance: (user.creditsBalance ?? 0) - cost
     };
+  }
+
+  /**
+   * Securely fetch contact info for a listing (to be called after qualification)
+   */
+  static async revealContactInfo(id: string) {
+    const result = await db.query.listings.findFirst({
+      where: eq(listings.id, id),
+      with: {
+        owner: {
+          columns: {
+            phone: true,
+            email: true,
+          }
+        }
+      }
+    });
+
+    if (!result) throw new Error('Listing not found');
+    return result.owner;
+  }
+
+  /**
+   * Generates a concise, high-density 150-token brief of the listing to optimize n8n LLM token costs.
+   */
+  static generateSparseBrief(listing: any): string {
+    if (!listing) return 'No property context available.';
+    
+    // Parse amenities if present and convert to a clean list
+    let amenitiesList = 'None';
+    if (listing.amenities) {
+      try {
+        const ams = typeof listing.amenities === 'string' 
+          ? JSON.parse(listing.amenities) 
+          : listing.amenities;
+        if (typeof ams === 'object' && ams !== null) {
+          const activeAmenities = Object.entries(ams)
+            .filter(([_, v]) => v === true || v === 'true')
+            .map(([k]) => k);
+          if (activeAmenities.length > 0) {
+            amenitiesList = activeAmenities.join(', ');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to parse amenities for brief:', err);
+      }
+    }
+
+    return `Property Brief:
+- ID: ${listing.shortId || listing.id || 'N/A'}
+- Title: ${listing.enTitle || listing.arTitle || 'N/A'}
+- Type & Purpose: ${listing.type || 'N/A'} for ${listing.purpose || 'N/A'}
+- Price: SAR ${(listing.price || 0).toLocaleString()}
+- Location: ${listing.district || 'N/A'}, ${listing.city || 'N/A'}
+- Specs: ${listing.bedrooms || 0} Beds, ${listing.bathrooms || 0} Baths, ${listing.areaSqm || 0} Sqm
+- Status: ${listing.completionStatus || 'N/A'} (${listing.furnishingStatus || 'UNFURNISHED'})
+- REGA License: ${listing.regaFalLicense || 'N/A'}
+- Amenities: ${amenitiesList}`;
+  }
+
+  /**
+   * Fetches a listing and generates its sparse brief
+   */
+  static async getSparseBrief(id: string): Promise<string> {
+    try {
+      const listing = await db.query.listings.findFirst({
+        where: and(eq(listings.id, id), sql`${listings.deletedAt} IS NULL`),
+      });
+      return this.generateSparseBrief(listing);
+    } catch (err) {
+      console.error(`Error generating brief for listing ${id}:`, err);
+      return 'Failed to generate property brief.';
+    }
   }
 }
 

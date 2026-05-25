@@ -36,8 +36,9 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const [activeTab, setActiveTab] = useState('overview');
   const [mortgageType, setMortgageType] = useState<'resident' | 'expat'>('resident');
   const [amenitiesModalOpen, setAmenitiesModalOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isQualified, setIsQualified] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [revealedContact, setRevealedContact] = useState<{ phone?: string; email?: string } | null>(null);
 
   // Additional State & Refs
   const [similarListings, setSimilarListings] = useState<Listing[]>([]);
@@ -52,15 +53,45 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
     location: useRef<HTMLDivElement>(null),
   };
 
+  const handleContactAttempt = (type: 'phone' | 'email' | 'whatsapp') => {
+    setLightboxOpen(false);
+    if (isQualified && revealedContact) {
+      if (type === 'phone') window.location.href = `tel:${revealedContact.phone || '+966538498580'}`;
+      if (type === 'email') window.location.href = `mailto:${revealedContact.email || 'info@saudire.com'}?subject=Inquiry: ${title}`;
+      if (type === 'whatsapp') window.open(`https://wa.me/${revealedContact.phone?.replace(/[+\s\-]/g, '') || '966538498580'}?text=I am interested in: ${title}`, '_blank');
+    } else {
+      setChatOpen(true);
+    }
+  };
+
+  const handleQualificationSuccess = async () => {
+    try {
+      const res = await api.revealListingContact(id);
+      if (res.success && res.data) {
+        setRevealedContact(res.data);
+        setIsQualified(true);
+        setChatOpen(false); // Auto-close chat if qualified
+      }
+    } catch (err) {
+      console.error('Failed to reveal contact info', err);
+    }
+  };
+
   useEffect(() => {
     async function fetchDetail() {
+// ... existing fetchDetail logic ...
       setLoading(true);
       try {
         const res = await api.getListingById(id);
         if (res.success && res.data) {
-          const l = res.data as ListingWithOwner & { isFavorited?: boolean };
+          const l = res.data as ListingWithOwner & { isFavorited?: boolean; isQualified?: boolean };
           setListing(l);
           setShortlisted(!!l.isFavorited);
+          
+          // Auto-reveal if already qualified in DB
+          if (l.isQualified) {
+            handleQualificationSuccess();
+          }
         } else {
           setListing(null);
         }
@@ -208,7 +239,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 h-auto md:h-[550px] overflow-hidden rounded-2xl">
           {/* Main Feature Photo */}
-          <button className="col-span-1 md:col-span-8 relative aspect-[4/3] md:aspect-auto group overflow-hidden rounded-xl border border-surface-100 shadow-sm" onClick={() => setLightboxOpen(true)}>
+          <div className="col-span-1 md:col-span-8 relative aspect-[4/3] md:aspect-auto group overflow-hidden rounded-xl border border-surface-100 shadow-sm cursor-pointer" onClick={() => { setActiveTab('photos'); setLightboxOpen(true); }}>
             {l?.photos?.[0] && <Image src={l.photos[0]} alt={title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" priority unoptimized />}
             <div className="absolute top-4 left-4 flex gap-2">
               {l?.truCheckVerified && (
@@ -226,13 +257,13 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 <MapIcon className="w-3.5 h-3.5" />{t('map')}
               </button>
             </div>
-          </button>
+          </div>
           {/* Secondary Photo Stack: exactly 2 photos stacked */}
           <div className="hidden md:flex md:col-span-4 flex-col gap-3 h-full">
-            <button className="relative group overflow-hidden rounded-xl border border-surface-100 shadow-sm flex-1" onClick={() => setLightboxOpen(true)}>
+            <button className="relative group overflow-hidden rounded-xl border border-surface-100 shadow-sm flex-1" onClick={() => { setActiveTab('photos'); setLightboxOpen(true); }}>
               {l?.photos?.[1] && <Image src={l.photos[1]} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />}
             </button>
-            <button className="relative group overflow-hidden bg-charcoal rounded-xl border border-surface-100 shadow-sm flex-1" onClick={() => setLightboxOpen(true)}>
+            <button className="relative group overflow-hidden bg-charcoal rounded-xl border border-surface-100 shadow-sm flex-1" onClick={() => { setActiveTab('photos'); setLightboxOpen(true); }}>
               {l?.photos?.[2] && <Image src={l.photos[2]} alt="" fill className="object-cover opacity-50" unoptimized />}
               <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
                 <span className="text-2xl font-black">+{Math.max(0, (l?.photos?.length || 0) - 2)}</span>
@@ -295,10 +326,8 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 {title}
               </h1>
 
-              {/* Stats bar: Views + Property ID */}
+              {/* Stats bar: Property ID only (Views removed as per request) */}
               <div className="flex items-center gap-4 text-[11px] font-bold text-charcoal-muted uppercase tracking-widest">
-                <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" />{l.viewsCount ?? 0} {t('views')}</span>
-                <span className="text-surface-300">•</span>
                 <span>{t('propertyId')}: <span className="text-primary-600 font-black">{l.shortId || l.id.slice(0, 8).toUpperCase()}</span></span>
               </div>
 
@@ -410,7 +439,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
             {/* ── MOBILE ONLY: Agent Card after Property Info ── */}
             <div className="lg:hidden">
-              <AgentContactCard l={l} t={t} locale={locale} setIsQualified={setIsQualified} />
+              <AgentContactCard l={l} t={t} locale={locale} handleContactAttempt={handleContactAttempt} isQualified={isQualified} revealedContact={revealedContact} />
             </div>
 
             {/* REGA Compliance Card */}
@@ -572,14 +601,14 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('investmentInsights')}</h4>
                 <div className="grid gap-3">
                   {[
-                    { label: t('marketGuide') },
-                    { label: t('roiProjections') },
-                    { label: t('legalChecklist') },
-                    { label: t('taxExplained') }
+                    { label: t('marketGuide'), slug: 'market-valuation-guide' },
+                    { label: t('roiProjections'), slug: 'roi-projections-2026' },
+                    { label: t('legalChecklist'), slug: 'legal-handover-checklist' },
+                    { label: t('taxExplained'), slug: 'ownership-taxes-explained' }
                   ].map((item, idx) => (
-                    <Link key={idx} href="#" className="flex items-center justify-between group">
+                    <Link key={idx} href={`/${locale}/news/${item.slug}`} className="flex items-center justify-between group">
                       <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item.label}</span>
-                      <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-2 transition-transform" />
+                      <ChevronRight className={`w-4 h-4 text-surface-300 transition-transform ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
                     </Link>
                   ))}
                 </div>
@@ -589,7 +618,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
           {/* ── RIGHT SIDEBAR (Desktop only) ── */}
           <div className="hidden lg:block space-y-6">
-            <AgentContactCard l={l} t={t} locale={locale} setIsQualified={setIsQualified} />
+            <AgentContactCard l={l} t={t} locale={locale} handleContactAttempt={handleContactAttempt} isQualified={isQualified} revealedContact={revealedContact} />
 
             {/* Popular Areas */}
             <div className="bg-white border border-surface-200 p-6 space-y-4 shadow-sm rounded-2xl">
@@ -622,12 +651,12 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('investmentInsights')}</h4>
               <div className="grid gap-3">
                 {[
-                  { label: t('marketGuide') },
-                  { label: t('roiProjections') },
-                  { label: t('legalChecklist') },
-                  { label: t('taxExplained') }
+                  { label: t('marketGuide'), slug: 'market-valuation-guide' },
+                  { label: t('roiProjections'), slug: 'roi-projections-2026' },
+                  { label: t('legalChecklist'), slug: 'legal-handover-checklist' },
+                  { label: t('taxExplained'), slug: 'ownership-taxes-explained' }
                 ].map((item, idx) => (
-                  <Link key={idx} href="#" className="flex items-center justify-between group">
+                  <Link key={idx} href={`/${locale}/news/${item.slug}`} className="flex items-center justify-between group">
                     <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item.label}</span>
                     <ChevronRight className={`w-4 h-4 text-surface-300 transition-all ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-2' : 'group-hover:translate-x-2'}`} />
                   </Link>
@@ -669,64 +698,85 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         youtubeUrl={l.youtubeUrl}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         initialTab={activeTab as any}
+        isQualified={isQualified}
+        onContactAttempt={handleContactAttempt}
         agent={{
           name: l.owner.name || '',
           avatarUrl: l.owner.avatarUrl,
-          role: l.owner.role
+          role: l.owner.role,
+          phone: revealedContact?.phone
         }}
       />
 
       {/* MOBILE STICKY CONTACT BAR */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-surface-200 px-6 py-4 md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative w-10 h-10 rounded-full overflow-hidden border border-surface-100">
-            {l.owner.avatarUrl ? <Image src={l.owner.avatarUrl} alt="" fill className="object-cover" unoptimized /> : <div className="w-full h-full bg-primary-600 border border-primary-500 rounded-full" />}
+          <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-primary-100 bg-primary-50 flex items-center justify-center">
+            <Zap className="w-5 h-5 text-primary-600" />
           </div>
           <div>
-            <p className="text-[10px] font-black text-primary-600 uppercase tracking-widest leading-none">Agent</p>
-            <p className="text-sm font-bold text-charcoal truncate max-w-[120px]">{l.owner.name}</p>
+            <p className="text-[10px] font-black text-primary-600 uppercase tracking-widest leading-none">Platform</p>
+            <p className="text-sm font-bold text-charcoal truncate max-w-[120px]">Saudi RE Advisor</p>
           </div>
         </div>
         <div className="flex gap-2 flex-1 justify-end">
-          <button className="p-3 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-600/20"><Phone className="w-5 h-5" /></button>
-          <button className="px-5 py-3 bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+          <button 
+            onClick={() => handleContactAttempt('phone')}
+            className="p-3 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-600/20"
+          >
+            <Phone className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={() => handleContactAttempt('whatsapp')}
+            className="px-5 py-3 bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+          >
             <MessageSquare className="w-4 h-4" />
             WhatsApp
           </button>
         </div>
       </div>
 
-      <ChatWidget floating />
+      <ChatWidget 
+        floating 
+        showBubble={true}
+        open={chatOpen} 
+        setOpen={setChatOpen} 
+        mode="qualification" 
+        context={{ id: l.id, title: title }} 
+        onQualified={handleQualificationSuccess}
+      />
     </div>
   );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function AgentContactCard({ l, t, locale, setIsQualified }: { l: ListingWithOwner; t: any; locale: string; setIsQualified: (v: boolean) => void }) {
+function AgentContactCard({ l, t, locale, handleContactAttempt, isQualified, revealedContact }: { l: ListingWithOwner; t: any; locale: string; handleContactAttempt: (type: any) => void; isQualified: boolean; revealedContact: any }) {
+  const brokerName = l.owner?.name || 'Authorized Broker';
+  const avatarUrl = (l.owner as any)?.avatarUrl;
+
+  const profilePath = l.owner?.role === 'FIRM' ? 'firms' : 'brokers';
+
   return (
     <div className="bg-white border border-surface-200 rounded-2xl p-6 space-y-6 shadow-sm">
-      <div className="flex items-center gap-4">
-        <Link href={`/${locale}/${l.owner.role === 'FIRM' ? 'firms' : 'brokers'}/${l.owner.id}`}
-          className="relative w-16 h-16 rounded-full border-2 border-surface-100 overflow-hidden shadow-lg bg-surface-50 flex items-center justify-center hover:scale-105 transition-transform shrink-0">
-          {l.owner.avatarUrl ? (
-            <Image src={l.owner.avatarUrl} alt="" fill className="object-cover" unoptimized />
+      <Link href={`/${locale}/${profilePath}/${l.owner.id}`} className="flex items-center gap-4 group hover:opacity-90 transition-all">
+        <div className="relative w-16 h-16 rounded-full border-2 border-primary-100 overflow-hidden shadow-lg bg-primary-50 flex items-center justify-center shrink-0">
+          {avatarUrl ? (
+            <Image src={avatarUrl} alt={brokerName} fill className="object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-primary-600 text-white text-xl font-bold">
-              {l.owner.name?.charAt(0)}
+              {brokerName.charAt(0)}
             </div>
           )}
-        </Link>
+        </div>
         <div className="flex-1 min-w-0">
-          <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">TruBroker™</span>
-          <Link href={`/${locale}/${l.owner.role === 'FIRM' ? 'firms' : 'brokers'}/${l.owner.id}`}
-            className="hover:text-primary-600 transition-colors block">
-            <h5 className="text-base font-bold text-charcoal leading-tight truncate">{l.owner.name}</h5>
-          </Link>
+          <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">{t('verifiedBroker') || 'Verified Broker'}</span>
+          <h5 className="text-base font-bold text-charcoal leading-tight truncate group-hover:text-primary-600 transition-colors">{brokerName}</h5>
           <p className="text-xs text-charcoal-muted font-medium mt-0.5">
-            {l.owner.role === 'FIRM' ? t('management') : (l.owner.brokerProfile?.titleEn || t('professionalAgent'))}
+            {l.owner?.role === 'FIRM' ? 'Licensed Real Estate Firm' : 'Professional Broker'}
           </p>
         </div>
-      </div>
+        <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
+      </Link>
 
       <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -737,28 +787,36 @@ function AgentContactCard({ l, t, locale, setIsQualified }: { l: ListingWithOwne
       </div>
 
       <div className="space-y-2.5">
-        <button onClick={() => setIsQualified(true)}
-          className="w-full py-3 rounded-xl flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm bg-primary-600 text-white hover:bg-primary-700 active:scale-95">
+        <button 
+          onClick={() => handleContactAttempt('email')}
+          className="w-full py-3 rounded-xl flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm bg-primary-600 text-white hover:bg-primary-700 active:scale-95"
+        >
           <Mail className="w-4 h-4" />
-          {t('emailAgent')}
+          {isQualified && revealedContact ? revealedContact.email : t('emailAgent')}
         </button>
-        <button className="w-full py-3 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm border-charcoal text-charcoal hover:bg-surface-50 active:scale-95">
+        <button 
+          onClick={() => handleContactAttempt('phone')}
+          className="w-full py-3 rounded-xl border-2 flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm border-charcoal text-charcoal hover:bg-surface-50 active:scale-95"
+        >
           <Phone className="w-4 h-4" />
-          {t('callPrivate')}
+          {isQualified && revealedContact ? revealedContact.phone : t('callPrivate')}
         </button>
-        <button className="w-full py-3 rounded-xl flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95">
+        <button 
+          onClick={() => handleContactAttempt('whatsapp')}
+          className="w-full py-3 rounded-xl flex items-center justify-center gap-2.5 font-bold text-sm transition-all shadow-sm bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95"
+        >
           <MessageSquare className="w-4 h-4" />
           {t('whatsappContact')}
         </button>
       </div>
 
       <div className="pt-3 border-t border-surface-100">
-        <Link href={`/${locale}/firms/${l.owner.id}`} className="flex items-center justify-between group">
-          <span className="text-xs font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">
-            {l.owner.name || 'View Agency Profile'}
+        <div className="flex items-center justify-between group">
+          <span className="text-xs font-bold text-charcoal-muted">
+            Direct Platform Listing
           </span>
-          <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
-        </Link>
+          <CheckCircle className="w-4 h-4 text-emerald-500" />
+        </div>
       </div>
     </div>
   );

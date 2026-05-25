@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-canvas text-surface-800 font-sans;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-400;
+  }
+}
+
+@layer components {
+  /* ── Admin Card ── */
+  .admin-card {
+    @apply bg-white rounded-2xl border border-surface-200 shadow-card;
+  }
+
+  /* ── Status Badges ── */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-green  { @apply bg-emerald-50  text-emerald-700  border border-emerald-200; }
+  .badge-yellow { @apply bg-amber-50    text-amber-700    border border-amber-200; }
+  .badge-red    { @apply bg-red-50      text-red-700      border border-red-200; }
+  .badge-blue   { @apply bg-blue-50     text-blue-700     border border-blue-200; }
+  .badge-purple { @apply bg-purple-50   text-purple-700   border border-purple-200; }
+  .badge-gray   { @apply bg-surface-100 text-surface-600  border border-surface-200; }
+
+  /* ── Table ── */
+  .admin-table {
+    @apply w-full text-sm;
+  }
+  .admin-table th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider bg-surface-50 border-b border-surface-200;
+  }
+  .admin-table td {
+    @apply px-4 py-3.5 border-b border-surface-100 text-surface-700;
+  }
+  .admin-table tr:last-child td {
+    @apply border-0;
+  }
+  .admin-table tr:hover td {
+    @apply bg-surface-50/50;
+  }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl transition-colors;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-surface-50 text-surface-700 text-sm font-semibold rounded-xl border border-surface-200 transition-colors;
+  }
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-surface-500 hover:text-surface-800 hover:bg-surface-100 text-sm font-medium rounded-lg transition-colors;
+  }
+
+  /* ── Form inputs ── */
+  .admin-input {
+    @apply w-full px-3.5 py-2.5 bg-white border border-surface-200 rounded-xl text-sm text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all appearance-none;
+  }
+  
+  select.admin-input {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+  }
+
+  .admin-label {
+    @apply block text-xs font-semibold text-surface-600 uppercase tracking-wide mb-1.5;
+  }
+
+  /* ── Stat card ── */
+  .stat-card {
+    @apply admin-card p-5 flex items-start gap-4;
+  }
+  .stat-icon {
+    @apply w-11 h-11 rounded-xl flex items-center justify-center shrink-0;
+  }
+}

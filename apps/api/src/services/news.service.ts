@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { news } from '../db/schema';
+import { news, newsFavorites } from '../db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 
 export class NewsService {
@@ -25,11 +25,33 @@ export class NewsService {
   /**
    * Get news post by slug
    */
-  static async getNewsBySlug(slug: string) {
+  static async getNewsBySlug(slug: string, userId?: string) {
     const [post] = await db.select()
       .from(news)
-      .where(eq(news.slug, slug));
-    return post;
+      .where(eq(news.slug, slug))
+      .limit(1);
+
+    if (!post) return null;
+
+    if (userId) {
+      const fav = await db.select()
+        .from(newsFavorites)
+        .where(and(
+          eq(newsFavorites.userId, userId),
+          eq(newsFavorites.newsId, post.id)
+        ))
+        .limit(1);
+
+      return {
+        ...post,
+        isFavorited: fav.length > 0
+      };
+    }
+
+    return {
+      ...post,
+      isFavorited: false
+    };
   }
 
   /**

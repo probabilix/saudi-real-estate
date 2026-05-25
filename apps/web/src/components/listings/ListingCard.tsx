@@ -97,7 +97,7 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
     >
       <div className="bg-white border border-surface-200 rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 transform hover:-translate-y-1 relative h-full flex flex-col">
         {/* Link Overlay for the whole card area EXCEPT buttons */}
-        <Link 
+        <Link
           href={`/${locale}/listings/${listing.id}`}
           className="absolute inset-0 z-0"
           aria-label={title}
@@ -144,15 +144,14 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
           <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg shadow-lg pointer-events-none ${purposeBg[listing.purpose]}`}>
             {purposeLabel[listing.purpose]}
           </span>
-          
+
           {!isDashboard && (
             <button
               onClick={handleToggleFavorite}
-              className={`p-2 rounded-lg backdrop-blur-md border shadow-sm transition-all relative z-20 ${
-                favorited 
-                  ? 'bg-red-50/90 text-red-500 border-red-100' 
+              className={`p-2 rounded-lg backdrop-blur-md border shadow-sm transition-all relative z-20 ${favorited
+                  ? 'bg-red-50/90 text-red-500 border-red-100'
                   : 'bg-white/80 text-gray-400 border-gray-100 hover:text-red-500 hover:bg-white'
-              }`}
+                }`}
             >
               <Heart className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
             </button>
@@ -186,17 +185,17 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
               <Square className="w-4 h-4 text-primary-500/70" />
               <span className="font-medium">{listing.areaSqm?.toLocaleString()} {tCommon('sqm')}</span>
             </div>
-            
+
             {isDashboard && (
               <div className="ms-auto flex items-center gap-2 relative z-20">
-                <Link 
+                <Link
                   href={`/${locale}/edit-property/${listing.id}`}
                   className="p-2.5 bg-slate-50 hover:bg-primary-50 text-slate-400 hover:text-primary-600 rounded-xl transition-all border border-slate-100 hover:border-primary-100"
                 >
                   <span className="text-[10px] font-bold uppercase tracking-widest px-1">Edit</span>
                 </Link>
                 {onDelete && (
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();

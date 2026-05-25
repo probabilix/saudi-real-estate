@@ -10,14 +10,16 @@ import { api, NewsPost } from '@/lib/api';
 export default function NewsArticlePage({ params: { locale, slug } }: { params: { locale: string, slug: string } }) {
   const [post, setPost] = useState<NewsPost | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSaved, setIsSaved] = useState(false);
   const isRTL = locale === 'ar';
 
   useEffect(() => {
     const fetchPost = async () => {
       try {
         const res = await api.getNewsBySlug(slug);
-        if (res.success) {
-          setPost(res.data || null);
+        if (res.success && res.data) {
+          setPost(res.data);
+          setIsSaved(!!(res.data as any).isFavorited);
         }
       } catch (err) {
         console.error('Failed to fetch post', err);
@@ -60,8 +62,8 @@ export default function NewsArticlePage({ params: { locale, slug } }: { params: 
       {/* ── Article Header ── */}
       <header className="relative h-[60vh] md:h-[70vh] min-h-[500px] flex items-end pb-20">
         <div className="absolute inset-0">
-          <Image 
-            src={post.featuredImage || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1200'} 
+          <Image
+            src={post.featuredImage || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1200'}
             alt={title}
             fill
             priority
@@ -71,7 +73,7 @@ export default function NewsArticlePage({ params: { locale, slug } }: { params: 
         </div>
 
         <div className="max-w-4xl mx-auto px-4 relative z-10 w-full">
-          <Link 
+          <Link
             href={`/${locale}/news`}
             className="inline-flex items-center gap-2 text-white/70 hover:text-white mb-8 transition-colors text-sm font-bold group"
           >
@@ -108,96 +110,131 @@ export default function NewsArticlePage({ params: { locale, slug } }: { params: 
         <div className="flex flex-col md:flex-row gap-12">
           {/* Main Body */}
           <div className="flex-1">
-             <div className={`prose prose-lg prose-gray max-w-none ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}>
-                {/* For a real blog we'd use a markdown/rich text renderer here */}
-                {content.split('\n').map((para: string, i: number) => (
-                  <p key={i} className="mb-6 text-gray-600 leading-relaxed text-lg">
-                    {para}
-                  </p>
-                ))}
-             </div>
+            <div className={`prose prose-lg prose-gray max-w-none ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}>
+              {/* For a real blog we'd use a markdown/rich text renderer here */}
+              {content.split('\n').map((para: string, i: number) => (
+                <p key={i} className="mb-6 text-gray-600 leading-relaxed text-lg">
+                  {para}
+                </p>
+              ))}
+            </div>
 
-             {/* Footer Actions */}
-             <div className="mt-16 pt-10 border-t border-gray-100 flex flex-wrap items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                   <span className="text-xs font-black uppercase tracking-widest text-gray-400">
-                      {isRTL ? 'مشاركة:' : 'Share:'}
-                   </span>
-                   <div className="flex gap-2">
-                      {[Facebook, Twitter, Linkedin, Share2].map((Icon, i) => (
-                        <button key={i} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all">
-                          <Icon className="w-4 h-4" />
-                        </button>
-                      ))}
-                   </div>
+            {/* Footer Actions */}
+            <div className="mt-16 pt-10 border-t border-gray-100 flex flex-wrap items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-black uppercase tracking-widest text-gray-400">
+                  {isRTL ? 'مشاركة:' : 'Share:'}
+                </span>
+                <div className="flex gap-2">
+                  {[
+                    { Icon: Facebook, url: `https://www.facebook.com/sharer/sharer.php?u=${typeof window !== 'undefined' ? window.location.href : ''}` },
+                    { Icon: Twitter, url: `https://twitter.com/intent/tweet?url=${typeof window !== 'undefined' ? window.location.href : ''}&text=${encodeURIComponent(title)}` },
+                    { Icon: Linkedin, url: `https://www.linkedin.com/sharing/share-offsite/?url=${typeof window !== 'undefined' ? window.location.href : ''}` },
+                  ].map((item, i) => (
+                    <button
+                      key={i}
+                      onClick={() => window.open(item.url, '_blank', 'width=600,height=400')}
+                      className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all"
+                    >
+                      <item.Icon className="w-4 h-4" />
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator.share({ title, url: window.location.href });
+                      } else {
+                        navigator.clipboard.writeText(window.location.href);
+                        alert(isRTL ? 'تم نسخ الرابط!' : 'Link copied to clipboard!');
+                      }
+                    }}
+                    className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button className={`flex items-center gap-2 px-6 py-3 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 hover:bg-gray-50 transition-all ${isRTL ? 'font-arabic' : ''}`}>
-                   <Bookmark className="w-4 h-4" />
-                   {isRTL ? 'احفظ المقال' : 'Save Article'}
-                </button>
-             </div>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!post) return;
+                  const res = await api.toggleNewsFavorite(post.id);
+                  if (res.success) {
+                    setIsSaved(!!res.data?.isFavorited);
+                  } else if (res.error?.includes('Unauthorised')) {
+                    alert(isRTL ? 'يرجى تسجيل الدخول لحفظ المقالات' : 'Please login to save articles');
+                  }
+                }}
+                className={`flex items-center gap-2 px-6 py-3 border rounded-2xl text-sm font-bold transition-all ${isSaved ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-100 text-gray-900 hover:bg-gray-50'} ${isRTL ? 'font-arabic' : ''}`}
+              >
+                <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                {isSaved
+                  ? (isRTL ? 'تم الحفظ' : 'Saved')
+                  : (isRTL ? 'احفظ المقال' : 'Save Article')
+                }
+              </button>
+            </div>
           </div>
 
           {/* Sidebar */}
           <aside className="w-full md:w-64 space-y-12">
-             <div>
-                <h4 className={`text-xs font-black uppercase tracking-widest text-gray-900 mb-6 pb-2 border-b-2 border-primary-600 w-fit ${isRTL ? 'font-arabic' : ''}`}>
-                   {isRTL ? 'الكاتب' : 'Author'}
-                </h4>
-                <div className="flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600 font-black">
-                      {isRTL ? 'س' : 'A'}
-                   </div>
-                   <div>
-                      <p className={`font-bold text-gray-900 ${isRTL ? 'font-arabic' : ''}`}>
-                         {isRTL ? 'فريق سعودي عقار' : 'Saudi RE Team'}
-                      </p>
-                      <p className={`text-xs text-gray-400 ${isRTL ? 'font-arabic' : ''}`}>
-                         {isRTL ? 'قسم التحرير' : 'Editorial Department'}
-                      </p>
-                   </div>
+            <div>
+              <h4 className={`text-xs font-black uppercase tracking-widest text-gray-900 mb-6 pb-2 border-b-2 border-primary-600 w-fit ${isRTL ? 'font-arabic' : ''}`}>
+                {isRTL ? 'الكاتب' : 'Author'}
+              </h4>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600 font-black">
+                  {isRTL ? 'س' : 'A'}
                 </div>
-             </div>
+                <div>
+                  <p className={`font-bold text-gray-900 ${isRTL ? 'font-arabic' : ''}`}>
+                    {isRTL ? 'فريق سعودي عقار' : 'Saudi RE Team'}
+                  </p>
+                  <p className={`text-xs text-gray-400 ${isRTL ? 'font-arabic' : ''}`}>
+                    {isRTL ? 'قسم التحرير' : 'Editorial Department'}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-             <div>
-                <h4 className={`text-xs font-black uppercase tracking-widest text-gray-900 mb-6 pb-2 border-b-2 border-primary-600 w-fit ${isRTL ? 'font-arabic' : ''}`}>
-                   {isRTL ? 'الوسوم' : 'Tags'}
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                   {(isRTL ? ['اتجاهات السوق', 'الاستثمار', 'اللوائح', 'سعودية 2030'] : ['Market Trends', 'Investment', 'Regulations', 'Saudi 2030']).map(tag => (
-                     <span key={tag} className={`px-3 py-1.5 bg-gray-50 rounded-lg text-xs font-bold text-gray-500 hover:bg-primary-50 hover:text-primary-600 cursor-pointer transition-all ${isRTL ? 'font-arabic' : ''}`}>
-                        #{tag.replace(' ', '')}
-                     </span>
-                   ))}
-                </div>
-             </div>
+            <div>
+              <h4 className={`text-xs font-black uppercase tracking-widest text-gray-900 mb-6 pb-2 border-b-2 border-primary-600 w-fit ${isRTL ? 'font-arabic' : ''}`}>
+                {isRTL ? 'الوسوم' : 'Tags'}
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {(isRTL ? ['اتجاهات السوق', 'الاستثمار', 'اللوائح', 'سعودية 2030'] : ['Market Trends', 'Investment', 'Regulations', 'Saudi 2030']).map(tag => (
+                  <span key={tag} className={`px-3 py-1.5 bg-gray-50 rounded-lg text-xs font-bold text-gray-500 hover:bg-primary-50 hover:text-primary-600 cursor-pointer transition-all ${isRTL ? 'font-arabic' : ''}`}>
+                    #{tag.replace(' ', '')}
+                  </span>
+                ))}
+              </div>
+            </div>
           </aside>
         </div>
       </article>
 
       {/* ── Newsletter Section ── */}
       <section className="max-w-7xl mx-auto px-4 mb-24">
-         <div className="bg-gray-900 rounded-[48px] p-12 md:p-20 text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-[40%] h-full bg-primary-600/10 blur-[100px] pointer-events-none" />
-            <div className="relative z-10">
-               <h2 className={`text-3xl md:text-5xl font-black text-white mb-6 tracking-tight ${isRTL ? 'font-arabic' : 'font-serif'}`}>
-                  {isRTL ? 'ابقَ على اطلاع دائم بالسوق.' : 'Stay ahead of the market.'}
-               </h2>
-               <p className={`text-gray-400 text-lg mb-12 max-w-xl mx-auto font-medium ${isRTL ? 'font-arabic' : ''}`}>
-                  {isRTL ? 'اشترك في نشرتنا الإخبارية الأسبوعية للحصول على رؤى وبيانات عقارية حصرية.' : 'Subscribe to our weekly newsletter for exclusive real estate insights and data.'}
-               </p>
-               <div className={`max-w-md mx-auto flex flex-col sm:flex-row gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                  <input 
-                    type="email" 
-                    placeholder={isRTL ? 'أدخل بريدك الإلكتروني' : 'Enter your email'}
-                    className={`flex-1 px-8 py-4 bg-white/5 border border-white/10 rounded-[20px] text-white focus:outline-none focus:border-primary-500 transition-all ${isRTL ? 'text-right' : ''}`}
-                  />
-                  <button className={`px-10 py-4 bg-primary-600 text-white rounded-[20px] font-black hover:bg-primary-500 transition-all whitespace-nowrap shadow-xl shadow-primary-600/20 ${isRTL ? 'font-arabic' : ''}`}>
-                     {isRTL ? 'انضم الآن' : 'Join Now'}
-                  </button>
-               </div>
+        <div className="bg-gray-900 rounded-[48px] p-12 md:p-20 text-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[40%] h-full bg-primary-600/10 blur-[100px] pointer-events-none" />
+          <div className="relative z-10">
+            <h2 className={`text-3xl md:text-5xl font-black text-white mb-6 tracking-tight ${isRTL ? 'font-arabic' : 'font-serif'}`}>
+              {isRTL ? 'ابقَ على اطلاع دائم بالسوق.' : 'Stay ahead of the market.'}
+            </h2>
+            <p className={`text-gray-400 text-lg mb-12 max-w-xl mx-auto font-medium ${isRTL ? 'font-arabic' : ''}`}>
+              {isRTL ? 'اشترك في نشرتنا الإخبارية الأسبوعية للحصول على رؤى وبيانات عقارية حصرية.' : 'Subscribe to our weekly newsletter for exclusive real estate insights and data.'}
+            </p>
+            <div className={`max-w-md mx-auto flex flex-col sm:flex-row gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <input
+                type="email"
+                placeholder={isRTL ? 'أدخل بريدك الإلكتروني' : 'Enter your email'}
+                className={`flex-1 px-8 py-4 bg-white/5 border border-white/10 rounded-[20px] text-white focus:outline-none focus:border-primary-500 transition-all ${isRTL ? 'text-right' : ''}`}
+              />
+              <button className={`px-10 py-4 bg-primary-600 text-white rounded-[20px] font-black hover:bg-primary-500 transition-all whitespace-nowrap shadow-xl shadow-primary-600/20 ${isRTL ? 'font-arabic' : ''}`}>
+                {isRTL ? 'انضم الآن' : 'Join Now'}
+              </button>
             </div>
-         </div>
+          </div>
+        </div>
       </section>
     </div>
   );

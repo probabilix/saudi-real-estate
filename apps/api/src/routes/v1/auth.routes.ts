@@ -94,6 +94,7 @@ export default async function authRoutes(app: FastifyInstance) {
             name: newUser.name, 
             role: newUser.role, 
             email: newUser.email,
+            avatarUrl: newUser.avatarUrl,
             creditsBalance: newUser.creditsBalance
           } : undefined
         } 
@@ -167,6 +168,7 @@ export default async function authRoutes(app: FastifyInstance) {
             name: user.name, 
             role: user.role, 
             email: user.email,
+            avatarUrl: user.avatarUrl,
             creditsBalance: user.creditsBalance
           } 
         } 
@@ -256,6 +258,7 @@ export default async function authRoutes(app: FastifyInstance) {
             name: user.name, 
             role: user.role, 
             email: user.email, 
+            avatarUrl: user.avatarUrl,
             regaVerified: user.regaVerified,
             creditsBalance: user.creditsBalance
           } 

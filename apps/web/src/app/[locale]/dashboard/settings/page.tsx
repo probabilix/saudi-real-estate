@@ -20,7 +20,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Upload } from 'lucide-react';
+import { MANAGED_MODE } from '@/lib/config';
+import { useRef } from 'react';
 
 export default function SettingsPage({ params: { locale } }: { params: { locale: string } }) {
   const t = useTranslations('dashboard');
@@ -54,7 +56,9 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
     serviceAreas: [] as string[],
     gender: null,
     address: '',
-    avatarUrl: ''
+    avatarUrl: '',
+    nationality: '',
+    city: ''
   });
 
   useEffect(() => {
@@ -77,7 +81,9 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
           serviceAreas: p.serviceAreas || [],
           gender: p.gender || null,
           address: p.address || '',
-          avatarUrl: u.avatarUrl || user?.avatarUrl || ''
+          avatarUrl: u.avatarUrl || user?.avatarUrl || '',
+          nationality: p.nationality || '',
+          city: p.city || ''
         });
       }
       setLoading(false);
@@ -86,23 +92,15 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSave = async () => {
+
+  const { refreshUser } = useAuth();
+
+  const handleSave = async (autoSaveData?: any) => {
     // Reset errors
     setFormErrors([]);
     setError(null);
 
-    // Validate mandatory fields
-    const missingFields: string[] = [];
-    if (!formData.name?.trim()) missingFields.push('name');
-    if (!formData.whatsapp?.trim()) missingFields.push('whatsapp');
-    if (!formData.gender) missingFields.push('gender');
-
-    if (missingFields.length > 0) {
-      setFormErrors(missingFields);
-      setError('Please fill all mandatory fields (Name, WhatsApp, Gender)');
-      setTimeout(() => setError(null), 5000);
-      return;
-    }
+    const dataToSave = autoSaveData || formData;
 
     setSaving(true);
     // Normalize: convert empty strings to undefined to satisfy backend Zod schemas
@@ -110,25 +108,28 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
     const n = (v: any) => (v === '' ? undefined : v);
 
     const profileUpdate = {
-      titleEn: n(formData.titleEn),
-      titleAr: n(formData.titleAr),
-      bioEn: n(formData.bioEn),
-      bioAr: n(formData.bioAr),
-      whatsapp: n(formData.whatsapp),
-      nationalId: n(formData.nationalId),
-      regaLicenseNumber: n(formData.regaLicenseNumber),
-      experienceLevel: n(formData.experienceLevel),
-      languages: formData.languages,
-      serviceAreas: formData.serviceAreas,
-      gender: n(formData.gender),
-      address: n(formData.address),
-      name: n(formData.name)
+      titleEn: n(dataToSave.titleEn),
+      titleAr: n(dataToSave.titleAr),
+      bioEn: n(dataToSave.bioEn),
+      bioAr: n(dataToSave.bioAr),
+      whatsapp: n(dataToSave.whatsapp),
+      nationalId: n(dataToSave.nationalId),
+      regaLicenseNumber: n(dataToSave.regaLicenseNumber),
+      experienceLevel: n(dataToSave.experienceLevel),
+      languages: dataToSave.languages,
+      serviceAreas: dataToSave.serviceAreas,
+      gender: n(dataToSave.gender),
+      address: n(dataToSave.address),
+      name: n(dataToSave.name),
+      nationality: n(dataToSave.nationality),
+      city: n(dataToSave.city)
     };
     
     try {
       const res = await api.updateProfile(profileUpdate);
       if (res.success) {
         setSuccess('Profile updated successfully');
+        await refreshUser(true); // Sync header icon
         setTimeout(() => setSuccess(null), 5000);
         setFormErrors([]);
       } else {
@@ -143,6 +144,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
       setSaving(false);
     }
   };
+
 
   const handleUnifiedPolish = async (type: 'title' | 'bio') => {
     const isBio = type === 'bio';
@@ -322,9 +324,9 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
         </div>
       </div>
 
-      {/* ── Status Bar (Slim & Practical) ── */}
+      {/* ── Status Bar (Only for non-Managed Mode) ── */}
       <AnimatePresence>
-        {verStatus !== 'VERIFIED' && (
+        {!MANAGED_MODE && verStatus !== 'VERIFIED' && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -360,10 +362,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
                   <User className="w-12 h-12 text-gray-300" />
                 )}
               </div>
-              <button className={`absolute bottom-2 ${isRTL ? 'left-2' : 'right-2'} p-3 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-500 transition-all group-hover:scale-110 z-10`}>
-                <Camera className="w-4 h-4" />
-              </button>
-            </div>
+              </div>
             <div className="mt-6">
               <h3 className="text-sm font-bold text-gray-900">{formData.name}</h3>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
@@ -372,84 +371,88 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
             </div>
           </section>
 
-          {/* ── Professional Expertise (Relocated to Sidebar) ── */}
-          <section className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-xl shadow-black/[0.03] space-y-6">
-            <div className="flex items-center gap-3 pb-4 border-b border-gray-50">
-              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600">
-                <Globe className="w-4 h-4" />
-              </div>
-              <h3 className="font-bold text-gray-900">{tProfiles('marketTrackRecord')}</h3>
-            </div>
-
-            <div className="space-y-6">
-              {/* Experience Level */}
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-gray-500 ps-1">{tSettings('experienceLevel')}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['0-2', '3-5', '6-10', '10+'].map(level => {
-                    const isActive = formData.experienceLevel === level;
-                    return (
-                      <button
-                        key={level}
-                        onClick={() => setFormData({ ...formData, experienceLevel: level })}
-                        className={`py-2 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
-                          isActive
-                            ? 'bg-primary-600 border-primary-600 text-white shadow-md'
-                            : 'bg-white border-gray-100 text-gray-400 hover:border-primary-100 hover:text-primary-600'
-                        }`}
-                      >
-                        {level} {tProfiles('years')}
-                      </button>
-                    );
-                  })}
+          {/* ── Professional Expertise (Hidden in Managed Mode) ── */}
+          {!MANAGED_MODE && (
+            <section className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-xl shadow-black/[0.03] space-y-6">
+              <div className="flex items-center gap-3 pb-4 border-b border-gray-50">
+                <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600">
+                  <Globe className="w-4 h-4" />
                 </div>
+                <h3 className="font-bold text-gray-900">{tProfiles('marketTrackRecord')}</h3>
               </div>
 
-              {/* Regions Operated */}
-              <TagInput
-                label={tSettings('serviceAreas')}
-                placeholder="e.g. Riyadh..."
-                tags={formData.serviceAreas || []}
-                suggestions={CITIES}
-                onAdd={(tag) => {
-                  if (!(formData.serviceAreas || []).includes(tag)) {
-                    setFormData({ ...formData, serviceAreas: [...(formData.serviceAreas || []), tag] });
-                  }
-                }}
-                onRemove={(tag) => {
-                  setFormData({ ...formData, serviceAreas: (formData.serviceAreas || []).filter((t: string) => t !== tag) });
-                }}
-              />
+              <div className="space-y-6">
+                {/* Experience Level */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-500 ps-1">{tSettings('experienceLevel')}</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['0-2', '3-5', '6-10', '10+'].map(level => {
+                      const isActive = formData.experienceLevel === level;
+                      return (
+                        <button
+                          key={level}
+                          onClick={() => setFormData({ ...formData, experienceLevel: level })}
+                          className={`py-2 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
+                            isActive
+                              ? 'bg-primary-600 border-primary-600 text-white shadow-md'
+                              : 'bg-white border-gray-100 text-gray-400 hover:border-primary-100 hover:text-primary-600'
+                          }`}
+                        >
+                          {level} {tProfiles('years')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              {/* Languages Spoken */}
-              <TagInput
-                label={tSettings('spokenLanguages')}
-                placeholder="e.g. English..."
-                tags={formData.languages || []}
-                suggestions={LANGUAGES}
-                onAdd={(tag) => {
-                  if (!(formData.languages || []).includes(tag)) {
-                    setFormData({ ...formData, languages: [...(formData.languages || []), tag] });
-                  }
-                }}
-                onRemove={(tag) => {
-                  setFormData({ ...formData, languages: (formData.languages || []).filter((t: string) => t !== tag) });
-                }}
-              />
-            </div>
-          </section>
+                {/* Regions Operated */}
+                <TagInput
+                  label={tSettings('serviceAreas')}
+                  placeholder="e.g. Riyadh..."
+                  tags={formData.serviceAreas || []}
+                  suggestions={CITIES}
+                  onAdd={(tag) => {
+                    if (!(formData.serviceAreas || []).includes(tag)) {
+                      setFormData({ ...formData, serviceAreas: [...(formData.serviceAreas || []), tag] });
+                    }
+                  }}
+                  onRemove={(tag) => {
+                    setFormData({ ...formData, serviceAreas: (formData.serviceAreas || []).filter((t: string) => t !== tag) });
+                  }}
+                />
 
-          <section className="hidden lg:block bg-gradient-to-br from-primary-600 to-primary-800 rounded-[32px] p-8 text-white shadow-2xl shadow-primary-600/30">
-            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-primary-200" /> {tSettings('needHelp')}
-            </h3>
-            <p className="text-sm font-medium text-primary-100 mb-6 leading-relaxed">
-              {tSettings('helpDesc')}
-            </p>
-            <button className="w-full py-4 bg-white/10 backdrop-blur-md rounded-2xl font-bold text-sm hover:bg-white/20 transition-all border border-white/10">
-              {tSettings('contactSupport')}
-            </button>
-          </section>
+                {/* Languages Spoken */}
+                <TagInput
+                  label={tSettings('spokenLanguages')}
+                  placeholder="e.g. English..."
+                  tags={formData.languages || []}
+                  suggestions={LANGUAGES}
+                  onAdd={(tag) => {
+                    if (!(formData.languages || []).includes(tag)) {
+                      setFormData({ ...formData, languages: [...(formData.languages || []), tag] });
+                    }
+                  }}
+                  onRemove={(tag) => {
+                    setFormData({ ...formData, languages: (formData.languages || []).filter((t: string) => t !== tag) });
+                  }}
+                />
+              </div>
+            </section>
+          )}
+
+          {!MANAGED_MODE && (
+            <section className="hidden lg:block bg-gradient-to-br from-primary-600 to-primary-800 rounded-[32px] p-8 text-white shadow-2xl shadow-primary-600/30">
+              <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary-200" /> {tSettings('needHelp')}
+              </h3>
+              <p className="text-sm font-medium text-primary-100 mb-6 leading-relaxed">
+                {tSettings('helpDesc')}
+              </p>
+              <button className="w-full py-4 bg-white/10 backdrop-blur-md rounded-2xl font-bold text-sm hover:bg-white/20 transition-all border border-white/10">
+                {tSettings('contactSupport')}
+              </button>
+            </section>
+          )}
         </div>
 
         <div className="flex-1 space-y-6 md:space-y-8">
@@ -458,7 +461,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
               <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
                 <User className="w-4 h-4 md:w-5 md:h-5" />
               </div>
-              <h2 className="text-lg md:text-xl font-bold text-gray-900">{tSettings('professionalProfile')}</h2>
+              <h2 className="text-lg md:text-xl font-bold text-gray-900">{MANAGED_MODE ? 'Profile Settings' : tSettings('professionalProfile')}</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -506,194 +509,222 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
                   ))}
                 </div>
               </div>
-            </div>
-
-            <div className="space-y-8">
-              <div className="p-6 md:p-8 rounded-[32px] bg-gray-50/50 border border-gray-100 space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary-600 text-white flex items-center justify-center">
-                    <Briefcase className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-bold text-gray-900">{tSettings('professionalTitle')}</h3>
-                </div>
-
-                <div className="relative grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-center">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ps-1">{tSettings('english')}</label>
-                    <input
-                      placeholder={tSettings('titlePlaceholder')}
-                      value={formData.titleEn}
-                      onChange={e => setFormData({ ...formData, titleEn: e.target.value })}
-                      className="w-full h-12 bg-white border-2 border-gray-100 rounded-xl px-4 text-sm font-bold focus:border-primary-600/50 transition-all outline-none"
-                    />
-                  </div>
-
-                  <div className="flex justify-center md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:z-10 py-4 md:py-0">
-                    <button
-                      onClick={() => handleUnifiedPolish('title')}
-                      disabled={aiLoading || (!formData.titleEn && !formData.titleAr)}
-                      className="w-10 h-10 bg-white border-2 border-primary-100 rounded-full flex items-center justify-center text-primary-600 shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-50 group hover:bg-primary-50 relative z-20"
-                      title={tSettings('aiPolishTranslate')}
-                    >
-                      {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  <div className="space-y-2" dir="rtl">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ps-1 text-right block">{tSettings('arabic')}</label>
-                    <input
-                      placeholder={tSettings('titlePlaceholder')}
-                      value={formData.titleAr}
-                      onChange={e => setFormData({ ...formData, titleAr: e.target.value })}
-                      className="w-full h-12 bg-white border-2 border-gray-100 rounded-xl px-4 text-sm font-bold font-arabic focus:border-primary-600/50 transition-all outline-none text-right"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 md:p-8 rounded-[32px] bg-primary-50/30 border border-primary-100/50 space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary-600 text-white flex items-center justify-center">
-                    <MessageSquare className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-bold text-gray-900">{tSettings('aboutMe')}</h3>
-                </div>
-
-                <div className="relative flex flex-col items-stretch gap-4 md:grid md:grid-cols-2 md:gap-8 md:items-center">
-                  <div className="space-y-2 order-2 md:order-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ps-1">{tSettings('english')}</label>
-                    <textarea
-                      rows={4}
-                      placeholder={tSettings('bioPlaceholder')}
-                      value={formData.bioEn}
-                      onChange={e => setFormData({ ...formData, bioEn: e.target.value })}
-                      className="w-full bg-white border-2 border-gray-100 rounded-[24px] p-5 text-sm font-bold focus:border-primary-600/50 transition-all outline-none resize-none leading-relaxed"
-                    />
-                  </div>
-
-                  <div className="flex justify-center md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:z-10 py-2 md:py-0 order-1 md:order-2">
-                    <button
-                      onClick={() => handleUnifiedPolish('bio')}
-                      disabled={aiLoading || (!formData.bioEn && !formData.bioAr)}
-                      className="w-14 h-14 bg-primary-600 text-white rounded-full flex flex-col items-center justify-center shadow-xl shadow-primary-600/30 hover:scale-110 active:scale-95 transition-all disabled:opacity-50 group hover:bg-primary-500 overflow-hidden relative z-20"
-                      title={tSettings('premiumAiPolish')}
-                    >
-                      <AnimatePresence mode="wait">
-                        {aiLoading ? (
-                          <motion.div
-                            key="loading"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 flex items-center justify-center bg-primary-600"
-                          >
-                            <Loader2 className="w-6 h-6 animate-spin" />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            key="icon"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="flex flex-col items-center"
-                          >
-                            <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                            <span className="text-[8px] font-black uppercase mt-0.5 tracking-tighter">AI Magic</span>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 order-2 md:order-3" dir="rtl">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ps-1 text-right block">{tSettings('arabic')}</label>
-                    <textarea
-                      rows={4}
-                      placeholder={tSettings('bioPlaceholder')}
-                      value={formData.bioAr}
-                      onChange={e => setFormData({ ...formData, bioAr: e.target.value })}
-                      className="w-full bg-white border-2 border-gray-100 rounded-[24px] p-5 text-sm font-bold font-arabic focus:border-primary-600/50 transition-all outline-none resize-none leading-relaxed text-right"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-xl shadow-black/[0.03] space-y-8">
-            <div className="flex items-center gap-3 pb-6 border-b border-gray-50">
-              <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
-                <Award className="w-5 h-5" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-900">{tSettings('credentialsIdentity')}</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700 ps-1">{tSettings('regaLicenseNumber')}</label>
-                <div className="relative">
-                  <ShieldCheck className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400`} />
-                  <input
-                    readOnly={verStatus === 'VERIFIED'}
-                    value={formData.regaLicenseNumber}
-                    onChange={e => setFormData({ ...formData, regaLicenseNumber: e.target.value })}
-                    className={`w-full h-12 bg-gray-50 border border-gray-100 rounded-xl ${isRTL ? 'pe-11 ps-4' : 'ps-11 pe-4'} text-sm font-bold focus:bg-white transition-all outline-none`}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700 ps-1">{tSettings('nationalId')}</label>
+                <label className="text-sm font-bold text-gray-500 ps-1 flex items-center gap-1">
+                  Nationality
+                </label>
                 <input
-                  readOnly={verStatus === 'VERIFIED'}
-                  value={formData.nationalId}
-                  onChange={e => setFormData({ ...formData, nationalId: e.target.value })}
-                  className="w-full h-12 bg-gray-50 border border-gray-100 rounded-xl px-4 text-sm font-bold focus:bg-white transition-all outline-none"
+                  value={formData.nationality}
+                  onChange={e => setFormData({ ...formData, nationality: e.target.value })}
+                  placeholder="e.g. Saudi"
+                  className="w-full h-12 bg-white border-2 border-gray-100 rounded-xl px-4 text-sm font-bold shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] focus:border-primary-600/50 transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-500 ps-1 flex items-center gap-1">
+                  City
+                </label>
+                <input
+                  value={formData.city}
+                  onChange={e => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="e.g. Riyadh"
+                  className="w-full h-12 bg-white border-2 border-gray-100 rounded-xl px-4 text-sm font-bold shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] focus:border-primary-600/50 transition-all outline-none"
                 />
               </div>
             </div>
+
+            {!MANAGED_MODE && (
+              <div className="space-y-8">
+                <div className="p-6 md:p-8 rounded-[32px] bg-gray-50/50 border border-gray-100 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary-600 text-white flex items-center justify-center">
+                      <Briefcase className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-bold text-gray-900">{tSettings('professionalTitle')}</h3>
+                  </div>
+
+                  <div className="relative grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-center">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ps-1">{tSettings('english')}</label>
+                      <input
+                        placeholder={tSettings('titlePlaceholder')}
+                        value={formData.titleEn}
+                        onChange={e => setFormData({ ...formData, titleEn: e.target.value })}
+                        className="w-full h-12 bg-white border-2 border-gray-100 rounded-xl px-4 text-sm font-bold focus:border-primary-600/50 transition-all outline-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-center md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:z-10 py-4 md:py-0">
+                      <button
+                        onClick={() => handleUnifiedPolish('title')}
+                        disabled={aiLoading || (!formData.titleEn && !formData.titleAr)}
+                        className="w-10 h-10 bg-white border-2 border-primary-100 rounded-full flex items-center justify-center text-primary-600 shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-50 group hover:bg-primary-50 relative z-20"
+                        title={tSettings('aiPolishTranslate')}
+                      >
+                        {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    <div className="space-y-2" dir="rtl">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ps-1 text-right block">{tSettings('arabic')}</label>
+                      <input
+                        placeholder={tSettings('titlePlaceholder')}
+                        value={formData.titleAr}
+                        onChange={e => setFormData({ ...formData, titleAr: e.target.value })}
+                        className="w-full h-12 bg-white border-2 border-gray-100 rounded-xl px-4 text-sm font-bold font-arabic focus:border-primary-600/50 transition-all outline-none text-right"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 md:p-8 rounded-[32px] bg-primary-50/30 border border-primary-100/50 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary-600 text-white flex items-center justify-center">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-bold text-gray-900">{tSettings('aboutMe')}</h3>
+                  </div>
+
+                  <div className="relative flex flex-col items-stretch gap-4 md:grid md:grid-cols-2 md:gap-8 md:items-center">
+                    <div className="space-y-2 order-2 md:order-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ps-1">{tSettings('english')}</label>
+                      <textarea
+                        rows={4}
+                        placeholder={tSettings('bioPlaceholder')}
+                        value={formData.bioEn}
+                        onChange={e => setFormData({ ...formData, bioEn: e.target.value })}
+                        className="w-full bg-white border-2 border-gray-100 rounded-[24px] p-5 text-sm font-bold focus:border-primary-600/50 transition-all outline-none resize-none leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="flex justify-center md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:z-10 py-2 md:py-0 order-1 md:order-2">
+                      <button
+                        onClick={() => handleUnifiedPolish('bio')}
+                        disabled={aiLoading || (!formData.bioEn && !formData.bioAr)}
+                        className="w-14 h-14 bg-primary-600 text-white rounded-full flex flex-col items-center justify-center shadow-xl shadow-primary-600/30 hover:scale-110 active:scale-95 transition-all disabled:opacity-50 group hover:bg-primary-500 overflow-hidden relative z-20"
+                        title={tSettings('premiumAiPolish')}
+                      >
+                        <AnimatePresence mode="wait">
+                          {aiLoading ? (
+                            <motion.div
+                              key="loading"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute inset-0 flex items-center justify-center bg-primary-600"
+                            >
+                              <Loader2 className="w-6 h-6 animate-spin" />
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="icon"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="flex flex-col items-center"
+                            >
+                              <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                              <span className="text-[8px] font-black uppercase mt-0.5 tracking-tighter">AI Magic</span>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 order-2 md:order-3" dir="rtl">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ps-1 text-right block">{tSettings('arabic')}</label>
+                      <textarea
+                        rows={4}
+                        placeholder={tSettings('bioPlaceholder')}
+                        value={formData.bioAr}
+                        onChange={e => setFormData({ ...formData, bioAr: e.target.value })}
+                        className="w-full bg-white border-2 border-gray-100 rounded-[24px] p-5 text-sm font-bold font-arabic focus:border-primary-600/50 transition-all outline-none resize-none leading-relaxed text-right"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
+
+            {!MANAGED_MODE && (
+              <section className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-xl shadow-black/[0.03] space-y-8">
+                <div className="flex items-center gap-3 pb-6 border-b border-gray-50">
+                  <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">{tSettings('credentialsIdentity')}</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 ps-1">{tSettings('regaLicenseNumber')}</label>
+                    <div className="relative">
+                      <ShieldCheck className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400`} />
+                      <input
+                        readOnly={verStatus === 'VERIFIED'}
+                        value={formData.regaLicenseNumber}
+                        onChange={e => setFormData({ ...formData, regaLicenseNumber: e.target.value })}
+                        className={`w-full h-12 bg-gray-50 border border-gray-100 rounded-xl ${isRTL ? 'pe-11 ps-4' : 'ps-11 pe-4'} text-sm font-bold focus:bg-white transition-all outline-none`}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 ps-1">{tSettings('nationalId')}</label>
+                    <input
+                      readOnly={verStatus === 'VERIFIED'}
+                      value={formData.nationalId}
+                      onChange={e => setFormData({ ...formData, nationalId: e.target.value })}
+                      className="w-full h-12 bg-gray-50 border border-gray-100 rounded-xl px-4 text-sm font-bold focus:bg-white transition-all outline-none"
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
         </div>
       </div>
 
-      <div className="lg:hidden space-y-6 mt-8">
-          <section className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-[32px] p-8 text-white shadow-2xl shadow-primary-600/30">
-            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-primary-200" /> {tSettings('needHelp')}
-            </h3>
-            <p className="text-sm font-medium text-primary-100 mb-6 leading-relaxed">
-              {tSettings('helpDesc')}
-            </p>
-            <button className="w-full py-4 bg-white/10 backdrop-blur-md rounded-2xl font-bold text-sm hover:bg-white/20 transition-all border border-white/10">
-              {tSettings('contactSupport')}
-            </button>
-          </section>
-      </div>
+      {!MANAGED_MODE && (
+        <div className="lg:hidden space-y-6 mt-8">
+            <section className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-[32px] p-8 text-white shadow-2xl shadow-primary-600/30">
+              <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary-200" /> {tSettings('needHelp')}
+              </h3>
+              <p className="text-sm font-medium text-primary-100 mb-6 leading-relaxed">
+                {tSettings('helpDesc')}
+              </p>
+              <button className="w-full py-4 bg-white/10 backdrop-blur-md rounded-2xl font-bold text-sm hover:bg-white/20 transition-all border border-white/10">
+                {tSettings('contactSupport')}
+              </button>
+            </section>
+        </div>
+      )}
       <AnimatePresence>
         {error && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] bg-rose-600 text-white px-10 py-5 rounded-3xl shadow-2xl flex items-center gap-4 border border-rose-400/30 backdrop-blur-xl">
-            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="fixed bottom-12 inset-x-4 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 z-[100] bg-rose-600 text-white px-6 md:px-10 py-5 rounded-3xl shadow-2xl flex items-center gap-4 border border-rose-400/30 backdrop-blur-xl md:max-w-md">
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center shrink-0">
               <AlertCircle className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <p className="font-black uppercase tracking-widest text-[10px]">Error</p>
-              <p className="font-bold text-sm">{error}</p>
+            <div className="flex-1 text-center md:text-left">
+              <p className="font-black uppercase tracking-widest text-[10px] opacity-70">Error</p>
+              <p className="font-bold text-sm leading-tight">{error}</p>
             </div>
-            <button onClick={() => setError(null)} className="ml-4 p-1 hover:bg-white/10 rounded-full transition-all">
+            <button onClick={() => setError(null)} className="hidden md:block p-1 hover:bg-white/10 rounded-full transition-all shrink-0">
               <X className="w-4 h-4 text-white" />
             </button>
           </motion.div>
         )}
 
         {success && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-10 py-5 rounded-3xl shadow-2xl flex items-center gap-4 border border-emerald-400/30 backdrop-blur-xl">
-            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="fixed bottom-12 inset-x-4 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 md:px-10 py-5 rounded-3xl shadow-2xl flex items-center gap-4 border border-emerald-400/30 backdrop-blur-xl md:max-w-md">
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center shrink-0">
               <ShieldCheck className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <p className="font-black uppercase tracking-widest text-[10px]">Success</p>
-              <p className="font-bold text-sm">{success}</p>
+            <div className="flex-1 text-center md:text-left">
+              <p className="font-black uppercase tracking-widest text-[10px] opacity-70">Success</p>
+              <p className="font-bold text-sm leading-tight">{success}</p>
             </div>
-            <button onClick={() => setSuccess(null)} className="ml-4 p-1 hover:bg-white/10 rounded-full transition-all">
+            <button onClick={() => setSuccess(null)} className="hidden md:block p-1 hover:bg-white/10 rounded-full transition-all shrink-0">
               <X className="w-4 h-4 text-white" />
             </button>
           </motion.div>
@@ -702,12 +733,14 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
 
       {/* ── Mobile Sticky Bar ── */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-gray-100 p-4 pb-8 flex items-center justify-between gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{tCommon('status') || 'Status'}</span>
-          <span className={`text-xs font-bold ${verStatus === 'VERIFIED' ? 'text-emerald-600' : 'text-amber-600'}`}>
-            {verStatus}
-          </span>
-        </div>
+        {!MANAGED_MODE && (
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{tCommon('status') || 'Status'}</span>
+            <span className={`text-xs font-bold ${verStatus === 'VERIFIED' ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {verStatus}
+            </span>
+          </div>
+        )}
         <button
           onClick={handleSave}
           disabled={saving}

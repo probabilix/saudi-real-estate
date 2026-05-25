@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
+import { authenticateJWT, requireRole, optionalAuthenticateJWT } from '../../middleware/auth.middleware';
 import { NewsService } from '../../services/news.service';
 
 export default async function newsRoutes(app: FastifyInstance) {
@@ -35,12 +35,13 @@ export default async function newsRoutes(app: FastifyInstance) {
 
   /**
    * GET /api/v1/news/:slug
-   * Public: Fetch single news post by slug
+   * Public: Fetch single news post by slug (includes favorited status if authenticated)
    */
-  app.get('/:slug', async (request, reply) => {
+  app.get('/:slug', { preHandler: [optionalAuthenticateJWT] }, async (request, reply) => {
     const { slug } = request.params as { slug: string };
+    const userId = request.user?.userId;
     try {
-      const post = await NewsService.getNewsBySlug(slug);
+      const post = await NewsService.getNewsBySlug(slug, userId);
       if (!post) {
         return reply.code(404).send({ success: false, message: 'Post not found' });
       }

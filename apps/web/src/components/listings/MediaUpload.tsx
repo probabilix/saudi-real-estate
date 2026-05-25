@@ -46,6 +46,14 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
     onChange(updated);
   };
 
+  const setAsMain = (index: number) => {
+    if (index === 0) return;
+    const updated = [...images];
+    const [selected] = updated.splice(index, 1);
+    updated.unshift(selected);
+    onChange(updated);
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -85,6 +93,15 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                     <X className="w-5 h-5" />
                   </button>
                 </div>
+                {index > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAsMain(index)}
+                    className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md transform hover:scale-105 active:scale-95 z-20"
+                  >
+                    Set as Main
+                  </button>
+                )}
               </div>
 
               {index === 0 && (

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { 
   User, 
@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
+import { MANAGED_MODE, hasManagementAccess } from '@/lib/config';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
   const tDashboard = useTranslations('dashboard');
   const { user, loading: authLoading, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isRTL = locale === 'ar';
@@ -66,8 +68,33 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
 
   // Ensure menu is only visible when user is fully loaded
   const filteredMenu = (user && !authLoading) 
-    ? menuItems.filter(item => item.roles.includes(user.role))
+    ? menuItems.filter(item => {
+        // 1. Check basic role permission
+        if (!item.roles.includes(user.role)) return false;
+        
+        // 2. During Managed Mode, hide ALL management features for EVERYONE in the web app.
+        // Management must be done via the separate Admin Panel.
+        if (MANAGED_MODE) {
+          // Only allow 'Settings' (Account Settings)
+          return item.href.includes('/settings');
+        }
+        
+        return true;
+      })
     : [];
+
+  // Redirect logic for disabled management pages
+  React.useEffect(() => {
+    if (!authLoading && MANAGED_MODE && pathname) {
+      const isSettingsPage = pathname.includes('/settings');
+      const isDashboardPath = pathname.includes('/dashboard') || pathname.includes('/admin/verifications');
+      
+      // If we are on a dashboard page that isn't settings, redirect to settings
+      if (isDashboardPath && !isSettingsPage) {
+        router.push(`/${locale}/dashboard/settings`);
+      }
+    }
+  }, [pathname, authLoading, locale, router]);
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-white/80 backdrop-blur-xl border-inline-end border-gray-100 shadow-xl shadow-gray-200/20">
@@ -92,14 +119,6 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
               </p>
             </div>
           </div>
-          {['FIRM', 'AGENT', 'SOLO_BROKER', 'BUYER'].includes(user?.role || '') && !user?.regaVerified && (
-            <Link 
-              href={`/${locale}/dashboard/settings`}
-              className="block w-full text-center py-2 bg-amber-50 rounded-lg text-[10px] font-bold text-amber-600 border border-amber-100 hover:bg-amber-100 transition-colors"
-            >
-              {tDashboard('overview.verifyLicense')}
-            </Link>
-          )}
         </div>
       </div>
 

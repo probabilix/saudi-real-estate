@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { 
-  Heart, 
-  Search, 
+import {
+  Heart,
+  Search,
   LayoutGrid,
   List as ListIcon,
   Loader2,
@@ -27,7 +27,7 @@ export default function FavoritesPage() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,8 +69,8 @@ export default function FavoritesPage() {
   const filteredListings = listings.filter(l => {
     const title = locale === 'ar' ? l.arTitle : (l.enTitle || l.arTitle);
     const city = locale === 'ar' ? l.arCity : l.city;
-    return title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-           city.toLowerCase().includes(searchQuery.toLowerCase());
+    return title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      city.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   if (!isMounted || (authLoading && !isAuthenticated)) {
@@ -87,7 +87,7 @@ export default function FavoritesPage() {
       <div className="bg-white border-b border-surface-200 overflow-hidden relative">
         <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary-50/50 to-transparent pointer-events-none" />
         <div className="max-w-7xl mx-auto px-6 py-4 md:py-10 relative z-10">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col md:flex-row md:items-center justify-between gap-4"
@@ -116,13 +116,13 @@ export default function FavoritesPage() {
 
             <div className="hidden md:flex items-center gap-4">
               <div className="bg-white p-1 rounded-2xl border border-surface-200 shadow-sm flex items-center gap-1">
-                <button 
+                <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-primary-600 text-white shadow-lg' : 'text-charcoal-muted hover:bg-surface-50'}`}
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
-                <button 
+                <button
                   onClick={() => setViewMode('list')}
                   className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-primary-600 text-white shadow-lg' : 'text-charcoal-muted hover:bg-surface-50'}`}
                 >
@@ -140,7 +140,7 @@ export default function FavoritesPage() {
           <div className={`absolute inset-y-0 ${isRTL ? 'right-4' : 'left-4'} flex items-center pointer-events-none`}>
             <Search className="w-4 h-4 text-charcoal-muted" />
           </div>
-          <input 
+          <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -153,8 +153,8 @@ export default function FavoritesPage() {
         {loading ? (
           <div className="min-h-[400px] flex flex-col items-center justify-center gap-4 bg-white rounded-[40px] border border-surface-200 shadow-sm">
             <div className="relative">
-               <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
-               <Heart className="absolute inset-0 m-auto w-4 h-4 text-red-400" />
+              <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+              <Heart className="absolute inset-0 m-auto w-4 h-4 text-red-400" />
             </div>
             <p className="text-sm font-bold text-charcoal-muted animate-pulse tracking-widest uppercase">{tCommon('loading')}</p>
           </div>
@@ -170,9 +170,9 @@ export default function FavoritesPage() {
                   exit={{ opacity: 0, scale: 0.9, y: 20 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <ListingCard 
-                    listing={item} 
-                    index={i} 
+                  <ListingCard
+                    listing={item}
+                    index={i}
                     onToggleFavorite={(id, favorited) => {
                       if (!favorited) {
                         setListings(prev => prev.filter(l => l.id !== id));
@@ -184,7 +184,7 @@ export default function FavoritesPage() {
             </AnimatePresence>
           </div>
         ) : (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="min-h-[500px] flex flex-col items-center justify-center text-center p-12 bg-white rounded-[40px] border border-dashed border-surface-200 shadow-sm group"
@@ -200,7 +200,7 @@ export default function FavoritesPage() {
               {searchQuery ? 'Try a different search term.' : 'Properties you save will appear here for quick access across all your devices.'}
             </p>
             {!searchQuery && (
-              <Link 
+              <Link
                 href={`/${locale}/listings`}
                 className="flex items-center gap-4 px-12 py-4 bg-charcoal text-white rounded-2xl font-bold hover:bg-primary-600 transition-all shadow-2xl shadow-charcoal/20 active:scale-95 group/btn"
               >

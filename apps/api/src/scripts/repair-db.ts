@@ -23,6 +23,13 @@ async function repair() {
     `);
     console.log('✓ Index ensured');
 
+    // Delete duplicate legal pages
+    await db.execute(sql`
+      DELETE FROM "legal_pages" 
+      WHERE "slug" IN ('privacy-policy', 'terms-of-service', 'foreign-ownership-guide');
+    `);
+    console.log('✓ Duplicate legal pages deleted');
+
     console.log('Database repair completed successfully!');
     process.exit(0);
   } catch (err) {

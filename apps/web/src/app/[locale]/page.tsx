@@ -4,6 +4,10 @@ import FeaturedSection from '@/components/home/FeaturedSection';
 import HowItWorksSection from '@/components/home/HowItWorksSection';
 import CitySpotlightSection from '@/components/home/CitySpotlightSection';
 import CTASection from '@/components/home/CTASection';
+import TrustSection from '@/components/home/TrustSection';
+import RecentArticlesSection from '@/components/home/RecentArticlesSection';
+import FAQSection from '@/components/home/FAQSection';
+import FooterCTAStrip from '@/components/home/FooterCTAStrip';
 import ChatWidget from '@/components/chat/ChatWidget';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import { API_BASE_URL } from '@/lib/api';
@@ -17,38 +21,114 @@ export async function generateMetadata({ params: { locale } }: { params: { local
   };
 }
 
-// SSG with hourly revalidation for SEO
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage({ params: { locale } }: { params: { locale: string } }) {
   unstable_setRequestLocale(locale);
 
-  // Fetch first 3 featured listings for the featured section
+  let featuredLimit = 6;
   let featuredListings: Listing[] = [];
+  const cityCounts: Record<string, number> = { Riyadh: 0, Jeddah: 0, Dammam: 0, AlUla: 0 };
+  let recentArticles = [];
+  let homeFaqs = [];
+  let featuredSlugs: string[] = [];
+  let homepageStats = { listings: '200+', transactions: 'SAR 50M+', cities: '4', ownership: '100%' };
+  let contactPhone = '+966 53 849 8580';
+  let contactWhatsApp = '';
+
   try {
-    const res = await fetch(`${API_BASE_URL}/listings?limit=3&isFeatured=true`, {
-      next: { revalidate: 3600 },
-    });
-    
-    if (res.ok) {
-      const json = await res.json();
+    const settingsRes = await fetch(`${API_BASE_URL}/system/settings`, { cache: 'no-store' }).catch(() => null);
+    if (settingsRes?.ok) {
+      const json = await settingsRes.json();
+      const d = json?.data || {};
+
+      const limitVal = d.HOMEPAGE_FEATURED_LIMIT;
+      if (limitVal) featuredLimit = parseInt(String(limitVal), 10) || 6;
+
+      const slugsVal = d.homepage_featured_articles;
+      if (slugsVal) {
+        if (Array.isArray(slugsVal)) {
+          featuredSlugs = slugsVal;
+        } else {
+          try { featuredSlugs = JSON.parse(slugsVal); } catch {}
+        }
+      }
+
+      // Stats for Trust Section
+      const statsVal = d.homepage_stats;
+      if (statsVal) {
+        const parsed = typeof statsVal === 'object' ? statsVal : (() => { try { return JSON.parse(statsVal as string); } catch { return null; } })();
+        if (parsed) homepageStats = parsed;
+      }
+
+      // Contact info
+      if (d.contact_phone) contactPhone = d.contact_phone;
+      if (d.social_links) {
+        const sl = typeof d.social_links === 'object' ? d.social_links : (() => { try { return JSON.parse(d.social_links as string); } catch { return {}; } })();
+        if (sl?.whatsapp) contactWhatsApp = sl.whatsapp;
+      }
+    }
+  } catch (e) {
+    console.error('[HomePage] Settings fetch error:', e);
+  }
+
+  try {
+    const [listingsRes, newsRes, faqsRes, ...cityResponses] = await Promise.all([
+      fetch(`${API_BASE_URL}/listings?limit=${featuredLimit}&isFeatured=true`, { cache: 'no-store' }).catch(() => null),
+      fetch(`${API_BASE_URL}/news`, { cache: 'no-store' }).catch(() => null),
+      fetch(`${API_BASE_URL}/system/faqs`, { cache: 'no-store' }).catch(() => null),
+      ...['Riyadh', 'Jeddah', 'Dammam', 'AlUla'].map(city =>
+        fetch(`${API_BASE_URL}/listings?limit=1&city=${city}`, { cache: 'no-store' }).catch(() => null)
+      )
+    ]);
+
+    if (listingsRes?.ok) {
+      const json = await listingsRes.json();
       featuredListings = json?.data?.items || json?.items || [];
-    } else {
-      const errorText = await res.text();
-      console.error(`[HomePage] Fetch failed: ${res.status} ${res.statusText}`, errorText);
+    }
+
+    if (newsRes?.ok) {
+      const json = await newsRes.json();
+      const allNews = json?.data || json || [];
+      if (featuredSlugs.length > 0) {
+        const filtered = allNews.filter((post: any) => featuredSlugs.includes(post.slug));
+        recentArticles = filtered
+          .sort((a: any, b: any) => featuredSlugs.indexOf(a.slug) - featuredSlugs.indexOf(b.slug))
+          .slice(0, 4);
+        if (recentArticles.length === 0) recentArticles = allNews.slice(0, 4);
+      } else {
+        recentArticles = allNews.slice(0, 4);
+      }
+    }
+
+    if (faqsRes?.ok) {
+      const json = await faqsRes.json();
+      homeFaqs = json?.data || json || [];
+    }
+
+    const cities = ['Riyadh', 'Jeddah', 'Dammam', 'AlUla'];
+    for (let idx = 0; idx < cities.length; idx++) {
+      const cityRes = cityResponses[idx];
+      if (cityRes?.ok) {
+        const json = await cityRes.json();
+        cityCounts[cities[idx]] = json?.data?.total || json?.total || 0;
+      }
     }
   } catch (err) {
-    console.error('[HomePage] Fetch error:', err);
-    featuredListings = [];
+    console.error('[HomePage] Parallel data pipeline error:', err);
   }
 
   return (
     <>
-      <HeroSection />
+      <HeroSection contactPhone={contactPhone} />
       <FeaturedSection listings={featuredListings} />
       <HowItWorksSection />
-      <CitySpotlightSection />
-      <CTASection />
+      <TrustSection stats={homepageStats} />
+      <CitySpotlightSection counts={cityCounts} />
+      <CTASection contactPhone={contactPhone} whatsappNumber={contactWhatsApp} />
+      <RecentArticlesSection articles={recentArticles} />
+      <FAQSection faqs={homeFaqs} />
+      <FooterCTAStrip />
       <ChatWidget floating={true} />
     </>
   );

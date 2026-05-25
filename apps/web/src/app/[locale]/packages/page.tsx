@@ -2,18 +2,42 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
-import { Check, Wallet, Crown, Shield } from 'lucide-react';
+import { Check, Wallet, Crown, Shield, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
+
+import { MANAGED_MODE } from '@/lib/config';
+import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 
 export default function PackagesPage() {
   const t = useTranslations('packages');
+  const router = useRouter();
+  const locale = useLocale();
+  const [settings, setSettings] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (MANAGED_MODE) {
+      router.push(`/${locale}/dashboard/settings`);
+      return;
+    }
+    
+    api.getSystemSettings().then(res => {
+      if (res.success) setSettings(res.data);
+      setLoading(false);
+    });
+  }, []);
+
+  const plans = settings?.subscription_plans || {};
 
   const packages = [
     {
       id: 'executive',
       icon: <Crown className="w-6 h-6 text-purple-600" />,
       title: t('executive'),
-      credits: '10,000',
-      price: '4,999 SAR',
+      credits: plans.ELITE?.credits || '10,000',
+      price: plans.ELITE?.price ? `${plans.ELITE.price} SAR` : '4,999 SAR',
       color: 'bg-white border-purple-200 hover:border-purple-400 shadow-xl rounded-[32px]',
       btnColor: 'bg-purple-600 hover:bg-purple-700 text-white',
       tag: t('bestValue')
@@ -22,8 +46,8 @@ export default function PackagesPage() {
       id: 'professional',
       icon: <Shield className="w-6 h-6 text-indigo-600" />,
       title: t('professional'),
-      credits: '5,000',
-      price: '2,999 SAR',
+      credits: plans.PRO?.credits || '5,000',
+      price: plans.PRO?.price ? `${plans.PRO.price} SAR` : '2,999 SAR',
       color: 'bg-white border-indigo-200 hover:border-indigo-400 shadow-lg rounded-[32px]',
       btnColor: 'bg-indigo-600 hover:bg-indigo-700 text-white'
     },
@@ -31,8 +55,8 @@ export default function PackagesPage() {
       id: 'advanced',
       icon: <Shield className="w-6 h-6 text-blue-600" />,
       title: t('advanced'),
-      credits: '2,500',
-      price: '1,499 SAR',
+      credits: plans.ADVANCED?.credits || '2,500',
+      price: plans.ADVANCED?.price ? `${plans.ADVANCED.price} SAR` : '1,499 SAR',
       color: 'bg-white border-blue-200 hover:border-blue-400 shadow-lg rounded-[32px]',
       btnColor: 'bg-blue-600 hover:bg-blue-700 text-white'
     },
@@ -40,8 +64,8 @@ export default function PackagesPage() {
       id: 'starter',
       icon: <Wallet className="w-6 h-6 text-amber-600" />,
       title: t('starter'),
-      credits: '1,000',
-      price: '799 SAR',
+      credits: plans.STARTER?.credits || '1,000',
+      price: plans.STARTER?.price ? `${plans.STARTER.price} SAR` : '799 SAR',
       color: 'bg-white border-amber-200 hover:border-amber-400 shadow-lg rounded-[32px]',
       btnColor: 'bg-white border-2 border-amber-500 text-amber-600 hover:bg-amber-50'
     }
@@ -70,7 +94,12 @@ export default function PackagesPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-7xl mx-auto mb-16">
-          {packages.map((pkg, idx) => (
+          {loading ? (
+            <div className="col-span-full py-20 text-center">
+              <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto" />
+              <p className="text-gray-500 mt-4 font-medium tracking-wide">Syncing latest packages...</p>
+            </div>
+          ) : packages.map((pkg, idx) => (
             <motion.div
               key={pkg.id}
               initial={{ opacity: 0, y: 20 }}

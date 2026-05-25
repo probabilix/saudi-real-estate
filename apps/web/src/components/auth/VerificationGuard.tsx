@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { ShieldAlert, CheckCircle2, ChevronRight } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, ChevronRight, Lock } from 'lucide-react';
+import { MANAGED_MODE, hasManagementAccess } from '@/lib/config';
 import Link from 'next/link';
 
 interface VerificationGuardProps {
@@ -26,12 +27,69 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({ children }
     );
   }
 
-  // If user is verified, just render the content
-  if (user?.regaVerified) {
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const fromAdmin = searchParams?.get('from') === 'admin';
+  const locale = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] || 'en' : 'en';
+
+  // 1. If Managed Mode is ON, block ALL listing/management activity for EVERYONE in the web app.
+  // Exception: Admins and Whitelisted users (Firms/Brokers) can still manage properties.
+  // Also skip this block if we are coming from the admin panel (fromAdmin) so we can show a login prompt instead.
+  if (MANAGED_MODE && !hasManagementAccess(user) && !fromAdmin) {
+    return (
+      <div className="max-w-2xl mx-auto py-24 px-4 text-center">
+        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Lock className="w-10 h-10 text-slate-400" />
+        </div>
+        <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-tight">Management Restricted</h2>
+        <p className="text-slate-600 mb-8 text-lg">
+          Property listing and management are strictly restricted to the <strong>Official Admin Panel</strong>. 
+          The public portal is currently in viewer-only mode.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link 
+            href={`/${locale}`}
+            className="inline-flex items-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10"
+          >
+            Back to Home
+          </Link>
+          <Link 
+            href={`/${locale}/dashboard/settings`}
+            className="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-8 py-4 rounded-2xl font-bold hover:bg-slate-50 transition-all"
+          >
+            Account Settings
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. If we are coming from admin panel but not logged in, show a clearer message
+  if (!user && fromAdmin && !loading) {
+    return (
+      <div className="max-w-2xl mx-auto py-24 px-4 text-center">
+        <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+          <ShieldAlert className="w-10 h-10 text-emerald-900" />
+        </div>
+        <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-tight">Admin Authentication Required</h2>
+        <p className="text-slate-600 mb-8 text-lg">
+          To manage properties from the Admin Panel, you must be logged into your admin account on this portal as well.
+        </p>
+        <Link 
+          href={`/${locale}/auth/login?returnTo=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+          className="inline-flex items-center gap-2 bg-emerald-900 text-white px-8 py-4 rounded-2xl font-bold hover:scale-105 transition-all shadow-xl shadow-emerald-900/20"
+        >
+          Login as Admin
+        </Link>
+      </div>
+    );
+  }
+
+  // 3. If user is verified OR is whitelisted, allow access
+  if (user?.regaVerified || hasManagementAccess(user)) {
     return <>{children}</>;
   }
 
-  // If not verified, show the professional "Gate" UI
+  // 4. If not verified, show the professional "Gate" UI
   return (
     <div className="max-w-2xl mx-auto py-12 px-4">
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none text-center">

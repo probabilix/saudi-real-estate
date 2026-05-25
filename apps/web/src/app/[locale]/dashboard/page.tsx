@@ -18,6 +18,8 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
+import { MANAGED_MODE, hasManagementAccess } from '@/lib/config';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardOverview({ params: { locale } }: { params: { locale: string } }) {
   const t = useTranslations('dashboard');
@@ -28,11 +30,19 @@ export default function DashboardOverview({ params: { locale } }: { params: { lo
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [fetching, setFetching] = useState(true);
 
+  const router = useRouter();
+
   useEffect(() => {
-    // Sync profile on mount
+    // 1. Sync profile on mount
     refreshUser();
+
+    // 2. If Managed Mode is ON and user is NOT whitelisted, they shouldn't be here.
+    // Redirect them to Account Settings immediately.
+    if (MANAGED_MODE && user && !hasManagementAccess(user)) {
+      router.push(`/${locale}/dashboard/settings`);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     async function fetchStats() {

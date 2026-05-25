@@ -16,7 +16,7 @@ export const getApiBaseUrl = () => {
       return 'http://localhost:3001/api/v1';
     }
   }
-  
+
   // If we're on the server (SSR/ISR)
   if (process.env.NODE_ENV === 'development') {
     return 'http://localhost:3001/api/v1';
@@ -90,7 +90,7 @@ class ApiClient {
 
     const fetchPromise = (async () => {
       let retries = 2;
-      
+
       while (retries >= 0) {
         try {
           // Auto-inject Authorization header if token exists in localStorage
@@ -102,17 +102,18 @@ class ApiClient {
             ...(options.body ? { 'Content-Type': 'application/json' } : {})
           });
 
-          let response = await fetch(url, { 
-            ...options, 
+          let response = await fetch(url, {
+            ...options,
             headers: getHeaders(token),
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-store'
           });
 
           // Invalidate cache on mutations (POST, PUT, PATCH, DELETE)
           if (options.method && options.method !== 'GET') {
             this.cache.clear();
           }
-          
+
           // Handle cases where response might not be JSON or empty
           let result: ApiResponse<T>;
           const text = await response.text();
@@ -124,7 +125,7 @@ class ApiClient {
 
           // 401 Interceptor: Attempt silent refresh
           if (response.status === 401 && token && !endpoint.includes('/auth/refresh')) {
-            const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, { 
+            const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
               method: 'POST',
               credentials: 'include'
             });
@@ -133,12 +134,13 @@ class ApiClient {
             if (refreshResult.success && refreshResult.data?.accessToken) {
               const newToken = refreshResult.data.accessToken;
               localStorage.setItem('accessToken', newToken);
-              
+
               // Retry original request with NEW token
-              response = await fetch(url, { 
-                ...options, 
+              response = await fetch(url, {
+                ...options,
                 headers: getHeaders(newToken),
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store'
               });
               const retryText = await response.text();
               try {
@@ -170,7 +172,12 @@ class ApiClient {
           }
 
           const successRes = result as ApiResponse<T>;
-          
+
+          // Clear cache on mutations (POST, PUT, DELETE, etc.)
+          if (options.method && options.method !== 'GET') {
+            this.cache.clear();
+          }
+
           // Cache successful GET requests
           if (!options.method || options.method === 'GET') {
             this.cache.set(cacheKey, {
@@ -249,12 +256,18 @@ class ApiClient {
     if (params.status) s.append('status', params.status);
     if (params.q) s.append('q', params.q);
     if (params.limit) s.append('limit', params.limit.toString());
-    
+
     return this.fetcher<PaginatedResponse<Listing>>(`/listings?${s.toString()}`);
   }
 
   async getListingById(id: string) {
-    return this.fetcher<ListingWithOwner>(`/listings/${id}`);
+    return this.fetcher<ListingWithOwner>(`/listings/${id}?t=${Date.now()}`);
+  }
+
+  async revealListingContact(id: string) {
+    return this.fetcher<{ phone: string; email: string }>(`/listings/${id}/reveal`, {
+      method: 'POST',
+    });
   }
 
   async createListing(data: Partial<Listing>) {
@@ -342,7 +355,7 @@ class ApiClient {
     });
   }
 
-   async reclaimBrokerCredits(brokerId: string, amount: number) {
+  async reclaimBrokerCredits(brokerId: string, amount: number) {
     return this.fetcher<{ success: boolean; message: string }>(`/firm/brokers/${brokerId}/reclaim`, {
       method: 'POST',
       body: JSON.stringify({ amount }),
@@ -373,6 +386,19 @@ class ApiClient {
 
   async getFavorites() {
     return this.fetcher<PaginatedResponse<Listing & { isFavorited: boolean }>>('/favorites', {
+      method: 'GET',
+    });
+  }
+
+  async toggleNewsFavorite(newsId: string) {
+    return this.fetcher<{ isFavorited: boolean }>('/favorites/news/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ newsId }),
+    });
+  }
+
+  async getNewsFavorites() {
+    return this.fetcher<{ items: (NewsPost & { isFavorited: boolean })[] }>('/favorites/news', {
       method: 'GET',
     });
   }
@@ -416,6 +442,25 @@ class ApiClient {
     return this.fetcher<LegalPage>(`/legal/${slug}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  async getSystemSettings() {
+    return this.fetcher<Record<string, any>>('/system/settings', {
+      method: 'GET',
+    });
+  }
+
+  async chatProxy(data: { mode: string; message: string; history: any[]; locale: string; context?: any }) {
+    return this.fetcher<any>('/system/chat', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getChatHistory() {
+    return this.fetcher<{ success: boolean; buyerProfileId: string; sessionId: string; history: any[] }>('/system/chat/history', {
+      method: 'GET',
     });
   }
 }

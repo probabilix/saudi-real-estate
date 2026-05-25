@@ -32,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (token) {
         const result = await api.getMe();
         if (result.success && result.data) {
+          console.log('[AUTH DEBUG] Web App User:', result.data.user);
           setUser(result.data.user);
         } else {
           localStorage.removeItem('accessToken');

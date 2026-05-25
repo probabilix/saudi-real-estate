@@ -44,7 +44,7 @@ export default function CityDropdown({ city, onChange, className }: CityDropdown
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="appearance-none bg-white border border-surface-200 rounded-xl ps-12 pe-12 py-3 text-sm text-charcoal font-medium outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all w-full md:w-auto min-w-[200px] text-start shadow-sm"
+          className="appearance-none bg-white border border-surface-200 rounded-xl ps-12 pe-12 py-3 text-sm text-charcoal font-medium outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all w-full text-start shadow-sm"
         >
           <span className="truncate block pr-4">{currentLabel}</span>
           <ChevronDown 

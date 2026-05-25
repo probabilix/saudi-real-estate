@@ -41,6 +41,7 @@ export const residenceTypeEnum = pgEnum('residence_type', ['FAMILY', 'BACHELOR']
 export const genderEnum = pgEnum('gender', ['MALE', 'FEMALE']);
 export const verificationStatusEnum = pgEnum('verification_status', ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED']);
 export const brokerExperienceLevelEnum = pgEnum('broker_experience_level', ['0-2', '3-5', '6-10', '10+']);
+export const senderTypeEnum = pgEnum('sender_type', ['USER', 'ASSISTANT']);
 
 // ── Users Table ──
 export const users = pgTable('users', {
@@ -91,6 +92,8 @@ export const brokerProfiles = pgTable('broker_profiles', {
   // Address
   nationalShortAddress: varchar('national_short_address', { length: 255 }),
   address: text('address'),
+  nationality: varchar('nationality', { length: 100 }),
+  city: varchar('city', { length: 100 }),
   
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
@@ -151,8 +154,10 @@ export const listings = pgTable('listings', {
   // Visibility & Search
   isFeatured: boolean('is_featured').default(false),
   featuredUntil: timestamp('featured_until', { withTimezone: true }),
+  featuredOrder: integer('featured_order').default(0),
   verified: boolean('verified').default(false),
   truCheckVerified: boolean('tru_check_verified').default(false),
+  aiQualificationActive: boolean('ai_qualification_active').default(true),
   mandateDocUrl: text('mandate_doc_url'),
   viewsCount: integer('views_count').default(0),
   searchVector: tsvector('search_vector'), // Full text search
@@ -186,8 +191,21 @@ export const buyerProfiles = pgTable('buyer_profiles', {
   contactProvided: boolean('contact_provided').default(false),
   languagePreference: languageEnum('language_preference').default('en'),
   lastSeen: timestamp('last_seen', { withTimezone: true }),
+  lastAiSummary: text('last_ai_summary'),
+  summaryUpdatedAt: timestamp('summary_updated_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+// ── Chat Messages Table ──
+export const chatMessages = pgTable('chat_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  buyerProfileId: uuid('buyer_profile_id').references(() => buyerProfiles.id).notNull(),
+  sender: senderTypeEnum('sender').notNull(),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  buyerProfileIdx: index('chat_msg_buyer_profile_idx').on(table.buyerProfileId),
+}));
 
 // ── Leads Table ──
 export const leads = pgTable('leads', {
@@ -200,6 +218,7 @@ export const leads = pgTable('leads', {
   aiSummary: text('ai_summary'),
   buyerBudgetDisplay: varchar('buyer_budget_display', { length: 100 }),
   buyerTimelineDisplay: varchar('buyer_timeline_display', { length: 100 }),
+  isQualified: boolean('is_qualified').default(false),
   notifiedWhatsapp: boolean('notified_whatsapp').default(false),
   notifiedEmail: boolean('notified_email').default(false),
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
@@ -268,6 +287,16 @@ export const favorites = pgTable('favorites', {
   userListingIdx: index('user_listing_idx').on(table.userId, table.listingId),
 }));
 
+// ── News Favorites Table ──
+export const newsFavorites = pgTable('news_favorites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  newsId: uuid('news_id').references(() => news.id).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  userNewsIdx: index('user_news_idx').on(table.userId, table.newsId),
+}));
+
 
 // ── Relations ──
 
@@ -289,6 +318,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   subscriptions: many(subscriptions),
   featuredPlacements: many(featuredPlacements),
   favorites: many(favorites),
+  newsFavorites: many(newsFavorites),
 }));
 
 export const brokerProfilesRelations = relations(brokerProfiles, ({ one }) => ({
@@ -319,6 +349,17 @@ export const favoritesRelations = relations(favorites, ({ one }) => ({
   }),
 }));
 
+export const newsFavoritesRelations = relations(newsFavorites, ({ one }) => ({
+  user: one(users, {
+    fields: [newsFavorites.userId],
+    references: [users.id],
+  }),
+  news: one(news, {
+    fields: [newsFavorites.newsId],
+    references: [news.id],
+  }),
+}));
+
 export const leadsRelations = relations(leads, ({ one }) => ({
   buyerProfile: one(buyerProfiles, {
     fields: [leads.buyerProfileId],
@@ -340,6 +381,14 @@ export const buyerProfilesRelations = relations(buyerProfiles, ({ one, many }) =
     references: [users.id],
   }),
   leads: many(leads),
+  chatMessages: many(chatMessages),
+}));
+
+export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
+  buyerProfile: one(buyerProfiles, {
+    fields: [chatMessages.buyerProfileId],
+    references: [buyerProfiles.id],
+  }),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -360,11 +409,12 @@ export const featuredPlacementsRelations = relations(featuredPlacements, ({ one 
   }),
 }));
 
-export const newsRelations = relations(news, ({ one }) => ({
+export const newsRelations = relations(news, ({ one, many }) => ({
   author: one(users, {
     fields: [news.authorId],
     references: [users.id],
   }),
+  userFavorites: many(newsFavorites),
 }));
 
 export const legalPages = pgTable('legal_pages', {
@@ -374,5 +424,17 @@ export const legalPages = pgTable('legal_pages', {
   titleAr: varchar('title_ar', { length: 500 }).notNull(),
   contentEn: text('content_en').notNull(),
   contentAr: text('content_ar').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+// ── FAQs Table (Saudi RE Premium Settings) ──
+export const faqs = pgTable('faqs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  questionEn: text('question_en').notNull(),
+  questionAr: text('question_ar').notNull(),
+  answerEn: text('answer_en').notNull(),
+  answerAr: text('answer_ar').notNull(),
+  order: integer('order').default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

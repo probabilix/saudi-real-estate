@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { locales } from '@/i18n';
 import { AuthProvider } from '@/hooks/use-auth';
 import NavWrapper from '@/components/layout/NavWrapper';
+import ChatWidget from '@/components/chat/ChatWidget';
 import type { Locale } from '@/i18n';
 
 const playfair = Playfair_Display({

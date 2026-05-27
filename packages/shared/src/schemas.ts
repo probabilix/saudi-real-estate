@@ -58,6 +58,8 @@ export const createListingSchema = z.object({
   amenities: z.record(z.boolean()).default({}),
   foreignerEligible: z.boolean().default(false),
   isFreehold: z.boolean().default(true),
+  verified: z.boolean().default(false).optional(),
+
   regaAdvertisingLicense: z.string().max(100).optional(),
   regaFalLicense: z.string().max(100).optional(),
   regaLicenseIssueDate: z.string().optional(),
@@ -70,6 +72,8 @@ export const createListingSchema = z.object({
   truCheckVerified: z.boolean().default(false),
   youtubeUrl: z.string().url().max(255).optional().nullable(),
   videoUrl: z.string().url().optional().nullable(),
+  brochureUrl: z.string().url().optional().nullable(),
+  mapEmbedUrl: z.string().optional().nullable(),
   shortId: z.string().max(20).optional(),
   addedOn: z.string().optional(),
   bayutId: z.string().max(50).optional(),

@@ -125,6 +125,8 @@ export interface Listing {
   shortId: string | null;
   youtubeUrl: string | null;
   videoUrl: string | null;
+  brochureUrl: string | null;
+  mapEmbedUrl: string | null;
   viewsCount: number;
   isFavorited?: boolean;
   deletedAt: string | null;

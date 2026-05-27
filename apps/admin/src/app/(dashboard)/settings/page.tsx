@@ -1,13 +1,16 @@
 'use client';
-import { useState, useEffect } from 'react';
+export const dynamic = 'force-dynamic';
+import { useState, useEffect, useRef } from 'react';
 import { AdminTopBar } from '@/components/AdminSidebar';
 import { adminApi, SystemSetting, NewsPost } from '@/lib/api';
 import {
   Settings, Save, Globe, Share2, CreditCard, 
   Info, Loader2, CheckCircle2, AlertCircle,
   Twitter, Instagram, Linkedin, MessageSquare,
-  Youtube, Facebook, Newspaper, Mail, Phone, MapPin
+  Youtube, Facebook, Newspaper, Mail, Phone, MapPin,
+  Image as ImageIcon, Check, ChevronDown
 } from 'lucide-react';
+import { CldUploadWidget } from 'next-cloudinary';
 import clsx from 'clsx';
 
 export default function SettingsPage() {
@@ -44,7 +47,24 @@ export default function SettingsPage() {
     const result = await adminApi.updateSetting(key, value);
     
     if (result.success) {
-      setSuccess(`Updated ${key} successfully`);
+      const SETTING_NAMES: Record<string, string> = {
+        subscription_plans: 'Subscription Plans',
+        social_links: 'Social Media Links',
+        ai_qualification_webhook: 'Lead Qualification Webhook',
+        ai_general_assistant_webhook: 'General Assistant Webhook',
+        n8n_webhook_secret: 'Webhook Secret Key',
+        n8n_api_key: 'N8N API Key',
+        listing_cost_credits: 'Listing Cost Credits',
+        contact_phone: 'Contact Phone Number',
+        contact_email: 'Contact Email Address',
+        contact_location: 'Office Location Address',
+        sidebar_ad_image: 'Ad Banner Image',
+        sidebar_ad_link: 'Ad Target Link',
+        sidebar_ad_aspect_ratio: 'Ad Aspect Ratio Mode',
+        homepage_featured_articles: 'Homepage Featured Articles'
+      };
+      const friendlyName = SETTING_NAMES[key] || key;
+      setSuccess(`Updated ${friendlyName} successfully`);
       setSettings(prev => prev.map(s => s.key === key ? { ...s, value } : s));
     } else {
       setError(result.message || `Failed to update ${key}`);
@@ -67,7 +87,7 @@ export default function SettingsPage() {
     <div className="flex flex-col h-full">
       <AdminTopBar title="Site Settings" />
       
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 max-w-4xl">
+      <div className="flex-1 overflow-y-auto p-6 space-y-8 w-full max-w-5xl mx-auto min-w-0">
         
         {/* Status Messages */}
         {error && (
@@ -82,27 +102,6 @@ export default function SettingsPage() {
             {success}
           </div>
         )}
-
-        {/* Section: Subscription Plans */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-              <CreditCard className="w-4 h-4 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-surface-900">Subscription Plans</h2>
-              <p className="text-xs text-surface-500">Manage pricing and tier descriptions</p>
-            </div>
-          </div>
-          
-          <div className="admin-card overflow-hidden">
-            <SubscriptionEditor 
-              value={getSettingValue('subscription_plans')} 
-              onSave={(val) => handleUpdateSetting('subscription_plans', val)}
-              isSaving={saving === 'subscription_plans'}
-            />
-          </div>
-        </section>
 
         {/* Section: Social Media */}
         <section className="space-y-4">
@@ -320,8 +319,8 @@ export default function SettingsPage() {
             </div>
           </div>
           
-          <div className="admin-card p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
+          <div className="admin-card p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-w-0 w-full">
+            <div className="min-w-0 w-full">
               <label className="admin-label flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-surface-400" />
                 Contact Phone
@@ -329,18 +328,18 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  className="admin-input" 
+                  className="admin-input min-w-0 w-full" 
                   defaultValue={getSettingValue('contact_phone')}
                   onBlur={(e) => handleUpdateSetting('contact_phone', e.target.value)}
                 />
-                <button className="btn-secondary px-3">
+                <button className="btn-secondary px-3 shrink-0">
                   {saving === 'contact_phone' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 </button>
               </div>
               <p className="text-[10px] text-surface-400 mt-2">Primary contact phone number displayed across the site</p>
             </div>
 
-            <div>
+            <div className="min-w-0 w-full">
               <label className="admin-label flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-surface-400" />
                 Contact Email
@@ -348,18 +347,18 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <input 
                   type="email" 
-                  className="admin-input" 
+                  className="admin-input min-w-0 w-full" 
                   defaultValue={getSettingValue('contact_email')}
                   onBlur={(e) => handleUpdateSetting('contact_email', e.target.value)}
                 />
-                <button className="btn-secondary px-3">
+                <button className="btn-secondary px-3 shrink-0">
                   {saving === 'contact_email' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 </button>
               </div>
               <p className="text-[10px] text-surface-400 mt-2">Primary contact email address for general inquires</p>
             </div>
 
-            <div>
+            <div className="min-w-0 w-full">
               <label className="admin-label flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-surface-400" />
                 Office Location
@@ -367,15 +366,125 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  className="admin-input" 
+                  className="admin-input min-w-0 w-full" 
                   defaultValue={getSettingValue('contact_location')}
                   onBlur={(e) => handleUpdateSetting('contact_location', e.target.value)}
                 />
-                <button className="btn-secondary px-3">
+                <button className="btn-secondary px-3 shrink-0">
                   {saving === 'contact_location' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 </button>
               </div>
               <p className="text-[10px] text-surface-400 mt-2">Office location/address shown in the footers and pages</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Sidebar Banner Ad Settings */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+              <Globe className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-surface-900">Sidebar Banner Ad Settings</h2>
+              <p className="text-xs text-surface-500">Configure the dynamic advertising banner image and target link shown in the listing sidebar</p>
+            </div>
+          </div>
+          
+          <div className="admin-card p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-w-0 w-full">
+            <div className="min-w-0 w-full flex flex-col gap-1.5">
+              <label className="admin-label flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-surface-400" />
+                Ad Banner Image
+              </label>
+              
+              <div className="flex items-center gap-3">
+                {/* Image Preview Thumbnail */}
+                <div className="w-11 h-11 rounded-xl bg-surface-50 border border-surface-200 overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+                  {getSettingValue('sidebar_ad_image') ? (
+                    <img 
+                      src={getSettingValue('sidebar_ad_image')} 
+                      alt="Ad Preview" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <span className="text-[9px] text-surface-400 font-bold uppercase">No Ad</span>
+                  )}
+                </div>
+
+                <div className="flex-1 flex gap-2 min-w-0">
+                  <input 
+                    type="text" 
+                    className="admin-input min-w-0 w-full" 
+                    value={getSettingValue('sidebar_ad_image')}
+                    placeholder="Paste URL or upload image"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSettings(prev => prev.map(s => s.key === 'sidebar_ad_image' ? { ...s, value: val } : s));
+                    }}
+                    onBlur={(e) => handleUpdateSetting('sidebar_ad_image', e.target.value)}
+                  />
+                  <CldUploadWidget 
+                    uploadPreset="saudi_re_listing" 
+                    onSuccess={(result: any) => {
+                      if (result.event === 'success' && result.info?.secure_url) {
+                        handleUpdateSetting('sidebar_ad_image', result.info.secure_url);
+                      }
+                    }}
+                  >
+                    {({ open }) => (
+                      <button 
+                        type="button"
+                        onClick={() => open()}
+                        className="btn-secondary whitespace-nowrap px-3 shrink-0 flex items-center gap-1"
+                        title="Upload graphic"
+                      >
+                        <ImageIcon className="w-4 h-4 text-surface-500" />
+                        <span>Upload</span>
+                      </button>
+                    )}
+                  </CldUploadWidget>
+                </div>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-1">Upload promo image to Cloudinary or paste any URL</p>
+            </div>
+
+            <div className="min-w-0 w-full flex flex-col gap-1.5">
+              <label className="admin-label flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-surface-400" />
+                Ad Target Link
+              </label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  className="admin-input min-w-0 w-full" 
+                  defaultValue={getSettingValue('sidebar_ad_link')}
+                  placeholder="/contact or external URL"
+                  onBlur={(e) => handleUpdateSetting('sidebar_ad_link', e.target.value)}
+                />
+                <button className="btn-secondary px-3 shrink-0">
+                  {saving === 'sidebar_ad_link' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-1">Target redirect URL when the user clicks on the ad banner</p>
+            </div>
+
+            <div className="min-w-0 w-full flex flex-col gap-1.5">
+              <label className="admin-label flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5 text-surface-400" />
+                Ad Aspect Ratio Mode
+              </label>
+              <AdminSelect
+                value={getSettingValue('sidebar_ad_aspect_ratio') || 'auto'}
+                onChange={(val) => handleUpdateSetting('sidebar_ad_aspect_ratio', val)}
+                options={[
+                  { value: 'auto', label: 'Automatic (Natural Image Shape)' },
+                  { value: '1_1', label: '1:1 Square Compatibility' },
+                  { value: '3_4', label: '3:4 Portrait Compatibility' },
+                  { value: '16_9', label: '16:9 Landscape Compatibility' }
+                ]}
+              />
+              <p className="text-[10px] text-surface-400 mt-1">Controls cropping/fitting to match your ad graphics</p>
             </div>
           </div>
         </section>
@@ -597,3 +706,63 @@ function FeaturedArticlesEditor({ value, onSave, isSaving }: { value: string, on
     </div>
   );
 }
+
+function AdminSelect({
+  value,
+  onChange,
+  options
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedLabel = options.find((o) => o.value === value)?.label || value;
+
+  return (
+    <div className="relative w-full" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white border border-surface-200 rounded-xl text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all hover:bg-surface-50 text-left font-medium"
+      >
+        <span>{selectedLabel}</span>
+        <ChevronDown className={`w-4 h-4 text-surface-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-[100] bottom-full mb-2 w-full bg-white border border-surface-200 rounded-xl shadow-xl py-1 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-bottom-1 duration-200">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              className={`w-full px-3.5 py-2.5 text-left text-sm hover:bg-surface-50 transition-colors flex items-center justify-between ${
+                opt.value === value ? 'text-primary-600 font-semibold bg-primary-50/50' : 'text-surface-700'
+              }`}
+            >
+              <span>{opt.label}</span>
+              {opt.value === value && <Check className="w-4 h-4 text-primary-600" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+

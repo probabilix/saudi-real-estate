@@ -3,6 +3,7 @@ import { listings, users, leads, favorites, buyerProfiles } from '../db/schema';
 import { eq, and, gte, lte, or, sql, desc, asc, inArray, InferSelectModel, SQL, isNull } from 'drizzle-orm';
 import { ListingSearchInput } from '@saudi-re/shared';
 import { SystemService } from './system.service';
+import { CloudinaryService } from './cloudinary.service';
 
 
 /**
@@ -316,28 +317,75 @@ export class ListingService {
     };
   }
 
-  /**
-   * Create a new listing
-   * Initial state is DRAFT or FLAGGED depending on input
-   */
-  static async createListing(requesterId: string, data: any) {
-    const shortId = generateShortId();
+    /**
+     * Helper to automatically process and convert external PDF or Google Drive links
+     * into a Cloudinary URL to enable the dynamic 3D booklet page-turning reader.
+     */
+    private static async processBrochureUrl(url: string | null | undefined): Promise<string | null | undefined> {
+      if (!url || url.trim() === '') return url;
+      
+      // If it's already a Cloudinary URL, bypass conversion
+      if (url.includes('res.cloudinary.com')) return url;
+      
+      // Auto-detect Google Drive or direct PDF links
+      if (url.includes('drive.google.com') || url.toLowerCase().endsWith('.pdf') || url.includes('/uc?')) {
+        console.log(`[BROCHURE CONVERTER] Auto-detecting external PDF/Drive link: ${url}`);
+        
+        let downloadUrl = url;
+        if (url.includes('drive.google.com')) {
+          const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+          if (match && match[1]) {
+            downloadUrl = `https://docs.google.com/uc?export=download&id=${match[1]}`;
+          } else {
+            const idMatch = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+            if (idMatch && idMatch[1]) {
+              downloadUrl = `https://docs.google.com/uc?export=download&id=${idMatch[1]}`;
+            }
+          }
+        }
+        
+        try {
+          const cloudinaryUrl = await CloudinaryService.uploadFromUrl(downloadUrl);
+          if (cloudinaryUrl) {
+            console.log(`[BROCHURE CONVERTER] Successfully converted external PDF to Cloudinary: ${cloudinaryUrl}`);
+            return cloudinaryUrl;
+          }
+        } catch (err) {
+          console.error('[BROCHURE CONVERTER] Conversion failed, falling back to original link', err);
+        }
+      }
+      
+      return url;
+    }
 
-    // Allow Firm Owners to specify a different owner (one of their agents)
-    const finalOwnerId = data.ownerId || requesterId;
+    /**
+     * Create a new listing
+     * Initial state is DRAFT or FLAGGED depending on input
+     */
+    static async createListing(requesterId: string, data: any) {
+      const shortId = generateShortId();
 
-    const newListing = await db.insert(listings).values({
-      ...data,
-      id: undefined,
-      ownerId: finalOwnerId,
-      shortId,
-      status: 'DRAFT',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
+      // Allow Firm Owners to specify a different owner (one of their agents)
+      const finalOwnerId = data.ownerId || requesterId;
 
-    return newListing[0];
-  }
+      let processedBrochureUrl = data.brochureUrl;
+      if (processedBrochureUrl) {
+        processedBrochureUrl = await this.processBrochureUrl(processedBrochureUrl);
+      }
+
+      const newListing = await db.insert(listings).values({
+        ...data,
+        brochureUrl: processedBrochureUrl,
+        id: undefined,
+        ownerId: finalOwnerId,
+        shortId,
+        status: 'DRAFT',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+
+      return newListing[0];
+    }
 
   /**
    * Update an existing listing with hierarchical permission checks
@@ -395,6 +443,11 @@ export class ListingService {
           delete updateData[field]; // Ignore attempts to change core identity
         }
       });
+    }
+
+    // Process brochure URL if updated
+    if (updateData.brochureUrl !== undefined && updateData.brochureUrl !== current.brochureUrl) {
+      updateData.brochureUrl = await this.processBrochureUrl(updateData.brochureUrl);
     }
 
     // 4. Perform Update with timestamp

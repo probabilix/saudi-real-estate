@@ -163,9 +163,28 @@ export const adminApi = {
   getLegalPages: () => request<LegalPage[]>('/admin/legal'),
   updateLegalPage: (slug: string, data: Partial<LegalPage>) =>
     request(`/admin/legal/${slug}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // ── Contact Submissions (Inbox) ──
+  getAllSubmissions: () => request<ContactSubmission[]>('/admin/contact-submissions'),
+  toggleSubmissionReplied: (id: string) =>
+    request<ContactSubmission>(`/admin/contact-submissions/${id}/toggle`, {
+      method: 'PATCH',
+    }),
+  deleteSubmission: (id: string) =>
+    request(`/admin/contact-submissions/${id}`, {
+      method: 'DELETE',
+    }),
 };
 
-// ── Type Definitions ──
+export interface ContactSubmission {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  isReplied: boolean;
+  createdAt: string;
+}
+
 export interface AdminStats {
   totalUsers: number;
   totalListings: number;

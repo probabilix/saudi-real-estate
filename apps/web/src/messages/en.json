@@ -52,7 +52,9 @@
       "Khobar": "Khobar",
       "Dammam": "Dammam",
       "Mecca": "Mecca",
-      "Medina": "Medina"
+      "Medina": "Medina",
+      "Madinah": "Madinah"
+
     },
     "languages": {
       "English": "English",
@@ -260,12 +262,21 @@
     "seeVideo": "See video",
     "map": "Map",
     "video": "Video",
+    "brochure": "Brochure",
     "tabLocationNearby": "Location & Nearby",
     "regaVerifiedInfo": "REGA Verified Information",
     "reportProperty": "Report this property",
     "usefulLinks": "Useful Links",
     "otherNearbyAreas": "Other nearby areas with {type}",
-    "nearArea": "Near {area}"
+    "nearArea": "Near {area}",
+    "brochurePremiumMaterial": "Premium Material",
+    "brochureTitle": "Official Digital Brochure",
+    "brochureDesc": "Access premium project floorplans, REGA certificates, and exclusive unit finishes directly from the developer.",
+    "brochureCta": "View Brochure Booklet",
+    "sidebarConciergePill": "VIP CONCIERGE",
+    "sidebarConciergeTitle": "Direct Specialist Advice",
+    "sidebarConciergeDesc": "Looking for something bespoke? Let our licensed Saudi specialists curate a personalized selection of private listings tailored to your exact requirements.",
+    "sidebarConciergeCta": "Consult on WhatsApp"
   },
   "propertyTypes": {
     "APARTMENT": "Apartment",

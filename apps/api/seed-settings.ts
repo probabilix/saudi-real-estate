@@ -103,6 +103,34 @@ async function seedSettings() {
       set: { description: 'Authentication API key used to trigger programmatic actions in self-hosted n8n.' }
     });
 
+    // 7. Sidebar Dynamic Ad Banner
+    await db.insert(systemSettings).values({
+      key: 'sidebar_ad_image',
+      value: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+      description: 'The image URL for the listings sidebar dynamic ad banner.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { value: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80' }
+    });
+
+    await db.insert(systemSettings).values({
+      key: 'sidebar_ad_link',
+      value: '/contact',
+      description: 'The target redirect URL when clicking the sidebar ad banner.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { value: '/contact' }
+    });
+
+    await db.insert(systemSettings).values({
+      key: 'sidebar_ad_aspect_ratio',
+      value: 'auto',
+      description: 'The aspect ratio mode for the listings sidebar ad banner (auto, 1_1, 3_4, 16_9).'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { value: 'auto' }
+    });
+
     console.log('✅ Successfully seeded system settings');
   } catch (error) {
     console.error('❌ Seeding failed:', error);

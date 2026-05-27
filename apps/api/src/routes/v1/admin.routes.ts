@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { users, listings, systemSettings, news, legalPages } from '../../db/schema';
+import { users, listings, systemSettings, news, legalPages, contactSubmissions } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import { eq, desc, asc, count, sql, and, or, ilike, isNull, inArray } from 'drizzle-orm';
 
@@ -588,6 +588,48 @@ export default async function adminRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to delete news post' });
+    }
+  });
+
+  // ── Contact Submissions Management ──
+  app.get('/contact-submissions', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    try {
+      const submissions = await db.select()
+        .from(contactSubmissions)
+        .orderBy(desc(contactSubmissions.createdAt));
+      return reply.send({ success: true, data: submissions });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch contact submissions.' });
+    }
+  });
+
+  app.patch('/contact-submissions/:id/toggle', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const [submission] = await db.select().from(contactSubmissions).where(eq(contactSubmissions.id, id)).limit(1);
+      if (!submission) {
+        return reply.code(404).send({ success: false, message: 'Submission not found.' });
+      }
+      const [updated] = await db.update(contactSubmissions)
+        .set({ isReplied: !submission.isReplied })
+        .where(eq(contactSubmissions.id, id))
+        .returning();
+      return reply.send({ success: true, data: updated });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to toggle replied status.' });
+    }
+  });
+
+  app.delete('/contact-submissions/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      await db.delete(contactSubmissions).where(eq(contactSubmissions.id, id));
+      return reply.send({ success: true, message: 'Submission deleted successfully.' });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to delete submission.' });
     }
   });
 }

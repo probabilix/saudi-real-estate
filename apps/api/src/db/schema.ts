@@ -111,8 +111,11 @@ export const listings = pgTable('listings', {
   // Location
   city: varchar('city', { length: 100 }).notNull(),
   district: varchar('district', { length: 100 }),
+  arCity: varchar('ar_city', { length: 100 }),
+  arDistrict: varchar('ar_district', { length: 100 }),
   lat: decimal('lat', { precision: 10, scale: 7 }),
   lng: decimal('lng', { precision: 10, scale: 7 }),
+
   
   // Pricing & Area
   price: bigint('price', { mode: 'number' }).notNull(),
@@ -132,6 +135,8 @@ export const listings = pgTable('listings', {
   photos: text('photos').array().notNull(),
   youtubeUrl: varchar('youtube_url', { length: 255 }),
   videoUrl: text('video_url'), // Cloudinary video link
+  brochureUrl: text('brochure_url'), // Cloudinary PDF Brochure link
+  mapEmbedUrl: text('map_embed_url'), // Interactive Google Maps Embed link/HTML
   amenities: jsonb('amenities').default({}),
   history: jsonb('history').default([]),
   foreignerEligible: boolean('foreigner_eligible').default(false),
@@ -438,3 +443,14 @@ export const faqs = pgTable('faqs', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
+
+// ── Contact Submissions Table ──
+export const contactSubmissions = pgTable('contact_submissions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  isReplied: boolean('is_replied').default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+

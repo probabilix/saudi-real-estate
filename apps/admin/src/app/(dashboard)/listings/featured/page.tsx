@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+
 export default function FeaturedListingsPage() {
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [total, setTotal] = useState(0);
@@ -399,7 +401,7 @@ export default function FeaturedListingsPage() {
                             <StarOff className="w-4 h-4" />
                           </button>
                           <a
-                            href={`http://localhost:3000/en/listings/${listing.id}`}
+                            href={`${WEB_URL}/en/listings/${listing.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-ghost text-surface-400 hover:text-primary-600"
@@ -408,7 +410,7 @@ export default function FeaturedListingsPage() {
                             <ExternalLink className="w-4 h-4" />
                           </a>
                           <a 
-                            href={`http://localhost:3000/en/edit-property/${listing.id}?from=admin`} 
+                            href={`${WEB_URL}/en/edit-property/${listing.id}?from=admin`} 
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-ghost text-surface-400 hover:text-primary-600" 

@@ -51,7 +51,9 @@
       "Khobar": "الخبر",
       "Dammam": "الدمام",
       "Mecca": "مكة المكرمة",
-      "Medina": "المدينة المنورة"
+      "Medina": "المدينة المنورة",
+      "Madinah": "المدينة المنورة"
+
     },
     "languages": {
       "English": "الإنجليزية",
@@ -258,6 +260,7 @@
     "seeVideo": "شاهد الفيديو",
     "map": "الخريطة",
     "video": "فيديو",
+    "brochure": "الكتيب",
     "tabLocationNearby": "الموقع والمناطق القريبة",
     "regaVerifiedInfo": "معلومات موثقة من الهيئة العقارية",
     "reportProperty": "الإبلاغ عن هذا العقار",
@@ -265,7 +268,15 @@
     "otherNearbyAreas": "مناطق قريبة أخرى بـ {type}",
     "nearArea": "قرب {area}",
     "management": "الإدارة",
-    "professionalAgent": "وسيط عقاري محترف"
+    "professionalAgent": "وسيط عقاري محترف",
+    "brochurePremiumMaterial": "مستندات مميزة",
+    "brochureTitle": "الكتيب الرقمي الرسمي",
+    "brochureDesc": "احصل على مخططات المشروع الحصرية، شهادات الهيئة العامة للعقار، وتفاصيل التشطيبات مباشرة من المطور.",
+    "brochureCta": "عرض الكتيب الرقمي",
+    "sidebarConciergePill": "خدمة كبار الشخصيات",
+    "sidebarConciergeTitle": "استشارة مباشرة مع خبير",
+    "sidebarConciergeDesc": "تبحث عن عقار مخصص؟ دع مستشارينا المعتمدين يرشحون لك مجموعة حصرية من العقارات الفاخرة التي تلبي تطلعاتك بدقة.",
+    "sidebarConciergeCta": "استشارة عبر الواتساب"
   },
   "propertyTypes": {
     "APARTMENT": "شقة",

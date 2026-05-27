@@ -18,11 +18,12 @@ import {
   Zap, Flame, Tv, Coffee, Utensils, AlignLeft,
   Plus, Users, Briefcase, Glasses, Trash2, Home,
   Refrigerator, Shirt, Calendar, TrendingUp, X,
-  Building2 as AgencyIcon
+  Building2 as AgencyIcon, BookOpen, Map as MapIcon
 } from 'lucide-react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MediaUpload } from './MediaUpload';
+import { CldUploadWidget } from 'next-cloudinary';
 
 interface ListingFormProps {
   initialData?: any;
@@ -184,6 +185,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
         ...data,
         youtubeUrl: typeof data.youtubeUrl === 'string' && data.youtubeUrl.trim() === '' ? undefined : data.youtubeUrl ?? undefined,
         videoUrl: typeof data.videoUrl === 'string' && data.videoUrl.trim() === '' ? undefined : data.videoUrl ?? undefined,
+        brochureUrl: typeof data.brochureUrl === 'string' && data.brochureUrl.trim() === '' ? undefined : data.brochureUrl ?? undefined,
+        mapEmbedUrl: typeof data.mapEmbedUrl === 'string' && data.mapEmbedUrl.trim() === '' ? undefined : data.mapEmbedUrl ?? undefined,
         lat: data.lat === null || data.lat === '' ? undefined : data.lat,
         lng: data.lng === null || data.lng === '' ? undefined : data.lng,
         locationDescriptionDeedAr: data.locationDescriptionDeedAr === null || data.locationDescriptionDeedAr === '' ? undefined : data.locationDescriptionDeedAr,
@@ -228,11 +231,18 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       propertyAge: 0,
       floor: 0,
       furnishingStatus: 'UNFURNISHED',
+      residenceType: '',
+      completionStatus: '',
+      verified: false,
       arTitle: '',
       enTitle: '',
       arDescription: '',
       enDescription: '',
-      history: []
+      history: [],
+      youtubeUrl: '',
+      videoUrl: '',
+      brochureUrl: '',
+      mapEmbedUrl: ''
     }
   });
 
@@ -301,6 +311,7 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       furnishingStatus: initialData.furnishingStatus ?? undefined,
       completionStatus: initialData.completionStatus ?? undefined,
       residenceType: initialData.residenceType ?? undefined,
+      verified: !!initialData.verified,
       lat: initialData.lat != null ? initialData.lat : undefined,
       lng: initialData.lng != null ? initialData.lng : undefined,
       regaAdvertisingLicense: initialData.regaAdvertisingLicense ?? undefined,
@@ -308,6 +319,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       locationDescriptionDeedAr: initialData.locationDescriptionDeedAr ?? undefined,
       youtubeUrl: initialData.youtubeUrl ?? undefined,
       videoUrl: initialData.videoUrl ?? undefined,
+      brochureUrl: initialData.brochureUrl ?? undefined,
+      mapEmbedUrl: initialData.mapEmbedUrl ?? undefined,
     };
 
     reset(cleanData);
@@ -423,10 +436,14 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       propertyAge: data.propertyAge ?? undefined,
       furnishingStatus: data.furnishingStatus ?? undefined,
       residenceType: data.residenceType ?? undefined,
+      completionStatus: data.completionStatus || undefined,
+      verified: data.verified !== undefined ? Boolean(data.verified) : undefined,
       regaAdvertisingLicense: data.regaAdvertisingLicense ?? undefined,
       regaFalLicense: data.regaFalLicense ?? undefined,
       youtubeUrl: data.youtubeUrl ?? undefined,
       videoUrl: data.videoUrl ?? undefined,
+      brochureUrl: data.brochureUrl && (data.brochureUrl as string).trim() !== '' ? (data.brochureUrl as string) : undefined,
+      mapEmbedUrl: data.mapEmbedUrl && (data.mapEmbedUrl as string).trim() !== '' ? (data.mapEmbedUrl as string) : undefined,
       history: ((data.history as any) || []).map((h: any) => ({
         year: h.year,
         event: h.event || 'LISTED',
@@ -797,20 +814,93 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12">
                 <section className="bg-white p-8 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    <div className="space-y-8">
-                      <InputField label="City (Arabic)" dir="rtl" error={errors.arCity}>
-                        <input {...methods.register('arCity')} dir="rtl" className="w-full bg-transparent text-2xl font-black text-slate-900 text-right outline-none" />
+                    {/* Left Column: Bilingual Locations */}
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MapPin className="w-5 h-5 text-emerald-900" />
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Bilingual Location</h3>
+                      </div>
+                      <InputField label="City (Arabic - Required)" dir="rtl" error={errors.arCity}>
+                        <input {...methods.register('arCity')} dir="rtl" placeholder="الرياض..." className="w-full bg-transparent text-xl font-bold text-slate-900 text-right outline-none" />
                       </InputField>
                       <InputField label="District (Arabic)" dir="rtl" error={errors.arDistrict}>
-                        <input {...methods.register('arDistrict')} dir="rtl" className="w-full bg-transparent text-2xl font-black text-slate-900 text-right outline-none" />
+                        <input {...methods.register('arDistrict')} dir="rtl" placeholder="حي النرجس..." className="w-full bg-transparent text-xl font-bold text-slate-900 text-right outline-none" />
+                      </InputField>
+                      <hr className="border-slate-100 my-2" />
+                      <InputField label="City (English - Required)" error={errors.city}>
+                        <input {...methods.register('city')} placeholder="Riyadh..." className="w-full bg-transparent text-xl font-bold text-slate-900 outline-none" />
+                      </InputField>
+                      <InputField label="District (English)" error={errors.district}>
+                        <input {...methods.register('district')} placeholder="Al Narjis..." className="w-full bg-transparent text-xl font-bold text-slate-900 outline-none" />
                       </InputField>
                     </div>
-                    <div className="bg-emerald-900/5 rounded-[3.5rem] flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-emerald-900/10">
-                      <div className="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center shadow-lg border-2 border-slate-100 mb-6">
-                        <MapPin className="w-10 h-10 text-emerald-900" />
+
+                    {/* Right Column: Key Specifications */}
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Building className="w-5 h-5 text-emerald-900" />
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Listing Specifications</h3>
                       </div>
-                      <p className="text-sm font-black text-slate-900 mb-2 uppercase tracking-widest">Pin on Map</p>
-                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest max-w-[200px]">Map precision enables neighborhood analysis.</p>
+
+                      <Controller
+                        name="residenceType"
+                        control={control}
+                        render={({ field }) => (
+                          <EliteSelect
+                            label="Residence Type"
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            options={[
+                              { value: '', label: 'Select Residence Type...' },
+                              { value: 'FAMILY', label: 'Family' },
+                              { value: 'BACHELOR', label: 'Bachelor' }
+                            ]}
+                            icon={Users}
+                          />
+                        )}
+                      />
+
+                      <Controller
+                        name="completionStatus"
+                        control={control}
+                        render={({ field }) => (
+                          <EliteSelect
+                            label="Completion Status"
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            options={[
+                              { value: '', label: 'Select Completion Status...' },
+                              { value: 'READY', label: 'Ready' },
+                              { value: 'OFF_PLAN', label: 'Off-Plan' },
+                              { value: 'UNDER_CONSTRUCTION', label: 'Under Construction' }
+                            ]}
+                            icon={TrendingUp}
+                          />
+                        )}
+                      />
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 ml-4">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-900" />
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Verification Status</label>
+                        </div>
+                        <label className={`w-full flex items-center justify-between transition-all rounded-[1.5rem] border-2 shadow-sm p-4 md:p-6 cursor-pointer ${
+                          watch('verified')
+                            ? 'bg-emerald-900/5 border-emerald-900/30'
+                            : 'bg-white border-slate-300 hover:border-emerald-950/30'
+                        }`}>
+                          <div>
+                            <p className="font-black text-sm uppercase text-slate-900">Verified Property</p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Display verified badge on main site</p>
+                          </div>
+                          <div className="relative">
+                            <input type="checkbox" {...methods.register('verified')} className="sr-only" />
+                            <div className={`w-12 h-6 rounded-full transition-colors relative ${watch('verified') ? 'bg-emerald-950' : 'bg-slate-200'}`}>
+                              <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${watch('verified') ? 'translate-x-6' : ''}`} />
+                            </div>
+                          </div>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </section>
@@ -1171,6 +1261,56 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                       <div className="flex items-center gap-4">
                         <Video className="w-6 h-6 text-emerald-500" />
                         <input {...methods.register('videoUrl')} placeholder="https://..." className="w-full bg-transparent py-2 text-white font-bold outline-none placeholder:text-white/10" />
+                      </div>
+                    </InputField>
+                    {/* PDF Brochure Upload — Simplified Direct / Google Drive Link field with automatic booklet converter */}
+                    <div className="col-span-1 md:col-span-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-white/40 block mb-4">PDF Brochure</label>
+                      <div className="flex flex-col gap-4 p-6 rounded-2xl border border-white/10 bg-white/5">
+                        <div className="flex items-start gap-4">
+                          <BookOpen className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Bilingual Digital Brochure Booklet</h4>
+                            <p className="text-white/40 text-[10px] font-medium leading-relaxed">
+                              Paste your public **Google Drive share link**, Dropbox link, or direct PDF URL. Our backend will automatically synchronize the file and generate an immersive, interactive 3D booklet catalog on the public property page.
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="h-px bg-white/10 w-full" />
+                        
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-black uppercase tracking-widest text-emerald-400/80 block">PDF / Google Drive Link</label>
+                            {methods.watch('brochureUrl') && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                                  ✓ Booklet Configured
+                                </span>
+                                <a 
+                                  href={methods.watch('brochureUrl') as string} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-[9px] font-black uppercase tracking-widest text-white/40 hover:text-white underline"
+                                >
+                                  Preview Link
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                          <input 
+                            type="text" 
+                            {...methods.register('brochureUrl')}
+                            placeholder="Paste link here (e.g. https://drive.google.com/file/d/...)" 
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-primary-500 transition-all placeholder:text-white/10" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <InputField label="Google Maps Embed HTML / Link" dark>
+                      <div className="flex items-center gap-4">
+                        <MapIcon className="w-6 h-6 text-blue-400" />
+                        <input {...methods.register('mapEmbedUrl')} placeholder="Paste Google Maps iframe code or link..." className="w-full bg-transparent py-2 text-white font-bold outline-none placeholder:text-white/10" />
                       </div>
                     </InputField>
                   </div>

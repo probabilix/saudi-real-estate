@@ -368,7 +368,7 @@ export default function ChatWidget({
               animate={{ scale: 1, rotate: 0 }}
               exit={{ scale: 0, rotate: 20 }}
               onClick={() => setOpen(true)}
-              className="fixed bottom-6 end-6 w-16 h-16 bg-primary-600 text-white rounded-2xl shadow-2xl z-50 flex items-center justify-center hover:bg-primary-700 hover:scale-105 active:scale-95 transition-all group"
+              className="fixed bottom-24 md:bottom-6 end-6 w-16 h-16 bg-primary-600 text-white rounded-2xl shadow-2xl z-50 flex items-center justify-center hover:bg-primary-700 hover:scale-105 active:scale-95 transition-all group"
             >
               <MessageSquare className="w-7 h-7 group-hover:rotate-12 transition-transform" />
               <div className="absolute -top-1 -end-1 w-4 h-4 bg-accent-500 rounded-full border-2 border-white animate-pulse" />
@@ -382,7 +382,7 @@ export default function ChatWidget({
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="fixed bottom-6 end-6 w-[400px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-8rem)] rounded-3xl overflow-hidden z-50 border border-surface-200 shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col"
+              className="fixed bottom-24 md:bottom-6 end-6 w-[400px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-8rem)] rounded-3xl overflow-hidden z-50 border border-surface-200 shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col"
             >
               {chatContent}
             </motion.div>

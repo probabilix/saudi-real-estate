@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Building2, Newspaper,
   Settings, FileText, LogOut, ChevronRight, ChevronLeft,
   ShieldCheck, Bell, Menu, X, CreditCard,
-  BarChart3, Megaphone, Star, HelpCircle
+  BarChart3, Megaphone, Star, HelpCircle, Mail
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -31,6 +31,7 @@ const NAV_GROUPS = [
   {
     label: 'Content',
     items: [
+      { href: '/inbox', label: 'Inbox', icon: Mail },
       { href: '/news', label: 'News & Blog', icon: Newspaper },
       { href: '/faqs', label: 'FAQs Management', icon: HelpCircle },
       { href: '/legal', label: 'Legal Pages', icon: FileText },

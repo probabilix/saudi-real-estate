@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { systemSettings, users, buyerProfiles, leads, listings, chatMessages, faqs } from '../../db/schema';
+import { systemSettings, users, buyerProfiles, leads, listings, chatMessages, faqs, contactSubmissions } from '../../db/schema';
 import { eq, inArray, sql, and } from 'drizzle-orm';
 import { SystemService } from '../../services/system.service';
 import { ListingService } from '../../services/listing.service';
@@ -23,7 +23,10 @@ export default async function systemRoutes(app: FastifyInstance) {
         'subscription_plans',
         'HOMEPAGE_FEATURED_LIMIT',
         'homepage_featured_articles',
-        'homepage_stats'
+        'homepage_stats',
+        'sidebar_ad_image',
+        'sidebar_ad_link',
+        'sidebar_ad_aspect_ratio'
       ];
       const settings = await db.select()
         .from(systemSettings)
@@ -55,6 +58,27 @@ export default async function systemRoutes(app: FastifyInstance) {
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to fetch FAQs' });
+    }
+  });
+
+  // ── Public Contact Submissions Endpoint ──
+  app.post('/contact', async (request, reply) => {
+    try {
+      const { name, email, message } = request.body as { name: string; email: string; message: string };
+      if (!name || !email || !message) {
+        return reply.code(400).send({ success: false, message: 'All fields (name, email, message) are required.' });
+      }
+
+      const [newSubmission] = await db.insert(contactSubmissions).values({
+        name,
+        email,
+        message
+      }).returning();
+
+      return reply.send({ success: true, data: newSubmission });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to submit contact request.' });
     }
   });
 
@@ -772,4 +796,3 @@ ${historyText}
     }
   });
 }
-

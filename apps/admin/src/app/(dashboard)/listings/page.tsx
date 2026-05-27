@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+
 export default function ListingsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -231,7 +233,7 @@ export default function ListingsPage() {
               />
             </div>
             <a 
-                href="http://localhost:3000/en/post-property?from=admin"
+                href={`${WEB_URL}/en/post-property?from=admin`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary flex items-center gap-2"
@@ -421,7 +423,7 @@ export default function ListingsPage() {
                             </button>
                           )}
                           <a
-                            href={`http://localhost:3000/en/listings/${listing.id}`}
+                            href={`${WEB_URL}/en/listings/${listing.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-ghost text-surface-400 hover:text-primary-600"
@@ -430,7 +432,7 @@ export default function ListingsPage() {
                             <ArrowUpRight className="w-4 h-4" />
                           </a>
                           <a 
-                            href={`http://localhost:3000/en/edit-property/${listing.id}?from=admin`} 
+                            href={`${WEB_URL}/en/edit-property/${listing.id}?from=admin`} 
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-ghost text-surface-400 hover:text-primary-600" 

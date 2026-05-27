@@ -40,7 +40,7 @@ export default function LegalPages() {
     const result = await adminApi.updateLegalPage(selectedPage.slug, selectedPage);
     
     if (result.success) {
-      setSuccess(`Updated ${selectedPage.slug} successfully`);
+      setSuccess(`Updated "${selectedPage.titleEn}" successfully`);
       setPages(prev => prev.map(p => p.slug === selectedPage.slug ? selectedPage : p));
     } else {
       setError(result.error || 'Failed to update page');

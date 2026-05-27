@@ -48,4 +48,21 @@ export class CloudinaryService {
       return false;
     }
   }
+
+  /**
+   * Helper to upload a file directly from a remote public URL to Cloudinary
+   */
+  static async uploadFromUrl(url: string, folder: string = 'listings') {
+    try {
+      const result = await cloudinary.uploader.upload(url, {
+        folder: `saudi-re/${folder}`,
+        upload_preset: 'saudi_re_listing',
+        resource_type: 'image',
+      });
+      return result.secure_url;
+    } catch (error) {
+      console.error('Cloudinary uploadFromUrl Error:', error);
+      return null;
+    }
+  }
 }

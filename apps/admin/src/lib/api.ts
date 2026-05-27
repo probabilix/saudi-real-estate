@@ -104,10 +104,10 @@ export const adminApi = {
       body: JSON.stringify({ status }),
     }),
 
-  featureListing: (listingId: string, days?: number, featuredUntil?: string) =>
+  featureListing: (listingId: string, days?: number, featuredUntil?: string | null) =>
     request(`/admin/listings/${listingId}/feature`, {
       method: 'POST',
-      body: JSON.stringify({ days, featuredUntil }),
+      body: JSON.stringify({ days, featuredUntil: featuredUntil === undefined ? undefined : (featuredUntil || null) }),
     }),
 
   unfeatureListing: (listingId: string) =>
@@ -124,6 +124,12 @@ export const adminApi = {
     request(`/admin/listings/${listingId}/featured-order`, {
       method: 'PATCH',
       body: JSON.stringify({ featuredOrder }),
+    }),
+
+  updateFeaturedExpiry: (listingId: string, featuredUntil: string | null) =>
+    request(`/admin/listings/${listingId}/featured-expiry`, {
+      method: 'PATCH',
+      body: JSON.stringify({ featuredUntil }),
     }),
 
   toggleListingAI: (listingId: string, aiQualificationActive: boolean) =>

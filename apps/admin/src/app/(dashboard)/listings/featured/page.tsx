@@ -49,12 +49,26 @@ export default function FeaturedListingsPage() {
     });
 
     if (result.success && result.data) {
-      // Sort them ascending by featuredOrder first, or fallback to index
+      // Sort by featuredOrder (treat 0 or null as very large number so they go to end)
       const sorted = [...result.data.listings].sort((a, b) => {
-        return (a.featuredOrder || 0) - (b.featuredOrder || 0);
+        const aOrder = a.featuredOrder && a.featuredOrder > 0 ? a.featuredOrder : 9999;
+        const bOrder = b.featuredOrder && b.featuredOrder > 0 ? b.featuredOrder : 9999;
+        return aOrder - bOrder;
       });
-      setListings(sorted);
-      setTotal(result.data.total);
+
+      // Normalize: if any listing has order=0 or orders aren't 1..N, re-assign and save
+      const needsNormalization = sorted.some((l, i) => (l.featuredOrder || 0) !== i + 1);
+      if (needsNormalization) {
+        const normalized = sorted.map((l, i) => ({ ...l, featuredOrder: i + 1 }));
+        setListings(normalized);
+        setTotal(result.data.total);
+        // Persist normalized orders silently in background
+        Promise.all(normalized.map(l => adminApi.updateFeaturedOrder(l.id, l.featuredOrder)))
+          .catch(err => console.error('Failed to normalize featured orders:', err));
+      } else {
+        setListings(sorted);
+        setTotal(result.data.total);
+      }
     }
     setLoading(false);
   }
@@ -109,25 +123,15 @@ export default function FeaturedListingsPage() {
   const handleMoveUp = async (index: number) => {
     if (index === 0) return;
     const items = [...listings];
-
-    const current = items[index];
-    const prev = items[index - 1];
-
-    const currentOrder = current.featuredOrder || (index + 1);
-    const prevOrder = prev.featuredOrder || index;
-
-    current.featuredOrder = prevOrder;
-    prev.featuredOrder = currentOrder;
-
-    items[index] = prev;
-    items[index - 1] = current;
-
-    setListings(items);
-
+    // Swap the two items in the array
+    [items[index - 1], items[index]] = [items[index], items[index - 1]];
+    // Re-assign sequential order numbers based on new positions
+    const reordered = items.map((item, i) => ({ ...item, featuredOrder: i + 1 }));
+    setListings(reordered);
     try {
-      await adminApi.updateFeaturedOrder(current.id, prevOrder);
-      await adminApi.updateFeaturedOrder(prev.id, currentOrder);
-      setToast({ message: 'Featured order swapped and saved successfully!', type: 'success' });
+      await adminApi.updateFeaturedOrder(reordered[index - 1].id, index);
+      await adminApi.updateFeaturedOrder(reordered[index].id, index + 1);
+      setToast({ message: 'Featured order updated!', type: 'success' });
     } catch (err) {
       console.error(err);
       setToast({ message: 'Failed to update featured ordering.', type: 'error' });
@@ -137,25 +141,15 @@ export default function FeaturedListingsPage() {
   const handleMoveDown = async (index: number) => {
     if (index === listings.length - 1) return;
     const items = [...listings];
-
-    const current = items[index];
-    const next = items[index + 1];
-
-    const currentOrder = current.featuredOrder || (index + 1);
-    const nextOrder = next.featuredOrder || (index + 2);
-
-    current.featuredOrder = nextOrder;
-    next.featuredOrder = currentOrder;
-
-    items[index] = next;
-    items[index + 1] = current;
-
-    setListings(items);
-
+    // Swap the two items in the array
+    [items[index], items[index + 1]] = [items[index + 1], items[index]];
+    // Re-assign sequential order numbers based on new positions
+    const reordered = items.map((item, i) => ({ ...item, featuredOrder: i + 1 }));
+    setListings(reordered);
     try {
-      await adminApi.updateFeaturedOrder(current.id, nextOrder);
-      await adminApi.updateFeaturedOrder(next.id, currentOrder);
-      setToast({ message: 'Featured order swapped and saved successfully!', type: 'success' });
+      await adminApi.updateFeaturedOrder(reordered[index].id, index + 1);
+      await adminApi.updateFeaturedOrder(reordered[index + 1].id, index + 2);
+      setToast({ message: 'Featured order updated!', type: 'success' });
     } catch (err) {
       console.error(err);
       setToast({ message: 'Failed to update featured ordering.', type: 'error' });
@@ -163,16 +157,11 @@ export default function FeaturedListingsPage() {
   };
 
   const handleUpdateExpiry = async (id: string, dateStr: string) => {
+    // dateStr empty = clear date = permanent (null)
     if (!dateStr) {
-      setListings(prev => prev.map(item => {
-        if (item.id === id) {
-          return { ...item, featuredUntil: null };
-        }
-        return item;
-      }));
-
+      setListings(prev => prev.map(item => item.id === id ? { ...item, featuredUntil: null } : item));
       try {
-        await adminApi.featureListing(id, undefined, null as any);
+        await adminApi.updateFeaturedExpiry(id, null);
         setToast({ message: 'Promotion updated: set to Permanent!', type: 'success' });
       } catch (err) {
         console.error('Failed to save permanent expiry:', err);
@@ -191,17 +180,11 @@ export default function FeaturedListingsPage() {
     }
 
     const isoString = selectedDate.toISOString();
-
-    setListings(prev => prev.map(item => {
-      if (item.id === id) {
-        return { ...item, featuredUntil: isoString };
-      }
-      return item;
-    }));
+    setListings(prev => prev.map(item => item.id === id ? { ...item, featuredUntil: isoString } : item));
 
     try {
-      await adminApi.featureListing(id, undefined, isoString);
-      setToast({ message: 'Promotion expiry date successfully updated and saved!', type: 'success' });
+      await adminApi.updateFeaturedExpiry(id, isoString);
+      setToast({ message: 'Promotion expiry date updated successfully!', type: 'success' });
     } catch (err) {
       console.error('Failed to save expiry:', err);
       setToast({ message: 'Failed to save promotion expiry date.', type: 'error' });

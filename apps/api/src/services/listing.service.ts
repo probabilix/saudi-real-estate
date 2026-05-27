@@ -111,11 +111,20 @@ export class ListingService {
       ]
     });
 
+    // Filter out listings whose featuredUntil has passed (expired promotions)
+    // Only apply this filter when specifically querying featured listings
+    const now = new Date();
+    const filteredResults = isFeatured
+      ? results.filter(l =>
+          !l.featuredUntil || new Date(l.featuredUntil) >= now
+        )
+      : results;
+
     // Handle Favorites if userId is provided
     let favoritedIds: Set<string> = new Set();
-    if (userId && results.length > 0) {
+    if (userId && filteredResults.length > 0) {
       try {
-        const listingIds = results.map(r => r.id);
+        const listingIds = filteredResults.map(r => r.id);
         const userFavorites = await db.query.favorites.findMany({
           where: and(
             eq(favorites.userId, userId),
@@ -129,12 +138,12 @@ export class ListingService {
       }
     }
 
-    const items = results.slice(0, limit).map(item => ({
+    const items = filteredResults.slice(0, limit).map(item => ({
       ...item,
       isFavorited: favoritedIds.has(item.id)
     }));
 
-    const hasMore = results.length > limit;
+    const hasMore = filteredResults.length > limit;
 
     const lastItem = items.length > 0 ? items[items.length - 1] : null;
     const nextCursor = (hasMore && lastItem?.createdAt)

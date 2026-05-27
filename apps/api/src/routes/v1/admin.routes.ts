@@ -338,20 +338,42 @@ export default async function adminRoutes(app: FastifyInstance) {
   // ── Feature a Listing / Edit Date ──
   app.post('/listings/:id/feature', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { days, featuredUntil: customUntil } = request.body as { days?: number; featuredUntil?: string };
-    
-    let featuredUntil = new Date();
-    if (customUntil) {
-      featuredUntil = new Date(customUntil);
+    const body = request.body as { days?: number; featuredUntil?: string | null };
+    const { days } = body;
+    // featuredUntil = null means permanent, a string means specific date, undefined means default 7 days
+    const hasFeaturedUntil = Object.prototype.hasOwnProperty.call(body, 'featuredUntil');
+    const customUntil = body.featuredUntil;
+
+    let featuredUntilValue: Date | null;
+    if (hasFeaturedUntil && customUntil === null) {
+      // Explicitly set to null = permanent
+      featuredUntilValue = null;
+    } else if (hasFeaturedUntil && customUntil) {
+      featuredUntilValue = new Date(customUntil);
     } else {
-      featuredUntil.setDate(featuredUntil.getDate() + (days || 7));
+      // Default: feature for 7 days
+      featuredUntilValue = new Date();
+      featuredUntilValue.setDate(featuredUntilValue.getDate() + (days || 7));
     }
 
     try {
+      // Auto-assign featuredOrder if not yet featured (get max current order)
+      const existing = await db.select({ isFeatured: listings.isFeatured, featuredOrder: listings.featuredOrder })
+        .from(listings).where(eq(listings.id, id));
+      let featuredOrder = existing[0]?.featuredOrder;
+      if (!existing[0]?.isFeatured || !featuredOrder) {
+        const maxOrderResult = await db.select({ maxOrder: sql<number>`COALESCE(MAX(${listings.featuredOrder}), 0)` })
+          .from(listings).where(eq(listings.isFeatured, true));
+        featuredOrder = (Number(maxOrderResult[0]?.maxOrder) || 0) + 1;
+      }
+
       await db.update(listings)
-        .set({ isFeatured: true, featuredUntil, updatedAt: new Date() })
+        .set({ isFeatured: true, featuredUntil: featuredUntilValue, featuredOrder, updatedAt: new Date() })
         .where(eq(listings.id, id));
-      return reply.send({ success: true, message: `Listing featured until ${featuredUntil.toISOString()}` });
+      return reply.send({ 
+        success: true, 
+        message: featuredUntilValue ? `Listing featured until ${featuredUntilValue.toISOString()}` : 'Listing featured permanently'
+      });
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to feature listing' });
@@ -377,6 +399,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const { featuredOrder } = request.body as { featuredOrder: number };
     try {
+      await db.execute(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS featured_order INTEGER DEFAULT 0;`);
       await db.update(listings)
         .set({ featuredOrder, updatedAt: new Date() })
         .where(eq(listings.id, id));
@@ -384,6 +407,29 @@ export default async function adminRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to update featured order' });
+    }
+  });
+
+  // ── Update Featured Expiry Only ──
+  app.patch('/listings/:id/featured-expiry', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { featuredUntil: string | null };
+    const hasFeaturedUntil = Object.prototype.hasOwnProperty.call(body, 'featuredUntil');
+    if (!hasFeaturedUntil) {
+      return reply.code(400).send({ success: false, message: 'featuredUntil is required' });
+    }
+    const featuredUntilValue = body.featuredUntil ? new Date(body.featuredUntil) : null;
+    try {
+      await db.update(listings)
+        .set({ featuredUntil: featuredUntilValue, updatedAt: new Date() })
+        .where(eq(listings.id, id));
+      return reply.send({ 
+        success: true, 
+        message: featuredUntilValue ? `Expiry updated to ${featuredUntilValue.toISOString()}` : 'Set to permanent'
+      });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to update featured expiry' });
     }
   });
 

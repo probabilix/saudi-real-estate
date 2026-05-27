@@ -20,6 +20,7 @@ import { formatPrice, formatPriceCompact, ListingWithOwner, Listing, PropertyHis
 import { api, API_BASE_URL } from '@/lib/api';
 import ListingCard from '@/components/listings/ListingCard';
 import MediaModal from '@/components/listings/MediaModal';
+import BrochureModal from '@/components/listings/BrochureModal';
 import ChatWidget from '@/components/chat/ChatWidget';
 
 export default function ListingDetailPage({ params: { id, locale } }: { params: { id: string; locale: string } }) {
@@ -33,7 +34,8 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const [listing, setListing] = useState<ListingWithOwner | null>(null);
   const [loading, setLoading] = useState(true);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxTab, setLightboxTab] = useState<'photos' | 'brochure' | 'video' | 'location'>('photos');
+  const [lightboxTab, setLightboxTab] = useState<'photos' | 'video' | 'location'>('photos');
+  const [brochureModalOpen, setBrochureModalOpen] = useState(false);
   const [shortlisted, setShortlisted] = useState(false);
   const [descLang, setDescLang] = useState<'ar' | 'en'>(locale as 'ar' | 'en');
   const [activeTab, setActiveTab] = useState('overview');
@@ -318,7 +320,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             </div>
             <div className="absolute bottom-4 left-4 flex flex-wrap gap-2 z-10">
               {l.brochureUrl && (
-                <button onClick={(e) => { e.stopPropagation(); setLightboxTab('brochure'); setLightboxOpen(true); }} className="bg-primary-600/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full border border-primary-500 flex items-center gap-2 hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/20">
+                <button onClick={(e) => { e.stopPropagation(); setBrochureModalOpen(true); }} className="bg-primary-600/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full border border-primary-500 flex items-center gap-2 hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/20">
                   <BookOpen className="w-3.5 h-3.5" />{t('brochure') || 'Brochure'}
                 </button>
               )}
@@ -527,8 +529,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                   </div>
                   <button
                     onClick={() => {
-                      setLightboxTab('brochure');
-                      setLightboxOpen(true);
+                      setBrochureModalOpen(true);
                     }}
                     className="w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2.5 font-bold text-sm bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white transition-all shadow-lg shadow-primary-600/15 group active:scale-[0.98]"
                   >
@@ -738,8 +739,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 </div>
                 <button
                   onClick={() => {
-                    setLightboxTab('brochure');
-                    setLightboxOpen(true);
+                    setBrochureModalOpen(true);
                   }}
                   className="w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2.5 font-bold text-sm bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white transition-all shadow-lg shadow-primary-600/15 group active:scale-[0.98]"
                 >
@@ -848,7 +848,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         onClose={() => setLightboxOpen(false)}
         photos={l.photos}
         youtubeUrl={l.youtubeUrl}
-        brochureUrl={l.brochureUrl}
         mapEmbedUrl={l.mapEmbedUrl}
         initialTab={lightboxTab}
         isQualified={isQualified}
@@ -860,6 +859,15 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
           phone: revealedContact?.phone
         }}
       />
+
+      {/* Dedicated Fullscreen Brochure Modal */}
+      {l.brochureUrl && (
+        <BrochureModal
+          isOpen={brochureModalOpen}
+          onClose={() => setBrochureModalOpen(false)}
+          brochureUrl={l.brochureUrl}
+        />
+      )}
 
       {/* MOBILE STICKY CONTACT BAR */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-surface-200 px-6 py-4 md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex items-center justify-between gap-4">

@@ -40,7 +40,6 @@ const NAV_GROUPS = [
   {
     label: 'Platform',
     items: [
-      { href: '/subscriptions', label: 'Subscriptions', icon: CreditCard },
       { href: '/settings', label: 'Site Settings', icon: Settings },
     ],
   },

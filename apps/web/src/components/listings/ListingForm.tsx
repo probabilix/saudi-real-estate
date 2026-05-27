@@ -491,7 +491,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
         if (res.success && res.data?.shortId) shortId = res.data.shortId;
       }
       if (fromAdmin || user?.role === 'ADMIN') {
-        window.location.href = `http://localhost:3002/listings?success=drafted&shortId=${shortId || ''}`;
+        const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3002';
+        window.location.href = `${adminBase}/listings?success=drafted&shortId=${shortId || ''}`;
       } else {
         router.push(`/${locale}/dashboard/listings`);
         router.refresh();
@@ -538,7 +539,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
 
       if (fromAdmin || user?.role === 'ADMIN') {
         const type = isEdit ? 'updated' : 'created';
-        window.location.href = `http://localhost:3002/listings?success=${type}&shortId=${shortId || ''}`;
+        const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3002';
+        window.location.href = `${adminBase}/listings?success=${type}&shortId=${shortId || ''}`;
       } else {
         setIsSuccess(true);
         router.refresh();

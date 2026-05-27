@@ -77,9 +77,6 @@ export default function BrochureModal({
   const embedSrc = getBrochureEmbedUrl(brochureUrl);
 
   const getDownloadUrl = (url: string) => {
-    if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
-      return url.replace('/upload/', '/upload/fl_attachment/');
-    }
     return url;
   };
   const downloadUrl = getDownloadUrl(brochureUrl);
@@ -145,19 +142,12 @@ export default function BrochureModal({
   const handleZoomOut = () => setPhotoScale((prev) => Math.max(prev - 0.5, 1));
   const handleZoomReset = () => setPhotoScale(1);
 
-  // Dynamic Trigger to bypass React routing captures or context limitations
   const handleOpenDirect = () => {
     window.open(brochureUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownloadDirect = () => {
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.setAttribute('download', 'brochure.pdf');
-    link.setAttribute('target', '_blank');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.open(brochureUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -257,7 +247,7 @@ export default function BrochureModal({
                         
                         {/* Cover page or Mobile single page */}
                         {((!isMobile && brochurePage === 1) || isMobile) ? (
-                          <div className="relative h-full aspect-[1/1.414] max-h-[82vh] rounded-2xl overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] border border-white/10 bg-white">
+                          <div className="relative h-full aspect-[1/1.414] max-h-[90vh] rounded-2xl overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] border border-white/10 bg-white">
                             <Image
                               src={getCloudinaryPageUrl(brochureUrl, brochurePage)}
                               alt={`Brochure Page ${brochurePage}`}
@@ -273,7 +263,7 @@ export default function BrochureModal({
                           </div>
                         ) : (
                           /* Desktop Open spread view */
-                          <div className="relative h-full aspect-[2/1.414] max-h-[82vh] rounded-3xl overflow-hidden shadow-[0_35px_70px_-20px_rgba(0,0,0,0.7)] border border-white/15 bg-[#1b1f27] flex">
+                          <div className="relative h-full aspect-[2/1.414] max-h-[90vh] rounded-3xl overflow-hidden shadow-[0_35px_70px_-20px_rgba(0,0,0,0.7)] border border-white/15 bg-[#1b1f27] flex">
                             
                             {/* Left Page */}
                             <div className="w-1/2 h-full relative border-r border-black/25 bg-white">

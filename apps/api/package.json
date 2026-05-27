@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "pnpm --filter @saudi-re/shared build && tsc && ncc build src/index.ts -o api --minify --no-cache",
+    "build": "pnpm --filter @saudi-re/shared build && tsc && node --max-old-space-size=4096 node_modules/@vercel/ncc/dist/ncc/index.js build src/index.ts -o api --minify --no-cache",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

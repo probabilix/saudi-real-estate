@@ -1322,6 +1322,7 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                                 maxFiles: 1,
                                 clientAllowedFormats: ['pdf'],
                                 sources: ['local', 'google_drive', 'dropbox'],
+                                resourceType: 'image',
                                 styles: {
                                   palette: {
                                     window: '#0F172A',

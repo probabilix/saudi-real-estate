@@ -490,8 +490,9 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
         const res = await api.createListing({ ...payload, status: 'DRAFT' });
         if (res.success && res.data?.shortId) shortId = res.data.shortId;
       }
-      if (fromAdmin || user?.role === 'ADMIN') {
-        const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3002';
+      if (fromAdmin) {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || (isLocal ? 'http://localhost:3002' : 'https://saudi-real-estate-admin.vercel.app');
         window.location.href = `${adminBase}/listings?success=drafted&shortId=${shortId || ''}`;
       } else {
         router.push(`/${locale}/dashboard/listings`);
@@ -537,9 +538,10 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
         }
       }
 
-      if (fromAdmin || user?.role === 'ADMIN') {
+      if (fromAdmin) {
         const type = isEdit ? 'updated' : 'created';
-        const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3002';
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || (isLocal ? 'http://localhost:3002' : 'https://saudi-real-estate-admin.vercel.app');
         window.location.href = `${adminBase}/listings?success=${type}&shortId=${shortId || ''}`;
       } else {
         setIsSuccess(true);

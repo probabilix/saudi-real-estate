@@ -61,7 +61,9 @@ export default function SettingsPage() {
         sidebar_ad_image: 'Ad Banner Image',
         sidebar_ad_link: 'Ad Target Link',
         sidebar_ad_aspect_ratio: 'Ad Aspect Ratio Mode',
-        homepage_featured_articles: 'Homepage Featured Articles'
+        homepage_featured_articles: 'Homepage Featured Articles',
+        google_client_id: 'Google Client ID',
+        google_client_secret: 'Google Client Secret'
       };
       const friendlyName = SETTING_NAMES[key] || key;
       setSuccess(`Updated ${friendlyName} successfully`);
@@ -303,6 +305,55 @@ export default function SettingsPage() {
                 </button>
               </div>
               <p className="text-[10px] text-surface-400 mt-2">Credits deducted per property published</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Google OAuth Configuration */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+              <Globe className="w-4 h-4 text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-surface-900">Google OAuth Credentials</h2>
+              <p className="text-xs text-surface-500">Edit the Client ID and Secret key used for Google authentication SSO</p>
+            </div>
+          </div>
+          
+          <div className="admin-card p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="admin-label">Google OAuth Client ID</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  className="admin-input" 
+                  defaultValue={getSettingValue('google_client_id')}
+                  onBlur={(e) => handleUpdateSetting('google_client_id', e.target.value)}
+                  placeholder="xxxx-xxxx.apps.googleusercontent.com"
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'google_client_id' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">The Google Developer API credential Client ID</p>
+            </div>
+
+            <div>
+              <label className="admin-label">Google OAuth Client Secret</label>
+              <div className="flex gap-2">
+                <input 
+                  type="password" 
+                  className="admin-input" 
+                  defaultValue={getSettingValue('google_client_secret')}
+                  onBlur={(e) => handleUpdateSetting('google_client_secret', e.target.value)}
+                  placeholder="GOCSPX-xxxxxxxxxxxxxxxx"
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'google_client_secret' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">The private client secret associated with the ID</p>
             </div>
           </div>
         </section>

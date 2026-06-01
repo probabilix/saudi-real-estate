@@ -95,7 +95,8 @@ export default async function authRoutes(app: FastifyInstance) {
             role: newUser.role, 
             email: newUser.email,
             avatarUrl: newUser.avatarUrl,
-            creditsBalance: newUser.creditsBalance
+            creditsBalance: newUser.creditsBalance,
+            phone: newUser.phone
           } : undefined
         } 
       });
@@ -169,7 +170,8 @@ export default async function authRoutes(app: FastifyInstance) {
             role: user.role, 
             email: user.email,
             avatarUrl: user.avatarUrl,
-            creditsBalance: user.creditsBalance
+            creditsBalance: user.creditsBalance,
+            phone: user.phone
           } 
         } 
       });
@@ -185,39 +187,86 @@ export default async function authRoutes(app: FastifyInstance) {
    * Google OAuth Callback handler
    */
   app.get('/google/callback', async (request, reply) => {
+    app.log.info('[GOOGLE OAUTH CALLBACK] Callback request received. Query params: %j', request.query as any);
     try {
+      app.log.info('[GOOGLE OAUTH CALLBACK] Step 1: Exchanging authorization code for tokens...');
       const { token } = await (app as any).googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request);
+      app.log.info('[GOOGLE OAUTH CALLBACK] Tokens exchanged successfully. Token details: has_access_token=%s, token_type=%s', !!token.access_token, token.token_type);
       
-      // 1. Fetch Google Profile (In production, use the token to query Google API)
-      // For this implementation, we assume the token provides identity or we fetch it
-      const googleUserEmail = 'placeholder@gmail.com'; 
-      const googleUserName = 'Google User';
-
+      // 1. Fetch Google User Profile details from standard oauth endpoint
+      app.log.info('[GOOGLE OAUTH CALLBACK] Step 2: Fetching userinfo from Google API...');
+      const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${token.access_token}`
+        }
+      });
+      
+      if (!profileResponse.ok) {
+        const errorText = await profileResponse.text();
+        app.log.error('[GOOGLE OAUTH CALLBACK] Google API response was not OK: %s %s. Body: %s', profileResponse.status, profileResponse.statusText, errorText);
+        throw new Error(`Failed to fetch Google profile: ${profileResponse.statusText}`);
+      }
+      
+      const googleProfile = await profileResponse.json() as {
+        email: string;
+        name: string;
+        picture?: string;
+      };
+      app.log.info('[GOOGLE OAUTH CALLBACK] Google profile retrieved successfully for: %s', googleProfile.email);
+      
+      const googleUserEmail = googleProfile.email.toLowerCase().trim();
+      const googleUserName = googleProfile.name || 'Google User';
+      const googlePicture = googleProfile.picture || null;
+      
       // 2. Find or create user
+      app.log.info('[GOOGLE OAUTH CALLBACK] Step 3: Searching for user record in DB: %s', googleUserEmail);
       let user = await db.query.users.findFirst({
         where: eq(users.email, googleUserEmail),
       });
 
       if (!user) {
+        app.log.info('[GOOGLE OAUTH CALLBACK] User does not exist, inserting user record...');
         const newUsers = await db.insert(users).values({
           email: googleUserEmail,
           name: googleUserName,
           role: 'BUYER',
           passwordHash: 'OAUTH_USER',
+          avatarUrl: googlePicture,
           isActive: true,
           regaVerified: false,
         }).returning();
         user = newUsers[0];
-        await EmailService.sendWelcomeEmail(user.email, user.name as string, user.role);
+        app.log.info('[GOOGLE OAUTH CALLBACK] User record inserted successfully, ID: %s', user.id);
+        
+        try {
+          app.log.info('[GOOGLE OAUTH CALLBACK] Sending welcome email...');
+          await EmailService.sendWelcomeEmail(user.email, user.name as string, user.role);
+          app.log.info('[GOOGLE OAUTH CALLBACK] Welcome email sent.');
+        } catch (emailErr) {
+          app.log.error(emailErr, '[GOOGLE OAUTH CALLBACK] Welcome email failed to send (non-blocking)');
+        }
+      } else {
+        app.log.info('[GOOGLE OAUTH CALLBACK] User already exists, ID: %s', user.id);
+        // Synchronize avatar picture if it changed or was empty
+        if (googlePicture && user.avatarUrl !== googlePicture) {
+          app.log.info('[GOOGLE OAUTH CALLBACK] Synchronizing avatarUrl...');
+          await db.update(users)
+            .set({ avatarUrl: googlePicture, updatedAt: new Date() })
+            .where(eq(users.id, user.id));
+          user.avatarUrl = googlePicture;
+          app.log.info('[GOOGLE OAUTH CALLBACK] AvatarUrl synchronized successfully.');
+        }
       }
 
       // 3. Issue Tokens
+      app.log.info('[GOOGLE OAUTH CALLBACK] Step 4: Generating application tokens...');
       const { accessToken, refreshToken } = AuthService.generateTokens({
         userId: user.id,
         role: user.role,
       });
 
       // 4. Cookies & Redirect
+      app.log.info('[GOOGLE OAUTH CALLBACK] Step 5: Setting session cookies & redirecting...');
       reply.setCookie('refreshToken', refreshToken, {
         path: '/', 
         httpOnly: true, 
@@ -226,11 +275,14 @@ export default async function authRoutes(app: FastifyInstance) {
         maxAge: 30 * 24 * 60 * 60
       });
 
-      return reply.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?token=${accessToken}`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      app.log.info('[GOOGLE OAUTH CALLBACK] Redirecting back to frontend home page...');
+      return reply.redirect(`${frontendUrl}/en?token=${accessToken}`);
 
-    } catch (err) {
-      app.log.error(err);
-      return reply.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=OAuthFailed`);
+    } catch (err: any) {
+      app.log.error(err, '[GOOGLE OAUTH CALLBACK] OAuth Callback execution crashed!');
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return reply.redirect(`${frontendUrl}/en?error=OAuthFailed`);
     }
   });
 
@@ -260,7 +312,11 @@ export default async function authRoutes(app: FastifyInstance) {
             email: user.email, 
             avatarUrl: user.avatarUrl,
             regaVerified: user.regaVerified,
-            creditsBalance: user.creditsBalance
+            creditsBalance: user.creditsBalance,
+            phone: user.phone,
+            gender: user.gender,
+            nationality: user.nationality,
+            city: user.city
           } 
         } 
       });

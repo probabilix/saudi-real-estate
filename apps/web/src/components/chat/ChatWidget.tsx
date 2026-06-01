@@ -14,6 +14,47 @@ interface Message {
   timestamp: Date;
 }
 
+// Helper to parse and render markdown links as clickable React anchors
+function renderMessageContent(content: string, role: 'user' | 'assistant') {
+  const linkRegex = /\[([^\]]+)\]\s*\((https?:\/\/[^\s)]+)\)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = linkRegex.exec(content)) !== null) {
+    const [_, label, url] = match;
+    const matchIndex = match.index;
+
+    if (matchIndex > lastIndex) {
+      parts.push(content.substring(lastIndex, matchIndex));
+    }
+
+    parts.push(
+      <a
+        key={matchIndex}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={
+          role === 'assistant'
+            ? "text-primary-600 hover:text-primary-700 underline font-bold transition-colors"
+            : "text-white underline font-bold hover:opacity-90 transition-opacity"
+        }
+      >
+        {label}
+      </a>
+    );
+
+    lastIndex = linkRegex.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(content.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : content;
+}
+
 interface ChatWidgetProps {
   floating?: boolean;
   showBubble?: boolean;
@@ -300,13 +341,13 @@ export default function ChatWidget({
 
               {/* Bubble */}
               <div
-                className={`max-w-[80%] px-4 py-3 text-sm leading-relaxed shadow-sm rounded-2xl ${
+                className={`max-w-[80%] px-4 py-3 text-sm leading-relaxed shadow-sm rounded-2xl whitespace-pre-wrap ${
                   msg.role === 'assistant'
                     ? 'bg-surface-50 text-charcoal border border-surface-100'
                     : 'bg-primary-600 text-white'
                 } ${locale === 'ar' ? 'font-arabic' : 'font-medium'}`}
               >
-                {msg.content}
+                {renderMessageContent(msg.content, msg.role)}
               </div>
             </motion.div>
           ))}

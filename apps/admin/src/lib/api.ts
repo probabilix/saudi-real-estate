@@ -180,6 +180,26 @@ export const adminApi = {
     request(`/admin/contact-submissions/${id}`, {
       method: 'DELETE',
     }),
+
+  // ── Leads & CRM ──
+  getLeads: (params?: { status?: string; isQualified?: boolean; search?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.isQualified !== undefined) q.set('isQualified', String(params.isQualified));
+    if (params?.search) q.set('search', params.search);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    return request<{ leads: AdminLead[]; total: number; page: number; stats: AdminLeadStats }>(`/admin/leads?${q}`);
+  },
+
+  getLeadChatHistory: (leadId: string) =>
+    request<AdminChatMessage[]>(`/admin/leads/${leadId}/chat-history`),
+
+  updateLeadStatus: (leadId: string, status: string) =>
+    request(`/admin/leads/${leadId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
 };
 
 export interface ContactSubmission {
@@ -284,4 +304,59 @@ export interface AdminFaq {
   order: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminLead {
+  id: string;
+  buyerProfileId: string;
+  listingId: string;
+  brokerId: string;
+  status: 'NEW' | 'VIEWED' | 'CONTACTED' | 'CLOSED_WON' | 'CLOSED_LOST';
+  intentScoreAtCreation: number | null;
+  aiSummary: string | null;
+  buyerBudgetDisplay: string | null;
+  buyerTimelineDisplay: string | null;
+  isQualified: boolean;
+  notifiedWhatsapp: boolean;
+  notifiedEmail: boolean;
+  notifiedAt: string | null;
+  createdAt: string;
+  listing: {
+    id: string;
+    shortId: string | null;
+    arTitle: string;
+    enTitle: string | null;
+    price: number;
+    city: string;
+  } | null;
+  buyer: {
+    id: string;
+    sessionId: string;
+    intentScore: number;
+    lastAiSummary: string | null;
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+  } | null;
+  broker: {
+    id: string;
+    name: string | null;
+    email: string;
+    phone: string | null;
+  } | null;
+}
+
+export interface AdminLeadStats {
+  totalLeads: number;
+  qualifiedLeads: number;
+  conversionRate: number;
+  avgIntentScore: number;
+}
+
+export interface AdminChatMessage {
+  id: string;
+  buyerProfileId: string;
+  sender: 'USER' | 'ASSISTANT';
+  content: string;
+  createdAt: string;
 }

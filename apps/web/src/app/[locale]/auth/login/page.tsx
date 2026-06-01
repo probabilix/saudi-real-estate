@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { API_BASE_URL } from '@/lib/api';
 import { useTranslations } from 'next-intl';
@@ -14,10 +14,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 function LoginContent({ locale }: { locale: string }) {
   const t = useTranslations('auth');
   const tCommon = useTranslations('common');
-  const { login } = useAuth();
+  const { login, refreshUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo');
+  const oauthToken = searchParams.get('token');
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,6 +26,19 @@ function LoginContent({ locale }: { locale: string }) {
   const [loading, setLoading] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (oauthToken) {
+      localStorage.setItem('accessToken', oauthToken);
+      refreshUser(true).then(() => {
+        if (returnTo) {
+          router.push(returnTo);
+        } else {
+          router.push(`/${locale}`);
+        }
+      });
+    }
+  }, [oauthToken, locale, router, returnTo, refreshUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,14 +161,6 @@ function LoginContent({ locale }: { locale: string }) {
                   {t('continueWithGoogle')}
                 </button>
 
-                <button
-                  className="w-full flex items-center justify-center gap-4 px-8 py-4 border border-gray-100 rounded-2xl bg-white hover:bg-gray-50 hover:border-gray-200 transition-all font-bold text-gray-700 shadow-sm"
-                >
-                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                  {t('continueWithFacebook')}
-                </button>
 
                 <div className="relative py-4">
                   <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>

@@ -37,6 +37,10 @@ export interface User {
   avatarUrl: string | null;
   creditsBalance: number;
   isActive: boolean;
+  // Personal profile fields — available for ALL roles (buyer, broker, owner, etc.)
+  gender: 'MALE' | 'FEMALE' | null;
+  nationality: string | null;
+  city: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,11 +62,8 @@ export interface BrokerProfile {
   experienceLevel: '0-2' | '3-5' | '6-10' | '10+' | null;
   languages: string[];
   serviceAreas: string[];
-  gender: 'MALE' | 'FEMALE' | null;
   nationalShortAddress: string | null;
   address: string | null;
-  nationality: string | null;
-  city: string | null;
   createdAt: string;
   updatedAt: string;
 }

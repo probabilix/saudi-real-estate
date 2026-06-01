@@ -37,6 +37,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [imgError, setImgError] = useState(false);
 
   const isRTL = locale === 'ar';
 
@@ -73,24 +74,26 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
           titleAr: p.titleAr || '',
           bioEn: p.bioEn || '',
           bioAr: p.bioAr || '',
-          whatsapp: p.whatsapp || u.phone || user?.phone || '',
+          // phone lives on users table for all roles; whatsapp on broker_profiles is broker-specific
+          whatsapp: u.phone || user?.phone || '',
           nationalId: p.nationalId || '',
           regaLicenseNumber: p.regaLicenseNumber || u.regaLicence || user?.regaLicence || '',
           experienceLevel: p.experienceLevel || null,
           languages: p.languages || [],
           serviceAreas: p.serviceAreas || [],
-          gender: p.gender || null,
+          // gender/nationality/city now live on users table — available for ALL roles
+          gender: u.gender || user?.gender || null,
           address: p.address || '',
           avatarUrl: u.avatarUrl || user?.avatarUrl || '',
-          nationality: p.nationality || '',
-          city: p.city || ''
+          nationality: u.nationality || user?.nationality || '',
+          city: u.city || user?.city || ''
         });
       }
       setLoading(false);
     }
     loadProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]);
 
 
   const { refreshUser } = useAuth();
@@ -100,7 +103,9 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
     setFormErrors([]);
     setError(null);
 
-    const dataToSave = autoSaveData || formData;
+    // If autoSaveData is a React event (like MouseEvent), ignore it and use formData
+    const isReactEvent = autoSaveData && typeof autoSaveData === 'object' && ('nativeEvent' in autoSaveData || 'preventDefault' in autoSaveData || 'stopPropagation' in autoSaveData || 'target' in autoSaveData);
+    const dataToSave = (autoSaveData && typeof autoSaveData === 'object' && !isReactEvent) ? autoSaveData : formData;
 
     setSaving(true);
     // Normalize: convert empty strings to undefined to satisfy backend Zod schemas
@@ -108,21 +113,23 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
     const n = (v: any) => (v === '' ? undefined : v);
 
     const profileUpdate = {
+      // ── Personal fields → saved to users table for ALL roles ──
+      name: n(dataToSave.name),
+      phone: n(dataToSave.whatsapp),   // form field 'whatsapp' IS the personal phone number
+      gender: n(dataToSave.gender),
+      nationality: n(dataToSave.nationality),
+      city: n(dataToSave.city),
+      // ── Broker-specific extras → only saved if user is a broker/agent role ──
       titleEn: n(dataToSave.titleEn),
       titleAr: n(dataToSave.titleAr),
       bioEn: n(dataToSave.bioEn),
       bioAr: n(dataToSave.bioAr),
-      whatsapp: n(dataToSave.whatsapp),
       nationalId: n(dataToSave.nationalId),
       regaLicenseNumber: n(dataToSave.regaLicenseNumber),
       experienceLevel: n(dataToSave.experienceLevel),
       languages: dataToSave.languages,
       serviceAreas: dataToSave.serviceAreas,
-      gender: n(dataToSave.gender),
       address: n(dataToSave.address),
-      name: n(dataToSave.name),
-      nationality: n(dataToSave.nationality),
-      city: n(dataToSave.city)
     };
     
     try {
@@ -356,10 +363,15 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
           <section className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-xl shadow-black/[0.03] text-center">
             <div className="relative inline-block w-40 h-40 group">
               <div className="w-full h-full rounded-full bg-gray-50 border-4 border-white shadow-xl flex items-center justify-center overflow-hidden relative">
-                {formData.avatarUrl ? (
-                  <Image src={formData.avatarUrl} alt="Avatar" fill className="object-cover" unoptimized />
+                 {formData.avatarUrl && !imgError ? (
+                  <img 
+                    src={formData.avatarUrl} 
+                    alt="Avatar" 
+                    className="w-full h-full object-cover" 
+                    onError={() => setImgError(true)}
+                  />
                 ) : (
-                  <User className="w-12 h-12 text-gray-300" />
+                  <span className="text-4xl font-black text-primary-700 uppercase">{(formData.name || user?.name || user?.email || 'U')[0]}</span>
                 )}
               </div>
               </div>

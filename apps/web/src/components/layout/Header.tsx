@@ -23,6 +23,7 @@ export default function Header({ locale }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const [contactPhone, setContactPhone] = useState(tCommon('supportPhone'));
 
   // Fetch live contact phone from DB settings
@@ -159,16 +160,15 @@ export default function Header({ locale }: HeaderProps) {
                     <span className="text-xs font-bold text-gray-900 max-w-[100px] truncate">{user?.name?.split(' ')[0]}</span>
                   </div>
                   <div className="w-8 h-8 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center border border-primary-100 overflow-hidden shrink-0 relative">
-                    {user?.avatarUrl ? (
-                      <Image 
+                    {user?.avatarUrl && !imgError ? (
+                      <img 
                         src={user.avatarUrl} 
                         alt={user.name || 'User'} 
-                        fill 
-                        className="object-cover"
-                        unoptimized
+                        className="w-full h-full object-cover"
+                        onError={() => setImgError(true)}
                       />
                     ) : (
-                      <User className="w-4 h-4" />
+                      <span className="text-xs font-black text-primary-700 uppercase">{(user?.name || user?.email || 'U')[0]}</span>
                     )}
                   </div>
                   <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${userMenuOpen ? 'rotate-180' : ''}`} />

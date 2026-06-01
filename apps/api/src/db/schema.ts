@@ -42,6 +42,7 @@ export const genderEnum = pgEnum('gender', ['MALE', 'FEMALE']);
 export const verificationStatusEnum = pgEnum('verification_status', ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED']);
 export const brokerExperienceLevelEnum = pgEnum('broker_experience_level', ['0-2', '3-5', '6-10', '10+']);
 export const senderTypeEnum = pgEnum('sender_type', ['USER', 'ASSISTANT']);
+export const chatTypeEnum = pgEnum('chat_type', ['GENERAL', 'LISTING']);
 
 // ── Users Table ──
 export const users = pgTable('users', {
@@ -63,6 +64,10 @@ export const users = pgTable('users', {
   creditsBalance: integer('credits_balance').default(0),
   rating: decimal('rating', { precision: 3, scale: 2 }).default('0'),
   reviewCount: integer('review_count').default(0),
+  // Personal profile fields — available to ALL user roles (buyer, broker, owner, etc.)
+  gender: varchar('gender', { length: 10 }),
+  nationality: varchar('nationality', { length: 100 }),
+  city: varchar('city', { length: 100 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
@@ -207,6 +212,7 @@ export const chatMessages = pgTable('chat_messages', {
   buyerProfileId: uuid('buyer_profile_id').references(() => buyerProfiles.id).notNull(),
   sender: senderTypeEnum('sender').notNull(),
   content: text('content').notNull(),
+  chatType: chatTypeEnum('chat_type').default('LISTING').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (table) => ({
   buyerProfileIdx: index('chat_msg_buyer_profile_idx').on(table.buyerProfileId),

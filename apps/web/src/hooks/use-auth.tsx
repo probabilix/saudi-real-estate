@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { User, LoginInput, RegisterInput, BrokerWithProfile } from '@saudi-re/shared';
 import { api } from '@/lib/api';
+import PhoneCollectorModal from '@/components/auth/PhoneCollectorModal';
 
 type AuthContextType = {
   user: User | BrokerWithProfile | null;
@@ -25,9 +26,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const locale = useLocale();
   const lastSyncRef = useRef<number>(0);
   const SYNC_COOLDOWN = 30000; // 30 seconds
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+
+  useEffect(() => {
+    // If user is loaded and logged in, but has no phone number, open the modal
+    if (!loading && user && user.id && !user.phone) {
+      setShowPhoneModal(true);
+    } else {
+      setShowPhoneModal(false);
+    }
+  }, [user, loading]);
+
+  const handlePhoneComplete = (verifiedPhone: string) => {
+    setUser(prev => prev ? { ...prev, phone: verifiedPhone } : prev);
+    setShowPhoneModal(false);
+  };
 
   useEffect(() => {
     async function initAuth() {
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        if (urlToken) {
+          localStorage.setItem('accessToken', urlToken);
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        }
+      }
+
       const token = localStorage.getItem('accessToken');
       if (token) {
         const result = await api.getMe();
@@ -74,11 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const logout = async () => {
-    await api.logout();
+  const logout = () => {
     localStorage.removeItem('accessToken');
     setUser(null);
     router.push('/');
+    api.logout().catch((err) => console.error('Logout error:', err));
   };
 
   const refreshUser = async (force: boolean = false) => {
@@ -106,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, updateCredits, isAuthenticated: !!user }}>
       {children}
+      <PhoneCollectorModal isOpen={showPhoneModal} onComplete={handlePhoneComplete} onLogout={logout} />
     </AuthContext.Provider>
   );
 }

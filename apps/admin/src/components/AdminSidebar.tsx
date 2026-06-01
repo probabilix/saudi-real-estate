@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Building2, Newspaper,
   Settings, FileText, LogOut, ChevronRight, ChevronLeft,
   ShieldCheck, Bell, Menu, X, CreditCard,
-  BarChart3, Megaphone, Star, HelpCircle, Mail
+  BarChart3, Megaphone, Star, HelpCircle, Mail, Sparkles
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -25,6 +25,7 @@ const NAV_GROUPS = [
       { href: '/listings/featured', label: 'Featured Inventory', icon: Star },
       { href: '/users', label: 'Users & Brokers', icon: Users },
       { href: '/verifications', label: 'Verifications', icon: ShieldCheck },
+      { href: '/leads', label: 'Leads & CRM', icon: Sparkles },
     ],
   },
   {

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { users, listings, systemSettings, news, legalPages, contactSubmissions } from '../../db/schema';
+import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import { eq, desc, asc, count, sql, and, or, ilike, isNull, inArray } from 'drizzle-orm';
 
@@ -676,6 +676,197 @@ export default async function adminRoutes(app: FastifyInstance) {
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to delete submission.' });
+    }
+  });
+
+  // ── Leads & CRM Management Endpoints ──
+  app.get('/leads', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const query = request.query as { status?: string; isQualified?: string; search?: string; page?: string; limit?: string };
+    const page = parseInt(query.page || '1');
+    const limit = Math.min(parseInt(query.limit || '20'), 100);
+    const offset = (page - 1) * limit;
+
+    try {
+      // 1. Calculate CRM Metrics
+      const statsResult = await db.select({
+        total: count(),
+        qualified: sql<number>`COALESCE(SUM(CASE WHEN ${leads.isQualified} = true THEN 1 ELSE 0 END), 0)`,
+        avgIntent: sql<number>`COALESCE(AVG(${leads.intentScoreAtCreation}), 0)`
+      }).from(leads);
+
+      const totalLeads = Number(statsResult[0]?.total ?? 0);
+      const qualifiedLeads = Number(statsResult[0]?.qualified ?? 0);
+      const conversionRate = totalLeads > 0 ? Math.round((qualifiedLeads / totalLeads) * 100) : 0;
+      const avgIntentScore = Math.round(Number(statsResult[0]?.avgIntent ?? 0));
+
+      // 2. Fetch Leads List
+      const conditions: any[] = [];
+      if (query.status) conditions.push(eq(leads.status, query.status as any));
+      if (query.isQualified === 'true') conditions.push(eq(leads.isQualified, true));
+      if (query.isQualified === 'false') conditions.push(eq(leads.isQualified, false));
+
+      if (query.search) {
+        const searchPattern = `%${query.search.toLowerCase()}%`;
+        conditions.push(
+          or(
+            ilike(listings.enTitle, searchPattern),
+            ilike(listings.arTitle, searchPattern),
+            ilike(listings.shortId, searchPattern),
+            ilike(users.name, searchPattern),
+            ilike(users.email, searchPattern)
+          )
+        );
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [leadsList, totalResult] = await Promise.all([
+        db.select({
+          id: leads.id,
+          buyerProfileId: leads.buyerProfileId,
+          listingId: leads.listingId,
+          brokerId: leads.brokerId,
+          status: leads.status,
+          intentScoreAtCreation: leads.intentScoreAtCreation,
+          aiSummary: leads.aiSummary,
+          buyerBudgetDisplay: leads.buyerBudgetDisplay,
+          buyerTimelineDisplay: leads.buyerTimelineDisplay,
+          isQualified: leads.isQualified,
+          notifiedWhatsapp: leads.notifiedWhatsapp,
+          notifiedEmail: leads.notifiedEmail,
+          notifiedAt: leads.notifiedAt,
+          createdAt: leads.createdAt,
+          listing: {
+            id: listings.id,
+            shortId: listings.shortId,
+            arTitle: listings.arTitle,
+            enTitle: listings.enTitle,
+            price: listings.price,
+            city: listings.city,
+          },
+          buyer: {
+            id: buyerProfiles.id,
+            userId: buyerProfiles.userId,
+            sessionId: buyerProfiles.sessionId,
+            intentScore: buyerProfiles.intentScore,
+            lastAiSummary: buyerProfiles.lastAiSummary,
+          }
+        })
+        .from(leads)
+        .leftJoin(listings, eq(leads.listingId, listings.id))
+        .leftJoin(buyerProfiles, eq(leads.buyerProfileId, buyerProfiles.id))
+        .leftJoin(users, eq(buyerProfiles.userId, users.id)) // Joined for searching
+        .where(whereClause)
+        .orderBy(desc(leads.createdAt))
+        .limit(limit)
+        .offset(offset),
+        db.select({ count: count() })
+          .from(leads)
+          .leftJoin(listings, eq(leads.listingId, listings.id))
+          .leftJoin(buyerProfiles, eq(leads.buyerProfileId, buyerProfiles.id))
+          .leftJoin(users, eq(buyerProfiles.userId, users.id))
+          .where(whereClause),
+      ]);
+
+      // 3. Batch fetch Broker & Buyer User profiles for details
+      const buyerUserIds = leadsList.map(l => l.buyer?.userId).filter(Boolean) as string[];
+      const brokerUserIds = leadsList.map(l => l.brokerId).filter(Boolean) as string[];
+      const userIds = [...new Set([...buyerUserIds, ...brokerUserIds])];
+
+      const usersList = userIds.length > 0
+        ? await db.select({ id: users.id, name: users.name, email: users.email, phone: users.phone })
+            .from(users)
+            .where(inArray(users.id, userIds))
+        : [];
+
+      const userMap: Record<string, typeof usersList[0]> = {};
+      usersList.forEach(u => { userMap[u.id] = u; });
+
+      const enrichedLeads = leadsList.map(l => {
+        const buyerUser = l.buyer?.userId ? userMap[l.buyer.userId] : null;
+        const brokerUser = l.brokerId ? userMap[l.brokerId] : null;
+        return {
+          ...l,
+          buyer: l.buyer ? {
+            id: l.buyer.id,
+            sessionId: l.buyer.sessionId,
+            intentScore: l.buyer.intentScore,
+            lastAiSummary: l.buyer.lastAiSummary,
+            name: buyerUser?.name || null,
+            email: buyerUser?.email || null,
+            phone: buyerUser?.phone || null,
+          } : null,
+          broker: brokerUser ? {
+            id: brokerUser.id,
+            name: brokerUser.name,
+            email: brokerUser.email,
+            phone: brokerUser.phone,
+          } : null,
+        };
+      });
+
+      return reply.send({
+        success: true,
+        data: {
+          leads: enrichedLeads,
+          total: Number(totalResult[0]?.count ?? 0),
+          page,
+          stats: {
+            totalLeads,
+            qualifiedLeads,
+            conversionRate,
+            avgIntentScore
+          }
+        }
+      });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch CRM leads' });
+    }
+  });
+
+  app.get('/leads/:id/chat-history', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const lead = await db.query.leads.findFirst({
+        where: eq(leads.id, id),
+      });
+
+      if (!lead) {
+        return reply.code(404).send({ success: false, message: 'Lead not found' });
+      }
+
+      const messages = await db.select()
+        .from(chatMessages)
+        .where(eq(chatMessages.buyerProfileId, lead.buyerProfileId))
+        .orderBy(asc(chatMessages.createdAt));
+
+      return reply.send({
+        success: true,
+        data: messages,
+      });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch chat history' });
+    }
+  });
+
+  app.patch('/leads/:id/status', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { status } = request.body as { status: string };
+
+    if (!['NEW', 'VIEWED', 'CONTACTED', 'CLOSED_WON', 'CLOSED_LOST'].includes(status)) {
+      return reply.code(400).send({ success: false, message: 'Invalid lead status' });
+    }
+
+    try {
+      await db.update(leads)
+        .set({ status: status as any })
+        .where(eq(leads.id, id));
+      return reply.send({ success: true, message: 'Lead status updated successfully' });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to update lead status' });
     }
   });
 }

@@ -77,6 +77,9 @@ export default function BrochureModal({
   const embedSrc = getBrochureEmbedUrl(brochureUrl);
 
   const getDownloadUrl = (url: string) => {
+    if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
+      return url.replace('/upload/', '/upload/fl_attachment/');
+    }
     return url;
   };
   const downloadUrl = getDownloadUrl(brochureUrl);
@@ -142,13 +145,7 @@ export default function BrochureModal({
   const handleZoomOut = () => setPhotoScale((prev) => Math.max(prev - 0.5, 1));
   const handleZoomReset = () => setPhotoScale(1);
 
-  const handleOpenDirect = () => {
-    window.open(brochureUrl, '_blank', 'noopener,noreferrer');
-  };
 
-  const handleDownloadDirect = () => {
-    window.open(brochureUrl, '_blank', 'noopener,noreferrer');
-  };
 
   return (
     <AnimatePresence>
@@ -178,18 +175,22 @@ export default function BrochureModal({
           </div>
           
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleOpenDirect}
-              className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider transition-all text-white active:scale-95"
+            <a
+              href={brochureUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider transition-all text-white active:scale-95 inline-flex items-center justify-center"
             >
               Open Direct ↗
-            </button>
-            <button
-              onClick={handleDownloadDirect}
-              className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider transition-all text-white active:scale-95"
+            </a>
+            <a
+              href={downloadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider transition-all text-white active:scale-95 inline-flex items-center justify-center"
             >
               Download PDF ↓
-            </button>
+            </a>
           </div>
         </div>
 

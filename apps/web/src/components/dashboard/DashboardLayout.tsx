@@ -30,6 +30,7 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const isRTL = locale === 'ar';
 
@@ -106,10 +107,15 @@ export default function DashboardLayout({ children, locale }: DashboardLayoutPro
         <div className="p-4 rounded-2xl bg-white border border-gray-200/60 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center border border-primary-100 text-primary-600 font-bold overflow-hidden shrink-0">
-              {user?.avatarUrl ? (
-                <Image src={user.avatarUrl} alt={user.name ?? ''} fill className="object-cover" unoptimized />
+              {user?.avatarUrl && !imgError ? (
+                <img 
+                  src={user.avatarUrl} 
+                  alt={user.name ?? ''} 
+                  className="w-full h-full object-cover" 
+                  onError={() => setImgError(true)} 
+                />
               ) : (
-                <User className="w-5 h-5" />
+                <span className="text-sm font-black text-primary-700 uppercase">{(user?.name || user?.email || 'U')[0]}</span>
               )}
             </div>
             <div className="min-w-0">

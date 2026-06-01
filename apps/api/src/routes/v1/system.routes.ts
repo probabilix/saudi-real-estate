@@ -208,11 +208,24 @@ export default async function systemRoutes(app: FastifyInstance) {
         ? await ListingService.getSparseBrief(context.id)
         : undefined;
 
+      // Dynamically resolve the caller origin for environment-agnostic link generation
+      const originHeader = request.headers.origin as string;
+      const refererHeader = request.headers.referer as string;
+      let baseUrl = 'http://localhost:3000';
+      if (originHeader) {
+        baseUrl = originHeader;
+      } else if (refererHeader) {
+        try {
+          baseUrl = new URL(refererHeader).origin;
+        } catch { /* ignore parsing errors */ }
+      }
+
       // Construct highly secure and spoof-proof context parameters for n8n
       const secureContext = {
         ...context,
         sessionId: profile.sessionId,
         buyerProfileId: profile.id,
+        baseUrl,
       };
 
       const response = await fetch(webhookUrl, {

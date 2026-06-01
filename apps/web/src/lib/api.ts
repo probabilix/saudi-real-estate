@@ -210,6 +210,9 @@ class ApiClient {
 
     if (!options.method || options.method === 'GET') {
       this.inFlightRequests.set(cacheKey, fetchPromise);
+      fetchPromise.finally(() => {
+        this.inFlightRequests.delete(cacheKey);
+      });
     }
 
     return fetchPromise;
@@ -310,7 +313,7 @@ class ApiClient {
     });
   }
 
-  async updateProfile(data: Partial<BrokerProfile>) {
+  async updateProfile(data: Partial<BrokerProfile> & { name?: string; avatarUrl?: string; phone?: string; gender?: string | null; nationality?: string | null; city?: string | null }) {
     return this.fetcher('/user/profile', {
       method: 'PATCH',
       body: JSON.stringify(data),

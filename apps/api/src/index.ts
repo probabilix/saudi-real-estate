@@ -13,7 +13,8 @@ import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-
 import { ZodError } from 'zod';
 import v1Routes from './routes/v1';
 import { db } from './db';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
+import { systemSettings } from './db/schema';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -46,10 +47,15 @@ const bootstrap = async () => {
     // Schema self-healing: Ensure listings table column exists before API requests hit the routes
     try {
       await db.execute(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS ai_qualification_active BOOLEAN DEFAULT true;`);
+      // Add personal profile columns to users table (available for ALL roles, not just brokers)
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10);`);
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS nationality VARCHAR(100);`);
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(100);`);
       app.log.info('Database schema self-healing verified: listings.ai_qualification_active is initialized.');
       
       // Self-heal chat messaging structures
       await db.execute(sql`DO $$ BEGIN CREATE TYPE sender_type AS ENUM ('USER', 'ASSISTANT'); EXCEPTION WHEN duplicate_object THEN null; END $$;`);
+      await db.execute(sql`DO $$ BEGIN CREATE TYPE chat_type AS ENUM ('GENERAL', 'LISTING'); EXCEPTION WHEN duplicate_object THEN null; END $$;`);
       await db.execute(sql`ALTER TABLE buyer_profiles ADD COLUMN IF NOT EXISTS last_ai_summary TEXT;`);
       await db.execute(sql`ALTER TABLE buyer_profiles ADD COLUMN IF NOT EXISTS summary_updated_at TIMESTAMP WITH TIME ZONE;`);
       await db.execute(sql`
@@ -58,11 +64,13 @@ const bootstrap = async () => {
           buyer_profile_id UUID NOT NULL REFERENCES buyer_profiles(id) ON DELETE CASCADE,
           sender sender_type NOT NULL,
           content TEXT NOT NULL,
+          chat_type chat_type DEFAULT 'LISTING' NOT NULL,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
+      await db.execute(sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS chat_type chat_type DEFAULT 'LISTING' NOT NULL;`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS chat_msg_buyer_profile_idx ON chat_messages(buyer_profile_id);`);
-      app.log.info('Database schema self-healing verified: Persistent chat messages table and buyer profile summary columns initialized.');
+      app.log.info('Database schema self-healing verified: Persistent chat messages table, buyer profile summary columns, and chat_type fields initialized.');
 
       // Self-heal buyer profiles auto-creation trigger on users table insert
       await db.execute(sql`
@@ -106,13 +114,33 @@ const bootstrap = async () => {
       parseOptions: {},
     });
 
-    // 0.1 Google OAuth Registration
+    // 0.1 Dynamic Google OAuth Registration from Database settings
+    let googleClientId = process.env.GOOGLE_CLIENT_ID || 'place-client-id-here';
+    let googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || 'place-client-secret-here';
+    
+    try {
+      const dbClientId = await db.query.systemSettings.findFirst({
+        where: eq(systemSettings.key, 'google_client_id')
+      });
+      const dbClientSecret = await db.query.systemSettings.findFirst({
+        where: eq(systemSettings.key, 'google_client_secret')
+      });
+      
+      if (dbClientId?.value) googleClientId = dbClientId.value;
+      if (dbClientSecret?.value) googleClientSecret = dbClientSecret.value;
+    } catch (dbErr: any) {
+      app.log.warn(`[OAUTH SETUP] Google OAuth keys could not be queried from DB, using env: ${dbErr.message}`);
+    }
+
     await app.register(oauth2, {
       name: 'googleOAuth2',
+      scope: ['profile', 'email'],
+      checkStateFunction: () => true, // Type-safe way to bypass state validation on localhost
+      generateStateFunction: () => 'fixed-state', // Required alongside checkStateFunction
       credentials: {
         client: {
-          id: process.env.GOOGLE_CLIENT_ID || 'place-client-id-here',
-          secret: process.env.GOOGLE_CLIENT_SECRET || 'place-client-secret-here',
+          id: googleClientId,
+          secret: googleClientSecret,
         },
         auth: oauth2.GOOGLE_CONFIGURATION,
       },

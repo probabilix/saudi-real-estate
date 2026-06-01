@@ -121,24 +121,36 @@ export const buyerProfileSchema = z.object({
   languagePreference: z.enum(LANGUAGES).default('en'),
 });
 
-// ── Broker profile schemas ──
+// ── Universal user profile schema (ALL roles: buyer, broker, owner, etc.) ──
+export const updateUserProfileSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  phone: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return undefined;
+    return String(val).replace(/\s+/g, '');
+  }, z.string().regex(/^\+[1-9]\d{1,14}$/).optional().nullable()),
+  gender: z.enum(['MALE', 'FEMALE']).optional().nullable(),
+  nationality: z.string().max(100).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  avatarUrl: z.string().url().optional().nullable(),
+});
+
+// ── Broker profile schemas (broker/agent extras only) ──
 export const brokerProfileSchema = z.object({
   titleEn: z.string().max(255).optional(),
   titleAr: z.string().max(255).optional(),
   bioEn: z.string().max(5000).optional(),
   bioAr: z.string().max(5000).optional(),
-  whatsapp: z.preprocess((val) => (val === '' ? undefined : val), z.string().regex(/^\+[1-9]\d{1,14}$/).optional().nullable()),
+  whatsapp: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return undefined;
+    return String(val).replace(/\s+/g, '');
+  }, z.string().regex(/^\+[1-9]\d{1,14}$/).optional().nullable()),
   nationalId: z.string().max(50).optional(),
   regaLicenseNumber: z.string().max(100).optional(),
   experienceLevel: z.enum(['0-2', '3-5', '6-10', '10+']).optional(),
   languages: z.array(z.string()).default([]),
   serviceAreas: z.array(z.string()).default([]),
-  gender: z.enum(['MALE', 'FEMALE']),
   nationalShortAddress: z.string().max(255).optional(),
   address: z.string().max(500).optional(),
-  avatarUrl: z.string().url().optional().nullable(),
-  nationality: z.string().max(100).optional().nullable(),
-  city: z.string().max(100).optional().nullable(),
 });
 
 export const updateBrokerProfileSchema = brokerProfileSchema.partial();
@@ -197,3 +209,4 @@ export type ChatMessageInput = z.infer<typeof chatMessageSchema>;
 export type CreateAgentInput = z.infer<typeof createAgentSchema>;
 export type BrokerProfileInput = z.infer<typeof brokerProfileSchema>;
 export type UpdateBrokerProfileInput = z.infer<typeof updateBrokerProfileSchema>;
+export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;

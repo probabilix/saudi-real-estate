@@ -6,7 +6,7 @@ import { authenticateJWT } from '../../middleware/auth.middleware';
 import { EmailService } from '../../services/email.service';
 import { ListingService } from '../../services/listing.service';
 import { brokerProfiles } from '../../db/schema';
-import { updateBrokerProfileSchema } from '@saudi-re/shared';
+import { updateBrokerProfileSchema, updateUserProfileSchema } from '@saudi-re/shared';
 
 export default async function userRoutes(app: FastifyInstance) {
   
@@ -109,7 +109,7 @@ export default async function userRoutes(app: FastifyInstance) {
         return reply.code(404).send({ success: false, message: 'User not found' });
       }
 
-      const { users: userData, broker_profiles: brokerData } = results[0];
+      const { users: userData, broker_profiles: brokerData } = results[0] as any;
 
       return reply.send({
         success: true,
@@ -120,11 +120,16 @@ export default async function userRoutes(app: FastifyInstance) {
             email: userData.email,
             role: userData.role,
             phone: userData.phone,
+            // Personal profile fields on users table — available for ALL roles
+            gender: userData.gender || null,
+            nationality: userData.nationality || null,
+            city: userData.city || null,
             verificationStatus: userData.verificationStatus,
             regaLicence: userData.regaLicence,
             subscriptionTier: userData.subscriptionTier,
             avatarUrl: userData.avatarUrl,
           },
+          // Broker-specific extras — only populated if user has a broker_profiles row
           profile: brokerData || null
         }
       });
@@ -136,50 +141,72 @@ export default async function userRoutes(app: FastifyInstance) {
 
   /**
    * PATCH /api/v1/user/profile
-   * Updates or creates a broker profile
+   * Universal profile update — saves personal fields to users table for ALL roles.
+   * If the user is a broker/agent, also upserts broker-specific extras to broker_profiles.
    */
   app.patch('/profile', { preHandler: [authenticateJWT] }, async (request, reply) => {
     const userId = request.user?.userId;
-    const parsed = updateBrokerProfileSchema.safeParse(request.body);
+    const userRole = request.user?.role;
+    app.log.info('[UPDATE PROFILE] Request body received: %j', request.body as any);
 
-    if (!parsed.success) {
-      return reply.code(400).send({ success: false, errors: parsed.error.format() });
+    // Step 1: Validate & save personal fields to users table (ALL roles)
+    const userParsed = updateUserProfileSchema.safeParse(request.body);
+    if (!userParsed.success) {
+      app.log.error('[UPDATE PROFILE] User schema validation failed: %j', userParsed.error.format());
+      return reply.code(400).send({ success: false, errors: userParsed.error.format() });
     }
 
     try {
-      // Upsert logic for broker profile
-      const { avatarUrl: _omit, ...restOfData } = parsed.data;
-      const dataToUpdate = {
-        ...restOfData,
-        userId: userId as string,
-        updatedAt: new Date(),
-      };
+      const { name, phone, gender, nationality, city, avatarUrl } = userParsed.data;
+      const userUpdate: Record<string, any> = { updatedAt: new Date() };
+      if (name !== undefined)        userUpdate.name = name;
+      if (phone !== undefined)       userUpdate.phone = phone;
+      if (gender !== undefined)      userUpdate.gender = gender;
+      if (nationality !== undefined) userUpdate.nationality = nationality;
+      if (city !== undefined)        userUpdate.city = city;
+      if (avatarUrl !== undefined)   userUpdate.avatarUrl = avatarUrl;
 
-      const existingProfile = await db.query.brokerProfiles.findFirst({
-        where: eq(brokerProfiles.userId, userId as string),
-      });
+      const updatedUsers = await db.update(users)
+        .set(userUpdate)
+        .where(eq(users.id, userId as string))
+        .returning();
 
-      if (existingProfile) {
-        await db.update(brokerProfiles)
-          .set(dataToUpdate)
-          .where(eq(brokerProfiles.userId, userId as string));
-      } else {
-        await db.insert(brokerProfiles).values({
-          ...dataToUpdate,
-          id: undefined, // Let DB generate ID
-        });
-      }
+      app.log.info('[UPDATE PROFILE] users table updated row: %j', updatedUsers[0] || null);
 
-      // Also allow updating name/avatar on the main user record
-      const { name, avatarUrl } = request.body as any;
-      if (name || avatarUrl) {
-        await db.update(users)
-          .set({ 
-            ...(name && { name }), 
-            ...(avatarUrl && { avatarUrl }),
-            updatedAt: new Date() 
-          })
-          .where(eq(users.id, userId as string));
+      // Step 2: If user has a broker/agent role, also upsert broker-specific extras
+      const brokerRoles = ['SOLO_BROKER', 'AGENT', 'FIRM', 'OWNER', 'ADMIN'];
+      if (brokerRoles.includes(userRole as string)) {
+        const brokerParsed = updateBrokerProfileSchema.safeParse(request.body);
+        if (brokerParsed.success && Object.keys(brokerParsed.data).length > 0) {
+          app.log.info('[UPDATE PROFILE] Broker parsed data: %j', brokerParsed.data);
+          const brokerCleanData = { ...brokerParsed.data } as any;
+          delete brokerCleanData.gender;
+          delete brokerCleanData.nationality;
+          delete brokerCleanData.city;
+          delete brokerCleanData.whatsapp;
+          
+          const brokerData = {
+            ...brokerCleanData,
+            userId: userId as string,
+            updatedAt: new Date(),
+          };
+
+          const existingProfile = await db.query.brokerProfiles.findFirst({
+            where: eq(brokerProfiles.userId, userId as string),
+          });
+
+          if (existingProfile) {
+            await db.update(brokerProfiles)
+              .set(brokerData)
+              .where(eq(brokerProfiles.userId, userId as string));
+          } else {
+            await db.insert(brokerProfiles).values({
+              ...brokerData,
+              id: undefined,
+            });
+          }
+          app.log.info('[UPDATE PROFILE] broker_profiles upserted for userId: %s', userId);
+        }
       }
 
       return reply.send({ success: true, message: 'Profile updated successfully' });

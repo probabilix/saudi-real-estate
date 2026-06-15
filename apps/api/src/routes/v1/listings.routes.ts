@@ -82,7 +82,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
         request.user?.userId
       );
 
-      if (!listing || (listing.projectId && request.user?.role !== 'ADMIN' && request.user?.userId !== listing.ownerId)) {
+      if (!listing) {
         return reply.code(404).send({ success: false, message: 'Listing not found' });
       }
 

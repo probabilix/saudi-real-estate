@@ -22,7 +22,7 @@ function renderMessageContent(content: string, role: 'user' | 'assistant') {
   let match;
 
   while ((match = linkRegex.exec(content)) !== null) {
-    const [_, label, url] = match;
+    const [, label, url] = match;
     const matchIndex = match.index;
 
     if (matchIndex > lastIndex) {
@@ -58,8 +58,8 @@ function renderMessageContent(content: string, role: 'user' | 'assistant') {
 interface ChatWidgetProps {
   floating?: boolean;
   showBubble?: boolean;
-  mode?: 'general' | 'qualification';
-  context?: any; // For listing details
+  mode?: 'general' | 'qualification' | 'project_qualification';
+  context?: Record<string, unknown>; // For listing/project details
   onQualified?: () => void;
   open?: boolean;
   setOpen?: (open: boolean) => void;
@@ -85,7 +85,7 @@ export default function ChatWidget({
   const open = controlledOpen ?? internalOpen;
   const setOpen = controlledSetOpen ?? setInternalOpen;
 
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -107,7 +107,7 @@ export default function ChatWidget({
         setMessages([
           {
             role: 'assistant',
-            content: mode === 'qualification' 
+            content: (mode === 'qualification' || mode === 'project_qualification')
               ? (locale === 'ar' ? 'مرحباً! أنا مساعدك العقاري. هل ترغب في معرفة المزيد عن هذا العقار؟' : 'Hello! I am your real estate assistant. Would you like to know more about this property?')
               : (locale === 'ar' ? 'مرحباً! أنا مساعدك في منصة عقارات السعودية. كيف يمكنني مساعدتك في استكشاف العقارات أو الإجابة على استفساراتك؟' : 'Welcome! I am your Saudi RE assistant. How can I help you explore properties or answer questions about our platform?'),
             timestamp: new Date(),
@@ -123,14 +123,27 @@ export default function ChatWidget({
     if (isAuthenticated) {
       async function loadHistory() {
         try {
-          const res = await api.getChatHistory();
+          const projectId = context?.projectId as string | undefined;
+          const listingId = context?.id as string | undefined;
+          const res = await api.getChatHistory(projectId, listingId);
           if (res.success && res.data && Array.isArray(res.data.history)) {
             if (res.data.history.length > 0) {
-              setMessages(res.data.history.map((m: any) => ({
+              setMessages(res.data.history.map((m: { role: string; content: string; timestamp: string }) => ({
                 role: m.role as 'user' | 'assistant',
                 content: m.content,
                 timestamp: new Date(m.timestamp)
               })));
+            } else {
+              // Reset to welcome message if no context-specific history exists
+              setMessages([
+                {
+                  role: 'assistant',
+                  content: (mode === 'qualification' || mode === 'project_qualification')
+                    ? (locale === 'ar' ? 'مرحباً! أنا مساعدك العقاري. هل ترغب في معرفة المزيد عن هذا العقار؟' : 'Hello! I am your real estate assistant. Would you like to know more about this property?')
+                    : (locale === 'ar' ? 'مرحباً! أنا مساعدك في منصة عقارات السعودية. كيف يمكنني مساعدتك في استكشاف العقارات أو الإجابة على استفساراتك؟' : 'Welcome! I am your Saudi RE assistant. How can I help you explore properties or answer questions about our platform?'),
+                  timestamp: new Date(),
+                },
+              ]);
             }
           }
         } catch (err) {
@@ -139,7 +152,7 @@ export default function ChatWidget({
       }
       loadHistory();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, context?.projectId, context?.id, mode, locale]);
 
   // Auto-scroll
   useEffect(() => {
@@ -177,16 +190,26 @@ export default function ChatWidget({
         message: userMsg.content,
         history,
         locale,
-        context: mode === 'qualification' ? context : undefined
+        context: context ? context : undefined
       });
 
       if (!res.success) throw new Error(res.error || 'Failed to connect to AI');
 
       const data = res.data;
-      const aiContent = typeof data === 'string' ? data : (data.output || data.message || data.text || '...');
+      let aiContent = typeof data === 'string' ? data : (data.output || data.message || data.text || '...');
+
+      // Check for redirection flag
+      const redirectMatch = aiContent.match(/REDIRECT_TO_LISTING:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+        || aiContent.match(/REDIRECT_TO_LISTING:(SRE-[A-Z0-9]{6})/i);
+      
+      let targetRedirectId = '';
+      if (redirectMatch) {
+        targetRedirectId = redirectMatch[1];
+        aiContent = aiContent.replace(/REDIRECT_TO_LISTING:[^\s]+/i, '').trim();
+      }
 
       // Check for qualification success flag in the response
-      if (mode === 'qualification' && (aiContent.includes('QUALIFIED_SUCCESS') || data.qualified === true)) {
+      if ((mode === 'qualification' || mode === 'project_qualification') && (aiContent.includes('QUALIFIED_SUCCESS') || data.qualified === true)) {
         onQualified?.();
       }
 
@@ -196,10 +219,18 @@ export default function ChatWidget({
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (err: any) {
+
+      // Trigger automatic client-side redirection to targeted unit details
+      if (targetRedirectId) {
+        setTimeout(() => {
+          router.push(`/${locale}/listings/${targetRedirectId}?ai=true`);
+        }, 1500);
+      }
+    } catch (err) {
+      const error = err as Error;
       setMessages((prev) => [...prev, {
         role: 'assistant',
-        content: `Error: ${err.message || 'Something went wrong'}`,
+        content: `Error: ${error.message || 'Something went wrong'}`,
         timestamp: new Date(),
       }]);
     } finally {
@@ -227,7 +258,7 @@ export default function ChatWidget({
           </div>
           <div>
             <h3 className="text-sm font-bold text-charcoal">
-              {mode === 'qualification' 
+              {(mode === 'qualification' || mode === 'project_qualification')
                 ? (locale === 'ar' ? 'مساعد العقارات' : 'Property Advisor')
                 : (locale === 'ar' ? 'مساعد منصة عقارات السعودية' : 'Saudi RE Assistant')
               }
@@ -293,7 +324,7 @@ export default function ChatWidget({
           </div>
           <div>
             <h3 className="text-sm font-bold text-charcoal">
-              {mode === 'qualification' 
+              {(mode === 'qualification' || mode === 'project_qualification')
                 ? (locale === 'ar' ? 'مساعد العقارات' : 'Property Advisor')
                 : (locale === 'ar' ? 'مساعد منصة عقارات السعودية' : 'Saudi RE Assistant')
               }

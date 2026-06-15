@@ -59,7 +59,7 @@ export default async function LocaleLayout({
   unstable_setRequestLocale(locale);
 
   // Load messages directly
-  const messages = (await import(`@/messages/${locale}.json`)).default;
+  const messages = (await import(`../../messages/${locale}.json`)).default;
 
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
   // Use DM Sans for English, IBM Plex for Arabic

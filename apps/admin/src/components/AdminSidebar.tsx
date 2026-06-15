@@ -1,12 +1,13 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
 import {
   LayoutDashboard, Users, Building2, Newspaper,
   Settings, FileText, LogOut, ChevronRight, ChevronLeft,
   ShieldCheck, Bell, Menu, X, CreditCard,
-  BarChart3, Megaphone, Star, HelpCircle, Mail, Sparkles
+  BarChart3, Megaphone, Star, HelpCircle, Mail, Sparkles, Clock,
+  Layers
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -21,7 +22,9 @@ const NAV_GROUPS = [
   {
     label: 'Marketplace',
     items: [
+      { href: '/projects', label: 'Projects', icon: Layers },
       { href: '/listings', label: 'All Inventory', icon: Building2 },
+      { href: '/listings?status=FLAGGED', label: 'Pending Approvals', icon: Clock },
       { href: '/listings/featured', label: 'Featured Inventory', icon: Star },
       { href: '/users', label: 'Users & Brokers', icon: Users },
       { href: '/verifications', label: 'Verifications', icon: ShieldCheck },
@@ -48,6 +51,8 @@ const NAV_GROUPS = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const statusParam = searchParams.get('status');
   const { user, logout } = useAdminAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -129,7 +134,14 @@ export function AdminSidebar() {
             <ul className="space-y-0.5">
               {group.items.map(item => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+                let isActive = false;
+                if (item.href.includes('?status=FLAGGED')) {
+                  isActive = pathname === '/listings' && statusParam === 'FLAGGED';
+                } else if (item.href === '/listings') {
+                  isActive = pathname === '/listings' && !statusParam;
+                } else {
+                  isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+                }
                 return (
                   <li key={item.href}>
                     <Link

@@ -72,6 +72,18 @@ const bootstrap = async () => {
       await db.execute(sql`CREATE INDEX IF NOT EXISTS chat_msg_buyer_profile_idx ON chat_messages(buyer_profile_id);`);
       app.log.info('Database schema self-healing verified: Persistent chat messages table, buyer profile summary columns, and chat_type fields initialized.');
 
+      // Self-heal project favorites table
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS project_favorites (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS user_project_idx ON project_favorites (user_id, project_id);`);
+      app.log.info('Database schema self-healing verified: project_favorites table and index initialized.');
+
       // Self-heal buyer profiles auto-creation trigger on users table insert
       await db.execute(sql`
         CREATE OR REPLACE FUNCTION sync_user_to_buyer_profile()

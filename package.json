@@ -2,17 +2,22 @@
   "name": "saudi-realestate",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.15.4",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "turbo dev",
+
+    "dev": "cmd /C \"set NODE_OPTIONS=--max-old-space-size=2048&& turbo dev\"",
     "build": "turbo build",
     "lint": "turbo lint",
+
+
     "dev:web": "turbo dev --filter=@saudi-re/web",
     "dev:api": "turbo dev --filter=@saudi-re/api",
     "dev:admin": "turbo dev --filter=@saudi-re/admin",
+    "dev:crm": "turbo dev --filter=@saudi-re/crm",
     "build:web": "turbo build --filter=@saudi-re/web",
     "build:api": "turbo build --filter=@saudi-re/api",
     "build:admin": "turbo build --filter=@saudi-re/admin",
+    "build:crm": "turbo build --filter=@saudi-re/crm",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {

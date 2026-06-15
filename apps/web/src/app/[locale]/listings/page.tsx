@@ -2,9 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SlidersHorizontal, Map, Grid3X3, X, Loader2, Search } from 'lucide-react';
+import { SlidersHorizontal, Map, Grid3X3, X, Loader2, Search, Building } from 'lucide-react';
 import ListingCard from '@/components/listings/ListingCard';
 import PriceDropdown from '@/components/search/PriceDropdown';
 import PropertyTypeDropdown from '@/components/search/PropertyTypeDropdown';
@@ -50,6 +51,7 @@ function ListingsContent() {
         if (maxPrice) queryParams.set('maxPrice', String(maxPrice));
         if (bedrooms) queryParams.set('bedrooms', String(bedrooms));
         if (q) queryParams.set('q', q);
+        queryParams.set('excludeProjects', 'true');
         queryParams.set('lang', locale);
         queryParams.set('limit', '21');
         queryParams.set('page', String(page));
@@ -97,13 +99,22 @@ function ListingsContent() {
       {/* Page Header */}
       <div className="bg-surface-50 border-b border-surface-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14">
-          <div className="mb-8">
-            <span className="inline-block text-[10px] font-black uppercase tracking-[0.2em] text-primary-600 mb-2">
-              {t('browseInventory')}
-            </span>
-            <h1 className={`text-4xl lg:text-5xl font-bold text-charcoal ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
-              {t('title')}
-            </h1>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+            <div>
+              <span className="inline-block text-[10px] font-black uppercase tracking-[0.2em] text-primary-600 mb-2">
+                {t('browseInventory')}
+              </span>
+              <h1 className={`text-4xl lg:text-5xl font-bold text-charcoal ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
+                {t('title')}
+              </h1>
+            </div>
+            <Link
+              href={`/${locale}/projects`}
+              className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-charcoal text-white hover:bg-primary-600 font-bold text-sm shadow-md transition-all self-start md:self-auto hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <Building className="w-4 h-4" />
+              {t('switchToProjects')}
+            </Link>
           </div>
 
           {/* Filter Bar */}
@@ -226,7 +237,11 @@ function ListingsContent() {
           <>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
               {results.items.map((listing, i) => (
-                <ListingCard key={listing.id} listing={listing} index={i} />
+                <ListingCard
+                  key={listing.id}
+                  listing={listing}
+                  index={i}
+                />
               ))}
             </div>
 

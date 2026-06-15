@@ -2,11 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { API_BASE_URL } from '@/lib/api';
+import { API_BASE_URL, api } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { WHITELISTED_USERS } from '@/lib/config';
 
 import { Building2, ArrowLeft, Mail, ShieldCheck, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,9 +18,6 @@ function LoginContent({ locale }: { locale: string }) {
   const { login, refreshUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get('returnTo');
-  const oauthToken = searchParams.get('token');
-  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,12 +25,34 @@ function LoginContent({ locale }: { locale: string }) {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const performRedirect = (url: string) => {
+    if (url.startsWith('http://') || url.startsWith('https://') || url.includes('://')) {
+      window.location.href = url;
+    } else {
+      router.push(url);
+    }
+  };
+
+  const returnTo = searchParams.get('returnTo');
+  const oauthToken = searchParams.get('token');
+
   useEffect(() => {
     if (oauthToken) {
       localStorage.setItem('accessToken', oauthToken);
-      refreshUser(true).then(() => {
+      refreshUser(true).then(async () => {
         if (returnTo) {
-          router.push(returnTo);
+          const userRes = await api.getMe();
+          const loggedInUser = userRes.success ? userRes.data?.user : null;
+          const isCrmTarget = returnTo.includes('localhost:3003') || returnTo.includes('saudi-real-estate-crm');
+          
+          if (isCrmTarget) {
+            const isBroker = loggedInUser?.role === 'ADMIN' || loggedInUser?.role === 'SOLO_BROKER' || loggedInUser?.regaVerified || WHITELISTED_USERS.includes(loggedInUser?.email || '');
+            if (!isBroker) {
+              router.push(`/${locale}/post-property`);
+              return;
+            }
+          }
+          performRedirect(returnTo);
         } else {
           router.push(`/${locale}`);
         }
@@ -51,7 +71,18 @@ function LoginContent({ locale }: { locale: string }) {
       setLoading(false);
     } else {
       if (returnTo) {
-        router.push(returnTo);
+        const userRes = await api.getMe();
+        const loggedInUser = userRes.success ? userRes.data?.user : null;
+        const isCrmTarget = returnTo.includes('localhost:3003') || returnTo.includes('saudi-real-estate-crm');
+        
+        if (isCrmTarget) {
+          const isBroker = loggedInUser?.role === 'ADMIN' || loggedInUser?.role === 'SOLO_BROKER' || loggedInUser?.regaVerified || WHITELISTED_USERS.includes(loggedInUser?.email || '');
+          if (!isBroker) {
+            router.push(`/${locale}/post-property`);
+            return;
+          }
+        }
+        performRedirect(returnTo);
       } else {
         router.push(`/${locale}`);
       }

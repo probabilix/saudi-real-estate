@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { notFound, useRouter, usePathname } from 'next/navigation';
+import { notFound, useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/use-auth';
 import { MANAGED_MODE } from '@/lib/config';
@@ -23,6 +23,37 @@ import MediaModal from '@/components/listings/MediaModal';
 import BrochureModal from '@/components/listings/BrochureModal';
 import ChatWidget from '@/components/chat/ChatWidget';
 
+const AMENITY_METADATA: Record<string, { labelEn: string; labelAr: string }> = {
+  swimming_pool: { labelEn: 'Swimming Pool', labelAr: 'مسبح' },
+  gym: { labelEn: 'Gym / Fitness Center', labelAr: 'صالة رياضية' },
+  parking: { labelEn: 'Covered Parking', labelAr: 'موقف سيارات' },
+  wifi: { labelEn: 'WiFi', labelAr: 'إنترنت لاسلكي' },
+  private_garden: { labelEn: 'Private Garden', labelAr: 'حديقة خاصة' },
+  maid_room: { labelEn: 'Maid Room', labelAr: 'غرفة خادمة' },
+  smart_home: { labelEn: 'Smart Home', labelAr: 'منزل ذكي' },
+  elevator: { labelEn: 'Elevator', labelAr: 'مصعد' },
+  security: { labelEn: '24/7 Security', labelAr: 'حراسة وأمن' },
+  central_ac: { labelEn: 'Central AC', labelAr: 'تكييف مركزي' },
+  laundry: { labelEn: 'Laundry Room', labelAr: 'غرفة غسيل' },
+  pets_allowed: { labelEn: 'Pets Allowed', labelAr: 'مسموح بالحيوانات' },
+  basement: { labelEn: 'Basement', labelAr: 'قبو' },
+  balcony: { labelEn: 'Balcony', labelAr: 'شرفة / بلكونة' },
+  power: { labelEn: 'Power Backup', labelAr: 'مولد كهرباء' },
+  gas: { labelEn: 'Central Gas', labelAr: 'غاز مركزي' },
+  tv_room: { labelEn: 'TV Room', labelAr: 'غرفة تلفزيون' },
+  lounge: { labelEn: 'Lounge', labelAr: 'صالة استقبال' },
+  kitchen_plus: { labelEn: 'Equipped Kitchen', labelAr: 'مطبخ مجهز' },
+  driver_room: { labelEn: 'Driver Room', labelAr: 'غرفة سائق' },
+  concierge: { labelEn: 'Concierge Service', labelAr: 'خدمة بواب' },
+  study_room: { labelEn: 'Study Room', labelAr: 'غرفة دراسة' },
+  view_of_landmark: { labelEn: 'Landmark View', labelAr: 'إطلالة على معلم' },
+  walk_in_closet: { labelEn: 'Walk-in Closet', labelAr: 'غرفة ملابس' },
+  waste_disposal: { labelEn: 'Waste Disposal', labelAr: 'التخلص من النفايات' },
+  built_in_wardrobes: { labelEn: 'Built-in Wardrobes', labelAr: 'خزائن مدمجة' },
+  kitchen_appliances: { labelEn: 'Kitchen Appliances', labelAr: 'أجهزة مطبخ' },
+  barbecue_area: { labelEn: 'Barbecue Area', labelAr: 'منطقة شواء' },
+};
+
 export default function ListingDetailPage({ params: { id, locale } }: { params: { id: string; locale: string } }) {
   const t = useTranslations('listing');
   const tCommon = useTranslations('common');
@@ -30,9 +61,18 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const { isAuthenticated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Auto-open AI chat if ?ai=true is in the query params
+  useEffect(() => {
+    if (searchParams && searchParams.get('ai') === 'true') {
+      setChatOpen(true);
+    }
+  }, [searchParams]);
 
   const [listing, setListing] = useState<ListingWithOwner | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxTab, setLightboxTab] = useState<'photos' | 'video' | 'location'>('photos');
   const [brochureModalOpen, setBrochureModalOpen] = useState(false);
@@ -61,7 +101,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         if (adLink) setSidebarAdLink(adLink);
         if (adAspect) setSidebarAdAspectRatio(adAspect);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleShare = async (e: React.MouseEvent) => {
@@ -92,9 +132,26 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
   // Additional State & Refs
   const [similarListings, setSimilarListings] = useState<Listing[]>([]);
+  const [siblingLayouts, setSiblingLayouts] = useState<any[]>([]);
   const [loanAmount, setLoanAmount] = useState(0);
   const [loanPeriod, setLoanPeriod] = useState(15);
   const [isToggling, setIsToggling] = useState(false);
+
+  useEffect(() => {
+    const projId = listing?.projectId;
+    if (!projId) return;
+    async function fetchProject() {
+      try {
+        const res = await (api as any).getProjectById(projId);
+        if (res.success && res.data?.layouts) {
+          setSiblingLayouts(res.data.layouts.filter((lay: any) => lay.id !== id));
+        }
+      } catch (err) {
+        console.error('Failed to fetch project layouts:', err);
+      }
+    }
+    fetchProject();
+  }, [listing?.projectId, id]);
 
   const sectionRefs = {
     overview: useRef<HTMLDivElement>(null),
@@ -129,12 +186,16 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
   useEffect(() => {
     async function fetchDetail() {
-      // ... existing fetchDetail logic ...
       setLoading(true);
       try {
         const res = await api.getListingById(id);
         if (res.success && res.data) {
           const l = res.data as ListingWithOwner & { isFavorited?: boolean; isQualified?: boolean };
+          if (l.projectId) {
+            setIsRedirecting(true);
+            router.replace(`/${locale}/projects/${l.projectId}?layout=${l.id}`);
+            return;
+          }
           setListing(l);
           setShortlisted(!!l.isFavorited);
 
@@ -226,7 +287,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
     }
   }, [listing?.price]);
 
-  if (loading) {
+  if (loading || isRedirecting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white">
         <Loader2 className="w-16 h-16 text-primary-600 animate-spin mb-4" />
@@ -287,6 +348,14 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 <>
                   <ChevronRight className={`w-3 h-3 ${locale === 'ar' ? 'rotate-180' : ''}`} />
                   <span>{locale === 'ar' ? (listing.arDistrict || listing.district) : (listing.district || listing.arDistrict)}</span>
+                </>
+              )}
+              {(listing as any).projectId && (listing as any).project && (
+                <>
+                  <ChevronRight className={`w-3 h-3 ${locale === 'ar' ? 'rotate-180' : ''}`} />
+                  <Link href={`/${locale}/projects/${(listing as any).projectId}`} className="hover:text-primary-600 transition-colors">
+                    {locale === 'ar' ? (listing as any).project.nameAr : (listing as any).project.nameEn}
+                  </Link>
                 </>
               )}
               <ChevronRight className={`w-3 h-3 ${locale === 'ar' ? 'rotate-180' : ''}`} />
@@ -473,12 +542,18 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {Object.entries(l.amenities || {}).filter(([, val]) => val).slice(0, 8).map(([key], idx) => (
-                  <div key={idx} className="bg-surface-50 p-3 md:p-4 rounded-xl border border-surface-200 flex items-center gap-2.5 group hover:bg-white hover:shadow-md transition-all">
-                    <CheckCircle className="w-4 h-4 text-primary-500 shrink-0" />
-                    <span className="text-[10px] md:text-xs font-bold uppercase tracking-wide text-charcoal-muted leading-tight">{key.replace(/_/g, ' ')}</span>
-                  </div>
-                ))}
+                {Object.entries(l.amenities || {}).filter(([, val]) => val).slice(0, 8).map(([key], idx) => {
+                  const metadata = AMENITY_METADATA[key];
+                  const label = metadata
+                    ? (locale === 'ar' ? metadata.labelAr : metadata.labelEn)
+                    : key.replace(/_/g, ' ');
+                  return (
+                    <div key={idx} className="bg-surface-50 p-3 md:p-4 rounded-xl border border-surface-200 flex items-center gap-2.5 group hover:bg-white hover:shadow-md transition-all">
+                      <CheckCircle className="w-4 h-4 text-primary-500 shrink-0" />
+                      <span className="text-[10px] md:text-xs font-bold uppercase tracking-wide text-charcoal-muted leading-tight">{label}</span>
+                    </div>
+                  );
+                })}
               </div>
               {Object.values(l.amenities || {}).filter(Boolean).length > 8 && (
                 <button
@@ -666,6 +741,57 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               </div>
             )}
 
+            {/* Sibling Layouts in Project */}
+            {(listing as any).projectId && siblingLayouts.length > 0 && (
+              <div className="space-y-12 pt-12 border-t border-surface-200">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-600 block mb-1">
+                    {locale === 'ar' ? 'مخططات أخرى في نفس المشروع' : 'Other Layouts in This Project'}
+                  </span>
+                  <h3 className="text-3xl font-bold text-charcoal font-serif">
+                    {locale === 'ar' ? 'خيارات الوحدات المتاحة' : 'Available Unit Layouts'}
+                  </h3>
+                </div>
+
+                <div className="flex gap-6 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+                  {siblingLayouts.map((layout) => {
+                    const layTitle = locale === 'ar' ? layout.titleAr : (layout.titleEn || layout.titleAr);
+                    const layPhoto = layout.photos?.[0] || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80';
+                    return (
+                      <div key={layout.id} className="w-80 shrink-0 bg-white border border-surface-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all flex flex-col group relative">
+                        <Link href={`/${locale}/listings/${layout.id}`} className="absolute inset-0 z-10" />
+                        <div className="relative h-44 overflow-hidden">
+                          <Image src={layPhoto} alt={layTitle} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <div className="p-4 flex flex-col flex-1">
+                          <span className="text-[10px] font-bold text-primary-600 uppercase tracking-widest block mb-1">
+                            {layout.shortId}
+                          </span>
+                          <h4 className="text-sm font-bold text-charcoal truncate mb-2 group-hover:text-primary-600 transition-colors">
+                            {layTitle}
+                          </h4>
+                          <div className="flex items-baseline gap-1 mb-4">
+                            <span className="text-lg font-black text-charcoal">
+                              {formatPriceCompact(layout.price, locale as 'en' | 'ar')}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 pt-3 border-t border-surface-100 mt-auto text-xs text-charcoal-muted">
+                            {layout.bedrooms !== null && (
+                              <span>{layout.bedrooms} {locale === 'ar' ? 'غرف' : 'Beds'}</span>
+                            )}
+                            {layout.bedrooms !== null && layout.areaSqm !== null && <span>•</span>}
+                            {layout.areaSqm !== null && (
+                              <span>{Number(layout.areaSqm).toFixed(0)} {tCommon('sqm')}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Related Properties */}
             {similarListings.length > 0 && (
               <div className="space-y-12 pt-12 border-t border-surface-200">
@@ -779,21 +905,20 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               <span className="absolute top-3 right-3 bg-slate-950/40 backdrop-blur-md text-[8px] font-black text-white px-2.5 py-1 rounded-full uppercase tracking-widest z-10">
                 {locale === 'ar' ? 'إعلان موثق' : 'PROMOTION'}
               </span>
-              <Link 
+              <Link
                 href={sidebarAdLink || `/${locale}/contact`}
                 target={sidebarAdLink?.startsWith('http') ? '_blank' : undefined}
                 rel={sidebarAdLink?.startsWith('http') ? 'noopener noreferrer' : undefined}
                 className="block w-full overflow-hidden"
               >
-                <img 
-                  src={sidebarAdImage || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'} 
+                <img
+                  src={sidebarAdImage || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'}
                   alt="Saudi Real Estate Dynamic Banner Advertisement"
-                  className={`w-full object-cover group-hover:scale-105 transition-transform duration-500 ${
-                    sidebarAdAspectRatio === '16_9' ? 'aspect-[16/9] max-h-[320px]' :
-                    sidebarAdAspectRatio === '1_1' ? 'aspect-[1/1] max-h-[400px]' :
-                    sidebarAdAspectRatio === '3_4' ? 'aspect-[3/4] max-h-[450px]' :
-                    'h-auto max-h-[450px]'
-                  }`} 
+                  className={`w-full object-cover group-hover:scale-105 transition-transform duration-500 ${sidebarAdAspectRatio === '16_9' ? 'aspect-[16/9] max-h-[320px]' :
+                      sidebarAdAspectRatio === '1_1' ? 'aspect-[1/1] max-h-[400px]' :
+                        sidebarAdAspectRatio === '3_4' ? 'aspect-[3/4] max-h-[450px]' :
+                          'h-auto max-h-[450px]'
+                    }`}
                 />
               </Link>
             </div>
@@ -831,12 +956,18 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               </button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {Object.entries(l.amenities || {}).filter(([, val]) => val).map(([key], idx) => (
-                <div key={idx} className="flex items-center gap-2.5 p-3 bg-surface-50 rounded-xl border border-surface-100">
-                  <CheckCircle className="w-4 h-4 text-primary-500 shrink-0" />
-                  <span className="text-xs font-bold text-charcoal capitalize">{key.replace(/_/g, ' ')}</span>
-                </div>
-              ))}
+              {Object.entries(l.amenities || {}).filter(([, val]) => val).map(([key], idx) => {
+                const metadata = AMENITY_METADATA[key];
+                const label = metadata
+                  ? (locale === 'ar' ? metadata.labelAr : metadata.labelEn)
+                  : key.replace(/_/g, ' ');
+                return (
+                  <div key={idx} className="flex items-center gap-2.5 p-3 bg-surface-50 rounded-xl border border-surface-100">
+                    <CheckCircle className="w-4 h-4 text-primary-500 shrink-0" />
+                    <span className="text-xs font-bold text-charcoal capitalize">{label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -911,7 +1042,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         open={chatOpen}
         setOpen={setChatOpen}
         mode="qualification"
-        context={{ id: l.id, title: title }}
+        context={{ id: l.id, title: title, projectId: (l as any).projectId }}
         onQualified={handleQualificationSuccess}
       />
 

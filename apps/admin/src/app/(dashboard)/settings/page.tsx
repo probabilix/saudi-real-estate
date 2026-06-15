@@ -51,10 +51,12 @@ export default function SettingsPage() {
         subscription_plans: 'Subscription Plans',
         social_links: 'Social Media Links',
         ai_qualification_webhook: 'Lead Qualification Webhook',
+        ai_project_qualification_webhook: 'Project Qualification Webhook',
         ai_general_assistant_webhook: 'General Assistant Webhook',
         n8n_webhook_secret: 'Webhook Secret Key',
         n8n_api_key: 'N8N API Key',
         listing_cost_credits: 'Listing Cost Credits',
+        free_postings_limit: 'Free Postings Limit',
         contact_phone: 'Contact Phone Number',
         contact_email: 'Contact Email Address',
         contact_location: 'Office Location Address',
@@ -63,7 +65,8 @@ export default function SettingsPage() {
         sidebar_ad_aspect_ratio: 'Ad Aspect Ratio Mode',
         homepage_featured_articles: 'Homepage Featured Articles',
         google_client_id: 'Google Client ID',
-        google_client_secret: 'Google Client Secret'
+        google_client_secret: 'Google Client Secret',
+        resend_api_key: 'Resend API Key'
       };
       const friendlyName = SETTING_NAMES[key] || key;
       setSuccess(`Updated ${friendlyName} successfully`);
@@ -158,6 +161,23 @@ export default function SettingsPage() {
               </div>
 
               <div>
+                <label className="admin-label">Project Qualification Webhook (n8n)</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    className="admin-input" 
+                    placeholder="https://n8n.your-instance.com/webhook/..."
+                    defaultValue={getSettingValue('ai_project_qualification_webhook')}
+                    onBlur={(e) => handleUpdateSetting('ai_project_qualification_webhook', e.target.value)}
+                  />
+                  <button className="btn-secondary px-3">
+                    {saving === 'ai_project_qualification_webhook' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-surface-400 mt-2">Used on project pages to vet leads for specific layouts within the compound</p>
+              </div>
+
+              <div>
                 <label className="admin-label">General Assistant Webhook (n8n)</label>
                 <div className="flex gap-2">
                   <input 
@@ -207,6 +227,38 @@ export default function SettingsPage() {
                 </div>
                 <p className="text-[10px] text-surface-400 mt-2">Permits the backend to communicate programmatically with the self-hosted n8n API.</p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Email & Delivery Configuration */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+              <Mail className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-surface-900">Email Service Integration</h2>
+              <p className="text-xs text-surface-500">Configure transactional and security email delivery via Resend</p>
+            </div>
+          </div>
+          
+          <div className="admin-card p-6 space-y-6">
+            <div>
+              <label className="admin-label">Resend API Key</label>
+              <div className="flex gap-2">
+                <input 
+                  type="password" 
+                  className="admin-input" 
+                  placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxx"
+                  defaultValue={getSettingValue('resend_api_key')}
+                  onBlur={(e) => handleUpdateSetting('resend_api_key', e.target.value)}
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'resend_api_key' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">Allows the platform to send welcome, verification, and password reset OTP emails securely.</p>
             </div>
           </div>
         </section>
@@ -305,6 +357,22 @@ export default function SettingsPage() {
                 </button>
               </div>
               <p className="text-[10px] text-surface-400 mt-2">Credits deducted per property published</p>
+            </div>
+
+            <div>
+              <label className="admin-label">Free Postings Limit</label>
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  className="admin-input" 
+                  defaultValue={getSettingValue('free_postings_limit')}
+                  onBlur={(e) => handleUpdateSetting('free_postings_limit', e.target.value)}
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'free_postings_limit' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">Initial number of listings a broker can post for free</p>
             </div>
           </div>
         </section>

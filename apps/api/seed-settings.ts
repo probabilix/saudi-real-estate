@@ -65,7 +65,6 @@ async function seedSettings() {
       set: { value: 'sales@saudi-re.com' }
     });
 
-    // 5. AI Webhooks
     await db.insert(systemSettings).values({
       key: 'ai_qualification_webhook',
       value: '',
@@ -73,6 +72,15 @@ async function seedSettings() {
     }).onConflictDoUpdate({
       target: systemSettings.key,
       set: { description: 'N8N Webhook URL for lead qualification chat. Used on property detail pages.' }
+    });
+
+    await db.insert(systemSettings).values({
+      key: 'ai_project_qualification_webhook',
+      value: '',
+      description: 'N8N Webhook URL for project-level qualification chat. Used on project detail pages.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { description: 'N8N Webhook URL for project-level qualification chat. Used on project detail pages.' }
     });
 
     await db.insert(systemSettings).values({

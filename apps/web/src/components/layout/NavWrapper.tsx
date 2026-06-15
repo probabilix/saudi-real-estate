@@ -15,6 +15,7 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
   // Hide header/footer on auth and legal pages to maintain the "perfectly sorted" UI
   const isMinimalPage = pathname.includes('/login') ||
     pathname.includes('/register') ||
+    pathname.includes('/forgot-password') ||
     pathname.includes('/verify') ||
     pathname.includes('/post-property') ||
     pathname.includes('/edit-property');

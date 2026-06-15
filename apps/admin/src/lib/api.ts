@@ -56,13 +56,14 @@ export const adminApi = {
   getStats: () => request<AdminStats>('/admin/stats'),
 
   // ── Users ──
-  getUsers: (params?: { role?: string; status?: string; search?: string; page?: number; limit?: number }) => {
+  getUsers: (params?: { role?: string; status?: string; search?: string; page?: number; limit?: number; hasLicense?: string }) => {
     const q = new URLSearchParams();
     if (params?.role) q.set('role', params.role);
     if (params?.status) q.set('status', params.status);
     if (params?.search) q.set('search', params.search);
     if (params?.page) q.set('page', String(params.page));
     if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.hasLicense) q.set('hasLicense', params.hasLicense);
     return request<{ users: AdminUser[]; total: number; page: number }>(`/admin/users?${q}`);
   },
 
@@ -85,6 +86,18 @@ export const adminApi = {
     request(`/admin/users/${userId}/subscription`, {
       method: 'PATCH',
       body: JSON.stringify({ tier }),
+    }),
+
+  createUser: (data: { name: string; email: string; phone?: string; role: string; password?: string; regaLicence?: string }) =>
+    request<AdminUser>('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateUser: (userId: string, data: { name?: string; phone?: string; role?: string; password?: string; regaLicence?: string }) =>
+    request<AdminUser>(`/admin/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     }),
 
   // ── Listings ──
@@ -200,6 +213,72 @@ export const adminApi = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+
+  // ── Projects & Inventory Units ──
+  getProjects: () => request<AdminProject[]>('/listings/projects'),
+  getProjectDetails: (id: string) =>
+    request<{ project: AdminProject; layouts: AdminListing[] }>(`/listings/projects/${id}`),
+  updateProject: (id: string, data: Partial<AdminProject>) =>
+    request<{ success: boolean; data: AdminProject }>(`/listings/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  createProject: (data: { nameEn: string; nameAr: string; descriptionEn?: string; descriptionAr?: string; city: string; district?: string; mapEmbedUrl?: string }) =>
+    request<AdminProject>('/listings/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  createProjectBulk: (data: {
+    project: {
+      nameEn: string;
+      nameAr: string;
+      city: string;
+      district?: string;
+      descriptionEn?: string;
+      descriptionAr?: string;
+      brochureUrl?: string;
+      regaFalLicense?: string;
+      amenities?: Record<string, boolean>;
+      photos?: string[];
+      completionStatus?: 'READY' | 'OFF_PLAN' | 'UNDER_CONSTRUCTION';
+      expectedDelivery?: string;
+      totalUnits?: number;
+      mapEmbedUrl?: string;
+    };
+    layouts: Array<{
+      labelEn: string;
+      labelAr: string;
+      price: number;
+      areaSqm?: number;
+      bedrooms?: number;
+      bathrooms?: number;
+      photos?: string[];
+      completionStatus?: 'READY' | 'OFF_PLAN' | 'UNDER_CONSTRUCTION';
+      descriptionEn?: string;
+      descriptionAr?: string;
+    }>;
+    ownerId?: string;
+  }) =>
+    request<{ success: boolean; data: { project: AdminProject; listings: any[] } }>('/listings/projects/bulk', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getListingUnits: (listingId: string) =>
+    request<AdminProjectUnit[]>(`/listings/${listingId}/units`),
+  addListingUnits: (listingId: string, units: Array<{ unitNumber: string; floor: number; type: string; status?: string; price?: number }>) =>
+    request<AdminProjectUnit[]>(`/listings/${listingId}/units`, {
+      method: 'POST',
+      body: JSON.stringify({ units }),
+    }),
+  updateListingUnit: (listingId: string, unitId: string, data: { unitNumber?: string; floor?: number; type?: string; status?: string; price?: number | null }) =>
+    request<AdminProjectUnit>(`/listings/${listingId}/units/${unitId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteListingUnit: (listingId: string, unitId: string) =>
+    request(`/listings/${listingId}/units/${unitId}`, {
+      method: 'DELETE',
+    }),
 };
 
 export interface ContactSubmission {
@@ -236,10 +315,16 @@ export interface AdminUser {
   verificationStatus: string;
   regaLicence: string | null;
   regaVerified: boolean;
+  isReapplied: boolean;
   subscriptionTier: string;
   creditsBalance: number;
   createdAt: string;
   listingCount?: number;
+  gender?: string | null;
+  nationality?: string | null;
+  city?: string | null;
+  bioEn?: string | null;
+  bioAr?: string | null;
 }
 
 export interface AdminListing {
@@ -261,6 +346,7 @@ export interface AdminListing {
   createdAt: string;
   owner: { id: string; name: string | null; email: string; role: string } | null;
   aiQualificationActive?: boolean;
+  projectId?: string | null;
 }
 
 export interface SystemSetting {
@@ -359,4 +445,37 @@ export interface AdminChatMessage {
   sender: 'USER' | 'ASSISTANT';
   content: string;
   createdAt: string;
+}
+
+export interface AdminProject {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  city: string;
+  district: string | null;
+  mapEmbedUrl: string | null;
+  brochureUrl?: string | null;
+  regaFalLicense?: string | null;
+  amenities?: Record<string, boolean> | null;
+  photos?: string[] | null;
+  completionStatus?: 'READY' | 'OFF_PLAN' | 'UNDER_CONSTRUCTION' | null;
+  expectedDelivery?: string | null;
+  totalUnits?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminProjectUnit {
+  id: string;
+  projectId: string;
+  listingId: string | null;
+  unitNumber: string;
+  floor: number;
+  type: string;
+  status: string;
+  price: number | null;
+  createdAt: string;
+  updatedAt: string;
 }

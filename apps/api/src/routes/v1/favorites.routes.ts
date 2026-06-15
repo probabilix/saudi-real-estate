@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { favorites, listings, newsFavorites, news } from '../../db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { favorites, listings, newsFavorites, news, projectFavorites, projects } from '../../db/schema';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { authenticateJWT } from '../../middleware/auth.middleware';
 
 export default async function favoritesRoutes(app: FastifyInstance) {
@@ -200,6 +200,120 @@ export default async function favoritesRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to fetch news favorites' });
+    }
+  });
+
+  /**
+   * POST /api/v1/favorites/projects/toggle
+   * Toggles a project in the user's favorites
+   */
+  app.post('/projects/toggle', { preHandler: [authenticateJWT] }, async (request, reply) => {
+    const { projectId } = request.body as { projectId: string };
+    const userId = request.user?.userId;
+
+    if (!projectId) {
+      return reply.code(400).send({ success: false, message: 'Project ID is required' });
+    }
+
+    try {
+      // 1. Check if it's already favorited
+      const existing = await db.query.projectFavorites.findFirst({
+        where: and(
+          eq(projectFavorites.userId, userId as string),
+          eq(projectFavorites.projectId, projectId)
+        ),
+      });
+
+      if (existing) {
+        // Remove from favorites
+        await db.delete(projectFavorites)
+          .where(and(
+            eq(projectFavorites.userId, userId as string),
+            eq(projectFavorites.projectId, projectId)
+          ));
+        
+        return reply.send({ 
+          success: true, 
+          message: 'Removed from favorites',
+          data: { isFavorited: false }
+        });
+      } else {
+        // Add to favorites
+        // Verify project exists first
+        const projectItem = await db.query.projects.findFirst({
+          where: eq(projects.id, projectId)
+        });
+
+        if (!projectItem) {
+          return reply.code(404).send({ success: false, message: 'Project not found' });
+        }
+
+        await db.insert(projectFavorites).values({
+          userId: userId as string,
+          projectId: projectId,
+        });
+
+        return reply.send({ 
+          success: true, 
+          message: 'Added to favorites',
+          data: { isFavorited: true }
+        });
+      }
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  /**
+   * GET /api/v1/favorites/projects
+   * Returns the list of favorited projects for the current user
+   */
+  app.get('/projects', { preHandler: [authenticateJWT] }, async (request, reply) => {
+    const userId = request.user?.userId;
+
+    try {
+      const results = await db.select({
+        project: projects
+      })
+      .from(projectFavorites)
+      .innerJoin(projects, eq(projectFavorites.projectId, projects.id))
+      .where(eq(projectFavorites.userId, userId as string))
+      .orderBy(desc(projectFavorites.createdAt));
+
+      const items = await Promise.all(
+        results.map(async (r) => {
+          const layouts = await db.select()
+            .from(listings)
+            .where(and(
+              eq(listings.projectId, r.project.id),
+              eq(listings.status, 'ACTIVE'),
+              sql`${listings.deletedAt} IS NULL`
+            ));
+
+          const minPrice = layouts.reduce((min, l) => l.price && l.price < min ? l.price : min, Infinity);
+          const bedrooms = layouts.map(l => l.bedrooms).filter((b): b is number => b != null);
+          const minBedrooms = bedrooms.length > 0 ? Math.min(...bedrooms) : undefined;
+          const maxBedrooms = bedrooms.length > 0 ? Math.max(...bedrooms) : undefined;
+
+          return {
+            ...r.project,
+            layoutCount: layouts.length,
+            minPrice: minPrice === Infinity ? 0 : minPrice,
+            minBedrooms,
+            maxBedrooms,
+            isFavorited: true
+          };
+        })
+      );
+
+      return reply.send({
+        success: true,
+        data: { items }
+      });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch project favorites' });
     }
   });
 }

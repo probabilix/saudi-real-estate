@@ -23,11 +23,18 @@ export default async function userRoutes(app: FastifyInstance) {
     }
 
     try {
+      // Check if user is reapplying after rejection
+      const existingUser = await db.query.users.findFirst({
+        where: eq(users.id, userId as string)
+      });
+      const isReapplied = existingUser?.verificationStatus === 'REJECTED';
+
       // 1. Update user record
       const updatedUsers = await db.update(users)
         .set({ 
           regaLicence: licenseNumber,
           verificationStatus: 'PENDING',
+          isReapplied,
           updatedAt: new Date()
         })
         .where(eq(users.id, userId as string))
@@ -213,6 +220,45 @@ export default async function userRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  /**
+   * POST /api/v1/user/purchase-credits
+   * Simulates purchasing credits and adds them to the user's credits balance.
+   */
+  app.post('/purchase-credits', { preHandler: [authenticateJWT] }, async (request, reply) => {
+    const userId = request.user?.userId;
+    const { credits } = request.body as { credits: number };
+
+    if (!credits || typeof credits !== 'number' || credits <= 0) {
+      return reply.code(400).send({ success: false, message: 'Valid credits amount is required' });
+    }
+
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, userId as string)).limit(1);
+      if (!user) {
+        return reply.code(404).send({ success: false, message: 'User not found' });
+      }
+
+      const currentBalance = user.creditsBalance || 0;
+      const newBalance = currentBalance + credits;
+
+      await db.update(users)
+        .set({ 
+          creditsBalance: newBalance,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId as string));
+
+      return reply.send({ 
+        success: true, 
+        message: `Successfully purchased ${credits.toLocaleString()} credits.`,
+        data: { newBalance }
+      });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to process purchase' });
     }
   });
 

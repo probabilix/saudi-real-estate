@@ -22,6 +22,11 @@ export default function FeaturedListingsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [homepageLimit, setHomepageLimit] = useState<number>(6);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    setToken(localStorage.getItem('adminToken'));
+  }, []);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     type: 'unfeature';
@@ -393,7 +398,7 @@ export default function FeaturedListingsPage() {
                             <ExternalLink className="w-4 h-4" />
                           </a>
                           <a 
-                            href={`${WEB_URL}/en/edit-property/${listing.id}?from=admin`} 
+                            href={`${WEB_URL}/en/edit-property/${listing.id}?from=admin${token ? `&token=${token}` : ''}`} 
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-ghost text-surface-400 hover:text-primary-600" 

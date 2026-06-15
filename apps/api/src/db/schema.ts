@@ -17,7 +17,7 @@ export const tsvector = customType<{ data: string }>({
 });
 
 // ── Enums (Align with Master Architecture) ──
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER']);
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER', 'SALES_AGENT']);
 export const listingTypeEnum = pgEnum('listing_type', [
   'APARTMENT', 'VILLA', 'FLOOR', 'RESIDENTIAL_BUILDING', 'RESIDENTIAL_LAND', 
   'REST_HOUSE', 'CHALET', 'ROOM', 'TOWNHOUSE', 'DUPLEX',
@@ -28,7 +28,19 @@ export const listingTypeEnum = pgEnum('listing_type', [
 export const listingStatusEnum = pgEnum('listing_status', ['ACTIVE', 'SOLD', 'RENTED', 'DRAFT', 'FLAGGED', 'REMOVED']);
 export const listingPurposeEnum = pgEnum('listing_purpose', ['SALE', 'RENT', 'LEASE']);
 export const translationStatusEnum = pgEnum('translation_status', ['PENDING', 'DONE', 'FAILED']);
-export const leadStatusEnum = pgEnum('lead_status', ['NEW', 'VIEWED', 'CONTACTED', 'CLOSED_WON', 'CLOSED_LOST']);
+export const leadStatusEnum = pgEnum('lead_status', [
+  'NEW',
+  'VIEWED',
+  'CONTACTED',
+  'ATTEMPTED_CONTACT',
+  'AGENT_CONTACTED',
+  'SITE_VISIT_SCHEDULED',
+  'PROPERTY_VIEWING',
+  'OFFER_SUBMITTED',
+  'CLOSED_WON',
+  'CLOSED_LOST',
+  'AI_DISQUALIFIED'
+]);
 export const buyerPurposeEnum = pgEnum('buyer_purpose', ['OWN_USE', 'INVESTMENT', 'RENTAL_INCOME']);
 export const subscriptionTierEnum = pgEnum('subscription_tier', ['FREE', 'STARTER', 'PRO', 'ELITE']);
 export const placementTypeEnum = pgEnum('placement_type', ['HOMEPAGE_BANNER', 'TOP_OF_SEARCH', 'CITY_SPOTLIGHT']);
@@ -56,6 +68,7 @@ export const users = pgTable('users', {
   name: varchar('name', { length: 255 }),
   regaLicence: varchar('rega_licence', { length: 100 }),
   regaVerified: boolean('rega_verified').default(false),
+  isReapplied: boolean('is_reapplied').default(false),
   subscriptionTier: subscriptionTierEnum('subscription_tier').default('FREE'),
   subscriptionUntil: timestamp('subscription_until', { withTimezone: true }),
   avatarUrl: text('avatar_url'),
@@ -105,10 +118,35 @@ export const brokerProfiles = pgTable('broker_profiles', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
+// ── Projects Table ──
+export const projects = pgTable('projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  nameEn: varchar('name_en', { length: 255 }).notNull(),
+  nameAr: varchar('name_ar', { length: 255 }).notNull(),
+  descriptionEn: text('description_en'),
+  descriptionAr: text('description_ar'),
+  city: varchar('city', { length: 100 }).notNull(),
+  district: varchar('district', { length: 100 }),
+  mapEmbedUrl: text('map_embed_url'),
+
+  // ── Project-level shared fields (uploaded once, inherited by all layouts) ──
+  brochureUrl: text('brochure_url'),
+  regaFalLicense: varchar('rega_fal_license', { length: 100 }),
+  amenities: jsonb('amenities').default({}),
+  photos: text('photos').array().default(sql`'{}'::text[]`),
+  completionStatus: completionStatusEnum('completion_status'),
+  expectedDelivery: varchar('expected_delivery', { length: 50 }),
+  totalUnits: integer('total_units'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
 // ── Listings Table ──
 export const listings = pgTable('listings', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: uuid('owner_id').references(() => users.id).notNull(),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
   type: listingTypeEnum('type').notNull(),
   purpose: listingPurposeEnum('purpose').notNull(),
   status: listingStatusEnum('status').default('DRAFT'),
@@ -184,6 +222,20 @@ export const listings = pgTable('listings', {
   shortIdIdx: index('short_id_idx').on(table.shortId),
 }));
 
+// ── Project Units Table ──
+export const projectUnits = pgTable('project_units', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  listingId: uuid('listing_id').references(() => listings.id, { onDelete: 'cascade' }),
+  unitNumber: varchar('unit_number', { length: 50 }).notNull(),
+  floor: smallint('floor').notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // e.g. '3BHK', '4BHK', 'Studio', 'Penthouse'
+  status: varchar('status', { length: 50 }).default('AVAILABLE').notNull(), // 'AVAILABLE', 'RESERVED', 'SOLD'
+  price: bigint('price', { mode: 'number' }), // Specific price override for this unit
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
 // ── Buyer Profiles Table ──
 export const buyerProfiles = pgTable('buyer_profiles', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -203,6 +255,13 @@ export const buyerProfiles = pgTable('buyer_profiles', {
   lastSeen: timestamp('last_seen', { withTimezone: true }),
   lastAiSummary: text('last_ai_summary'),
   summaryUpdatedAt: timestamp('summary_updated_at', { withTimezone: true }),
+
+  // ── New qualification preference fields (collected by AI before qualifying) ──
+  completionStatusPreference: varchar('completion_status_preference', { length: 50 }),
+  // Values: 'READY' | 'OFF_PLAN' | null (not yet specified)
+  districtPreference: varchar('district_preference', { length: 100 }),
+  // Specific district within city, e.g. 'Al Malqa', 'Hittin'
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
@@ -213,9 +272,18 @@ export const chatMessages = pgTable('chat_messages', {
   sender: senderTypeEnum('sender').notNull(),
   content: text('content').notNull(),
   chatType: chatTypeEnum('chat_type').default('LISTING').notNull(),
+
+  // ── Property context tagging (fixes CRM mixed chat history bug) ──
+  // listingId: set when buyer is on a specific layout/listing page
+  // projectId: set for both project-page chats AND layout-page chats (if listing belongs to a project)
+  listingId: uuid('listing_id').references(() => listings.id, { onDelete: 'set null' }),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (table) => ({
   buyerProfileIdx: index('chat_msg_buyer_profile_idx').on(table.buyerProfileId),
+  listingIdx: index('chat_msg_listing_idx').on(table.listingId),
+  projectIdx: index('chat_msg_project_idx').on(table.projectId),
 }));
 
 // ── Leads Table ──
@@ -233,6 +301,10 @@ export const leads = pgTable('leads', {
   notifiedWhatsapp: boolean('notified_whatsapp').default(false),
   notifiedEmail: boolean('notified_email').default(false),
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
+
+  // ── Project linkage (for project-level leads) ──
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
@@ -308,6 +380,16 @@ export const newsFavorites = pgTable('news_favorites', {
   userNewsIdx: index('user_news_idx').on(table.userId, table.newsId),
 }));
 
+// ── Project Favorites Table ──
+export const projectFavorites = pgTable('project_favorites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  projectId: uuid('project_id').references(() => projects.id).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  userProjectIdx: index('user_project_idx').on(table.userId, table.projectId),
+}));
+
 
 // ── Relations ──
 
@@ -330,6 +412,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   featuredPlacements: many(featuredPlacements),
   favorites: many(favorites),
   newsFavorites: many(newsFavorites),
+  projectFavorites: many(projectFavorites),
 }));
 
 export const brokerProfilesRelations = relations(brokerProfiles, ({ one }) => ({
@@ -339,14 +422,36 @@ export const brokerProfilesRelations = relations(brokerProfiles, ({ one }) => ({
   }),
 }));
 
+export const projectsRelations = relations(projects, ({ many }) => ({
+  listings: many(listings),
+  units: many(projectUnits),
+  projectFavorites: many(projectFavorites),
+}));
+
 export const listingsRelations = relations(listings, ({ one, many }) => ({
   owner: one(users, {
     fields: [listings.ownerId],
     references: [users.id],
   }),
+  project: one(projects, {
+    fields: [listings.projectId],
+    references: [projects.id],
+  }),
+  units: many(projectUnits),
   leads: many(leads),
   featuredPlacements: many(featuredPlacements),
   favorites: many(favorites),
+}));
+
+export const projectUnitsRelations = relations(projectUnits, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectUnits.projectId],
+    references: [projects.id],
+  }),
+  listing: one(listings, {
+    fields: [projectUnits.listingId],
+    references: [listings.id],
+  }),
 }));
 
 export const favoritesRelations = relations(favorites, ({ one }) => ({
@@ -371,6 +476,17 @@ export const newsFavoritesRelations = relations(newsFavorites, ({ one }) => ({
   }),
 }));
 
+export const projectFavoritesRelations = relations(projectFavorites, ({ one }) => ({
+  user: one(users, {
+    fields: [projectFavorites.userId],
+    references: [users.id],
+  }),
+  project: one(projects, {
+    fields: [projectFavorites.projectId],
+    references: [projects.id],
+  }),
+}));
+
 export const leadsRelations = relations(leads, ({ one }) => ({
   buyerProfile: one(buyerProfiles, {
     fields: [leads.buyerProfileId],
@@ -383,6 +499,10 @@ export const leadsRelations = relations(leads, ({ one }) => ({
   broker: one(users, {
     fields: [leads.brokerId],
     references: [users.id],
+  }),
+  project: one(projects, {
+    fields: [leads.projectId],
+    references: [projects.id],
   }),
 }));
 
@@ -399,6 +519,14 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   buyerProfile: one(buyerProfiles, {
     fields: [chatMessages.buyerProfileId],
     references: [buyerProfiles.id],
+  }),
+  listing: one(listings, {
+    fields: [chatMessages.listingId],
+    references: [listings.id],
+  }),
+  project: one(projects, {
+    fields: [chatMessages.projectId],
+    references: [projects.id],
   }),
 }));
 
@@ -459,4 +587,115 @@ export const contactSubmissions = pgTable('contact_submissions', {
   isReplied: boolean('is_replied').default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+
+// ─────────────────────────────────────────────────────────────
+// ── CRM Module Tables ──
+// SEPARATE from the existing `leads` table (website AI-qualified leads).
+// crm_leads       = external campaign leads (Meta, Snapchat, TikTok, Manual)
+// crm_notes       = polymorphic notes (shared by website AND campaign leads)
+// crm_activities  = polymorphic audit trail
+// crm_followups   = polymorphic scheduled tasks
+// ─────────────────────────────────────────────────────────────
+
+export const crmLeadSourceEnum = pgEnum('crm_lead_source', [
+  'META_ADS', 'SNAPCHAT', 'TIKTOK', 'WHATSAPP', 'MANUAL',
+]);
+
+export const crmLeadStatusEnum = pgEnum('crm_lead_status', [
+  'NEW',
+  'ATTEMPTED_CONTACT',
+  'CONTACTED',
+  'SITE_VISIT_SCHEDULED',
+  'PROPERTY_VIEWING',
+  'OFFER_SUBMITTED',
+  'CLOSED_WON',
+  'CLOSED_LOST',
+]);
+
+export const crmActivityTypeEnum = pgEnum('crm_activity_type', [
+  'CREATED',
+  'STATUS_CHANGE',
+  'ASSIGNED',
+  'NOTE_ADDED',
+  'FOLLOWUP_SCHEDULED',
+  'FOLLOWUP_COMPLETED',
+  'WHATSAPP_CONTACT',
+  'SCORE_UPDATED',
+]);
+
+export const crmLeadTypeEnum = pgEnum('crm_lead_type', ['WEBSITE', 'CAMPAIGN']);
+
+// ── Campaign Leads Table ──
+export const crmLeads = pgTable('crm_leads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  source: crmLeadSourceEnum('source').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  phone: varchar('phone', { length: 30 }).notNull(),
+  email: varchar('email', { length: 255 }),
+  cityPreference: varchar('city_preference', { length: 100 }),
+  propertyInterest: varchar('property_interest', { length: 100 }),
+  status: crmLeadStatusEnum('status').default('NEW').notNull(),
+  leadScore: smallint('lead_score').default(0), // 0-5 manual agent rating
+  assignedAgentId: uuid('assigned_agent_id').references(() => users.id),
+  campaignDetails: jsonb('campaign_details'), // ad_id, campaign_name, ad_set_name, form_id
+  isDuplicate: boolean('is_duplicate').default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  phoneIdx:  index('crm_lead_phone_idx').on(table.phone),
+  sourceIdx: index('crm_lead_source_idx').on(table.source),
+  statusIdx: index('crm_lead_status_idx').on(table.status),
+  agentIdx:  index('crm_lead_agent_idx').on(table.assignedAgentId),
+}));
+
+// ── CRM Notes (polymorphic — website AND campaign leads) ──
+export const crmNotes = pgTable('crm_notes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  leadId: uuid('lead_id').notNull(),           // refs leads.id OR crm_leads.id
+  leadType: crmLeadTypeEnum('lead_type').notNull(),
+  agentId: uuid('agent_id').references(() => users.id),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  leadIdx: index('crm_note_lead_idx').on(table.leadId, table.leadType),
+}));
+
+// ── CRM Activities (polymorphic audit trail) ──
+export const crmActivities = pgTable('crm_activities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  leadId: uuid('lead_id').notNull(),
+  leadType: crmLeadTypeEnum('lead_type').notNull(),
+  performedById: uuid('performed_by_id').references(() => users.id),
+  activityType: crmActivityTypeEnum('activity_type').notNull(),
+  metadata: jsonb('metadata'), // { from: 'NEW', to: 'CONTACTED' } etc.
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  leadIdx: index('crm_activity_lead_idx').on(table.leadId, table.leadType),
+}));
+
+// ── CRM Follow-ups (polymorphic scheduled tasks) ──
+export const crmFollowups = pgTable('crm_followups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  leadId: uuid('lead_id').notNull(),
+  leadType: crmLeadTypeEnum('lead_type').notNull(),
+  agentId: uuid('agent_id').references(() => users.id),
+  scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+  note: text('note'),
+  isCompleted: boolean('is_completed').default(false),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  leadIdx:      index('crm_followup_lead_idx').on(table.leadId, table.leadType),
+  scheduledIdx: index('crm_followup_sched_idx').on(table.scheduledAt),
+}));
+
+// ── CRM Relations ──
+export const crmLeadsRelations = relations(crmLeads, ({ one }) => ({
+  assignedAgent: one(users, {
+    fields: [crmLeads.assignedAgentId],
+    references: [users.id],
+  }),
+}));
+
 

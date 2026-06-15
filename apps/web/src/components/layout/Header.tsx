@@ -34,7 +34,7 @@ export default function Header({ locale }: HeaderProps) {
         const phone = json?.data?.contact_phone;
         if (phone) setContactPhone(phone);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Scroll visibility
@@ -147,7 +147,14 @@ export default function Header({ locale }: HeaderProps) {
 
           {/* Actions */}
           <div className="flex items-center gap-4">
-            {/* Management buttons removed from web app Header */}
+            {/* Post a Property CTA */}
+            <Link
+              href={`/${locale}/post-property`}
+              className="hidden lg:flex items-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-primary-600/10 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>{t('listProperty')}</span>
+            </Link>
 
             {isAuthenticated ? (
               <div className="relative group">
@@ -161,9 +168,9 @@ export default function Header({ locale }: HeaderProps) {
                   </div>
                   <div className="w-8 h-8 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center border border-primary-100 overflow-hidden shrink-0 relative">
                     {user?.avatarUrl && !imgError ? (
-                      <img 
-                        src={user.avatarUrl} 
-                        alt={user.name || 'User'} 
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.name || 'User'}
                         className="w-full h-full object-cover"
                         onError={() => setImgError(true)}
                       />
@@ -257,12 +264,12 @@ export default function Header({ locale }: HeaderProps) {
                 className={`fixed top-0 bottom-0 ${isRTL ? 'left-0' : 'right-0'} w-[280px] bg-white z-[120] lg:hidden shadow-2xl flex flex-col`}
               >
                 <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-                   <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-white" />
-                   </div>
-                   <button onClick={() => setMobileOpen(false)} className="p-2 text-gray-400 hover:text-gray-900 transition-colors">
-                      <X className="w-6 h-6" />
-                   </button>
+                  <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-white" />
+                  </div>
+                  <button onClick={() => setMobileOpen(false)} className="p-2 text-gray-400 hover:text-gray-900 transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-2">
@@ -285,7 +292,19 @@ export default function Header({ locale }: HeaderProps) {
                       {link.label}
                     </Link>
                   ))}
-                  
+
+                  {/* Post Property CTA for Mobile */}
+                  <div className="pt-2 pb-4">
+                    <Link
+                      href={`/${locale}/post-property`}
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center justify-center gap-2 w-full py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold shadow-lg shadow-primary-600/20"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>{t('listProperty')}</span>
+                    </Link>
+                  </div>
+
                   {/* Additional Strip Links for Mobile */}
                   <div className="pt-4 mt-4 border-t border-gray-50 space-y-2">
                     <Link
@@ -301,7 +320,7 @@ export default function Header({ locale }: HeaderProps) {
                       {tCommon('downloadApp')}
                     </div>
                   </div>
-                  
+
                   {isAuthenticated && (
                     <div className="pt-4 mt-4 border-t border-gray-50 space-y-2">
                       <Link

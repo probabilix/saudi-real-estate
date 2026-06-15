@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<AdminLead[]>([]);
   const [stats, setStats] = useState<AdminLeadStats | null>(null);
@@ -428,7 +430,7 @@ export default function LeadsPage() {
               {/* Row 2: Buyer Preferences */}
               <div className="space-y-2">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Buyer Specifications</h3>
-                <div className="grid grid-cols-2 gap-4 bg-slate-50/50 rounded-2xl border border-slate-150 p-4">
+                <div className="grid grid-cols-2 gap-4 bg-slate-50/50 rounded-2xl border border-slate-100 p-4">
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Budget Range</span>
                     <span className="text-xs font-black text-slate-700">{selectedLead.buyerBudgetDisplay || 'Not Analyzed'}</span>
@@ -475,7 +477,7 @@ export default function LeadsPage() {
                         <span className="text-sm font-black text-slate-800">{selectedLead.listing.price.toLocaleString()} SAR</span>
                       </div>
                       <a 
-                        href={`http://localhost:3000/en/listings/${selectedLead.listingId}`}
+                        href={`${WEB_URL}/en/listings/${selectedLead.listingId}`}
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="p-2.5 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl hover:bg-primary-50 hover:text-primary-600 hover:border-primary-100 transition-all shadow-sm"
@@ -495,7 +497,7 @@ export default function LeadsPage() {
                 </h3>
                 
                 {/* Chat Container window */}
-                <div className="flex-1 overflow-y-auto bg-slate-900 border border-slate-850 rounded-2xl p-4 space-y-4 shadow-inner flex flex-col">
+                <div className="flex-1 overflow-y-auto bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-4 shadow-inner flex flex-col">
                   
                   {chatLoading ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-500">

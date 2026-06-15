@@ -31,6 +31,7 @@ export interface User {
   name: string;
   regaLicence: string | null;
   regaVerified: boolean;
+  isReapplied: boolean;
   verificationStatus: VerificationStatus;
   subscriptionTier: SubscriptionTier;
   subscriptionUntil: string | null;
@@ -131,6 +132,7 @@ export interface Listing {
   viewsCount: number;
   isFavorited?: boolean;
   deletedAt: string | null;
+  projectId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

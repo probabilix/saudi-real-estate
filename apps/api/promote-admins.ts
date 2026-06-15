@@ -12,7 +12,7 @@ async function promoteAdmins() {
 
   try {
     const result = await db.update(users)
-      .set({ role: 'ADMIN' })
+      .set({ role: 'ADMIN', isActive: true, verificationStatus: 'VERIFIED', regaVerified: true })
       .where(inArray(users.email, emails))
       .returning({ updatedEmail: users.email });
 

@@ -3,8 +3,8 @@ import { useState, useEffect, createContext, useContext, ReactNode, useRef } fro
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { User, LoginInput, RegisterInput, BrokerWithProfile } from '@saudi-re/shared';
-import { api } from '@/lib/api';
-import PhoneCollectorModal from '@/components/auth/PhoneCollectorModal';
+import { api } from '../lib/api';
+import PhoneCollectorModal from '../components/auth/PhoneCollectorModal';
 
 type AuthContextType = {
   user: User | BrokerWithProfile | null;
@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('accessToken');
     setUser(null);
     router.push('/');
-    api.logout().catch((err) => console.error('Logout error:', err));
+    api.logout().catch((err: any) => console.error('Logout error:', err));
   };
 
   const refreshUser = async (force: boolean = false) => {

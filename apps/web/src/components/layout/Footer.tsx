@@ -5,7 +5,8 @@ import { useTranslations, useLocale } from 'next-intl';
 import { Building2, Facebook, Instagram, Linkedin, Twitter, Youtube, Phone, MapPin, Globe } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useState, useEffect } from 'react';
-import { MANAGED_MODE } from '@/lib/config';
+import { useAuth } from '@/hooks/use-auth';
+import { MANAGED_MODE, hasManagementAccess, WHITELISTED_USERS } from '@/lib/config';
 
 // Official Brand Icons (SVGs) for maximum professionalism
 const XIcon = ({ className }: { className?: string }) => (
@@ -26,15 +27,34 @@ export default function Footer() {
   const tCommon = useTranslations('common');
   const tNav = useTranslations('navigation');
   const locale = useLocale();
+  const { user } = useAuth();
 
   const [settings, setSettings] = useState<any>(null);
+  const [crmUrl, setCrmUrl] = useState('http://localhost:3003');
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     api.getSystemSettings().then(res => {
       if (res.success) setSettings(res.data);
     });
+    if (typeof window !== 'undefined') {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const url = process.env.NEXT_PUBLIC_CRM_URL || (isLocal ? 'http://localhost:3003' : 'https://saudi-real-estate-crm.vercel.app');
+      setCrmUrl(url);
+    }
   }, []);
+
+  const isBroker = user && (user.role === 'ADMIN' || user.role === 'SOLO_BROKER' || user.regaVerified || hasManagementAccess(user));
+
+  const getBrokerDashboardHref = () => {
+    if (!user) {
+      return `/${locale}/auth/login?returnTo=${encodeURIComponent(crmUrl)}`;
+    }
+    if (isBroker) {
+      return crmUrl;
+    }
+    return `/${locale}/post-property`;
+  };
 
   const socialIcons: any = {
     x: XIcon,
@@ -116,25 +136,23 @@ export default function Footer() {
           </div>
 
           {/* For Professionals */}
-          {!MANAGED_MODE && (
-            <div>
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-surface-500 mb-6">
-                {t('forBrokers')}
-              </h3>
-              <ul className="space-y-4">
-                <li>
-                  <Link href={`/${locale}/auth/register`} className="text-sm text-surface-400 hover:text-primary-400 transition-colors">
-                    {tNav('listProperty')}
-                  </Link>
-                </li>
-                <li>
-                  <Link href={`/${locale}/auth/login`} className="text-sm text-surface-400 hover:text-primary-400 transition-colors">
-                    {tNav('brokerDashboard')}
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          )}
+          <div>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-surface-500 mb-6">
+              {t('forBrokers')}
+            </h3>
+            <ul className="space-y-4">
+              <li>
+                <Link href={`/${locale}/post-property`} className="text-sm text-surface-400 hover:text-primary-400 transition-colors">
+                  {tNav('listProperty')}
+                </Link>
+              </li>
+              <li>
+                <Link href={getBrokerDashboardHref()} className="text-sm text-surface-400 hover:text-primary-400 transition-colors">
+                  {tNav('brokerDashboard')}
+                </Link>
+              </li>
+            </ul>
+          </div>
 
           {/* Legal */}
           <div>

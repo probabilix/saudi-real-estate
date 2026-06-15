@@ -29,12 +29,13 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({ children }
 
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const fromAdmin = searchParams?.get('from') === 'admin';
+  const fromCrm = searchParams?.get('from') === 'crm';
   const locale = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] || 'en' : 'en';
 
   // 1. If Managed Mode is ON, block ALL listing/management activity for EVERYONE in the web app.
-  // Exception: Admins and Whitelisted users (Firms/Brokers) can still manage properties.
-  // Also skip this block if we are coming from the admin panel (fromAdmin) so we can show a login prompt instead.
-  if (MANAGED_MODE && !hasManagementAccess(user) && !fromAdmin) {
+  // Exception: Admins, Whitelisted users (Firms/Brokers), and verified brokers/solo brokers.
+  // Also skip this block if we are coming from the admin panel (fromAdmin) or CRM (fromCrm) so we can show a login prompt instead.
+  if (MANAGED_MODE && !hasManagementAccess(user) && !user?.regaVerified && user?.role !== 'SOLO_BROKER' && !fromAdmin && !fromCrm) {
     return (
       <div className="max-w-2xl mx-auto py-24 px-4 text-center">
         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -63,29 +64,41 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({ children }
     );
   }
 
-  // 2. If we are coming from admin panel but not logged in, show a clearer message
-  if (!user && fromAdmin && !loading) {
+  // 2. If we are coming from admin panel or CRM but not logged in, show a clearer, role-appropriate message
+  if (!user && (fromAdmin || fromCrm) && !loading) {
+    const isCrm = fromCrm;
+    const title = isCrm ? 'Broker Authentication Required' : 'Admin Authentication Required';
+    const description = isCrm
+      ? 'To manage properties from the CRM Dashboard, you must be logged into your broker account on this portal as well.'
+      : 'To manage properties from the Admin Panel, you must be logged into your admin account on this portal as well.';
+    const buttonText = isCrm ? 'Login as Broker' : 'Login as Admin';
+    
+    // CRM uses deep teal (#064e4b) theme, Admin uses standard emerald-900 theme
+    const accentColor = isCrm ? 'bg-[#064e4b] hover:bg-[#043a37]' : 'bg-emerald-900 hover:scale-105';
+    const iconBg = isCrm ? 'bg-[#064e4b]/10 text-[#064e4b]' : 'bg-emerald-50 text-emerald-900';
+    const iconColor = isCrm ? 'text-[#064e4b]' : 'text-emerald-900';
+
     return (
-      <div className="max-w-2xl mx-auto py-24 px-4 text-center">
-        <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-          <ShieldAlert className="w-10 h-10 text-emerald-900" />
+      <div className="max-w-2xl mx-auto py-24 px-4 text-center animate-in fade-in duration-300">
+        <div className={`w-20 h-20 ${iconBg} rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner`}>
+          <ShieldAlert className={`w-10 h-10 ${iconColor}`} />
         </div>
-        <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-tight">Admin Authentication Required</h2>
-        <p className="text-slate-600 mb-8 text-lg">
-          To manage properties from the Admin Panel, you must be logged into your admin account on this portal as well.
+        <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-tight">{title}</h2>
+        <p className="text-slate-600 mb-8 text-lg leading-relaxed max-w-md mx-auto">
+          {description}
         </p>
         <Link 
           href={`/${locale}/auth/login?returnTo=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
-          className="inline-flex items-center gap-2 bg-emerald-900 text-white px-8 py-4 rounded-2xl font-bold hover:scale-105 transition-all shadow-xl shadow-emerald-900/20"
+          className={`inline-flex items-center gap-2 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-xl ${accentColor}`}
         >
-          Login as Admin
+          {buttonText}
         </Link>
       </div>
     );
   }
 
   // 3. If user is verified OR is whitelisted, allow access
-  if (user?.regaVerified || hasManagementAccess(user)) {
+  if (user?.regaVerified || user?.role === 'SOLO_BROKER' || hasManagementAccess(user)) {
     return <>{children}</>;
   }
 

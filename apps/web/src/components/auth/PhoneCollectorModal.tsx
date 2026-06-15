@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { ShieldCheck, Loader2, Phone, Save, AlertCircle, ChevronDown, Check, Search, Globe } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api } from '../../lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCountryCallingCode } from 'react-phone-number-input';
 import type { CountryCode } from 'libphonenumber-js';
@@ -152,8 +152,8 @@ export default function PhoneCollectorModal({ isOpen, onComplete, onLogout }: { 
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 ml-1">Phone Number</label>              <div 
-                className="flex items-center w-full rounded-2xl border border-slate-300 bg-slate-50 focus-within:bg-white focus-within:border-primary-500 focus-within:ring-4 focus-within:ring-primary-500/10 transition-all duration-200 relative" 
+              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 ml-1">Phone Number</label>              <div
+                className="flex items-center w-full rounded-2xl border border-slate-300 bg-slate-50 focus-within:bg-white focus-within:border-primary-500 focus-within:ring-4 focus-within:ring-primary-500/10 transition-all duration-200 relative"
                 ref={dropdownRef}
                 onClick={(e) => e.stopPropagation()} // Stop bubbling so clicking the input area keeps the dropdown state intact
               >

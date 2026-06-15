@@ -6,6 +6,7 @@ import { registerSchema, loginSchema } from '@saudi-re/shared';
 import { users } from '../../db/schema';
 import { db } from '../../db';
 import { eq } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
 
 export default async function authRoutes(app: FastifyInstance) {
   /**
@@ -96,7 +97,9 @@ export default async function authRoutes(app: FastifyInstance) {
             email: newUser.email,
             avatarUrl: newUser.avatarUrl,
             creditsBalance: newUser.creditsBalance,
-            phone: newUser.phone
+            phone: newUser.phone,
+            verificationStatus: newUser.verificationStatus,
+            isReapplied: newUser.isReapplied
           } : undefined
         } 
       });
@@ -171,7 +174,9 @@ export default async function authRoutes(app: FastifyInstance) {
             email: user.email,
             avatarUrl: user.avatarUrl,
             creditsBalance: user.creditsBalance,
-            phone: user.phone
+            phone: user.phone,
+            verificationStatus: user.verificationStatus,
+            isReapplied: user.isReapplied
           } 
         } 
       });
@@ -316,7 +321,9 @@ export default async function authRoutes(app: FastifyInstance) {
             phone: user.phone,
             gender: user.gender,
             nationality: user.nationality,
-            city: user.city
+            city: user.city,
+            verificationStatus: user.verificationStatus,
+            isReapplied: user.isReapplied
           } 
         } 
       });
@@ -353,6 +360,109 @@ export default async function authRoutes(app: FastifyInstance) {
       });
     } catch (err) {
       return reply.code(401).send({ success: false, message: 'Invalid or expired refresh token' });
+    }
+  });
+
+  /**
+   * POST /api/v1/auth/forgot-password
+   */
+  app.post('/forgot-password', async (request, reply) => {
+    const { email: rawEmail } = request.body as { email: string };
+    if (!rawEmail) {
+      return reply.code(400).send({ success: false, message: 'Email is required' });
+    }
+    const email = rawEmail.toLowerCase().trim();
+    try {
+      const user = await db.query.users.findFirst({
+        where: eq(users.email, email),
+      });
+
+      // Standard security: return success even if email not found to prevent user enumeration
+      if (!user) {
+        return reply.send({ 
+          success: true, 
+          message: 'If the email exists in our system, a recovery code has been sent.' 
+        });
+      }
+
+      // Generate secure 6-digit OTP code
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Sign dynamic JWT reset token (JWT_SECRET + user.passwordHash)
+      const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me-in-prod';
+      const sessionToken = jwt.sign(
+        { userId: user.id, otp },
+        JWT_SECRET + user.passwordHash,
+        { expiresIn: '10m' } // 10 minutes expiry
+      );
+
+      // Trigger Resend dynamic email dispatcher
+      await EmailService.sendPasswordResetOTP(user.email, user.name || 'User', otp);
+
+      return reply.send({
+        success: true,
+        message: 'If the email exists in our system, a recovery code has been sent.',
+        data: { token: sessionToken }
+      });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  /**
+   * POST /api/v1/auth/reset-password
+   */
+  app.post('/reset-password', async (request, reply) => {
+    const { token, code, newPassword } = request.body as { token: string; code: string; newPassword?: string };
+    if (!token || !code || !newPassword) {
+      return reply.code(400).send({ success: false, message: 'Token, code, and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return reply.code(400).send({ success: false, message: 'Password must be at least 6 characters long' });
+    }
+
+    try {
+      // 1. Decode token without verifying first to find user ID
+      const decoded = jwt.decode(token) as { userId: string; otp: string } | null;
+      if (!decoded || !decoded.userId) {
+        return reply.code(400).send({ success: false, message: 'Invalid or corrupted reset session' });
+      }
+
+      // 2. Load user to fetch their actual dynamic signature
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, decoded.userId),
+      });
+
+      if (!user) {
+        return reply.code(400).send({ success: false, message: 'Invalid or expired session' });
+      }
+
+      // 3. Cryptographically verify signature (JWT_SECRET + user.passwordHash)
+      const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me-in-prod';
+      let payload: { userId: string; otp: string };
+      try {
+        payload = jwt.verify(token, JWT_SECRET + user.passwordHash) as { userId: string; otp: string };
+      } catch (err) {
+        return reply.code(400).send({ success: false, message: 'Reset session has expired or is invalid' });
+      }
+
+      // 4. Validate OTP match
+      if (payload.otp !== code.trim()) {
+        return reply.code(400).send({ success: false, message: 'Invalid 6-digit recovery code' });
+      }
+
+      // 5. Update user password (automatically invalidates token on completion!)
+      const passwordHash = await AuthService.hashPassword(newPassword);
+      await db.update(users)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(eq(users.id, user.id));
+
+      return reply.send({ success: true, message: 'Password has been successfully reset' });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
     }
   });
 

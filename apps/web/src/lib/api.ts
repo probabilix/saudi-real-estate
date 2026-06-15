@@ -246,6 +246,20 @@ class ApiClient {
     });
   }
 
+  async forgotPassword(email: string) {
+    return this.fetcher<{ token: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(data: any) {
+    return this.fetcher<{ success: boolean; message?: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // ── Listings Endpoints ──
 
   async getListings(params: string) {
@@ -265,6 +279,27 @@ class ApiClient {
 
   async getListingById(id: string) {
     return this.fetcher<ListingWithOwner>(`/listings/${id}?t=${Date.now()}`);
+  }
+
+  async getProjectById(id: string) {
+    return this.fetcher<{
+      project: any;
+      layouts: any[];
+      owner?: any;
+      isQualified?: boolean;
+      projectUnits?: any[];
+      isFavorited?: boolean;
+    }>(`/system/projects/${id}?t=${Date.now()}`);
+  }
+
+  async getProjectsPublic(queryString: string = '') {
+    return this.fetcher<{ items: any[]; total: number }>(`/system/projects?${queryString}`);
+  }
+
+  async revealProjectContact(id: string) {
+    return this.fetcher<{ phone: string; email: string }>(`/system/projects/${id}/reveal`, {
+      method: 'POST',
+    });
   }
 
   async revealListingContact(id: string) {
@@ -393,6 +428,19 @@ class ApiClient {
     });
   }
 
+  async toggleProjectFavorite(projectId: string) {
+    return this.fetcher<{ isFavorited: boolean }>('/favorites/projects/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ projectId }),
+    });
+  }
+
+  async getProjectFavorites() {
+    return this.fetcher<{ items: any[] }>('/favorites/projects', {
+      method: 'GET',
+    });
+  }
+
   async toggleNewsFavorite(newsId: string) {
     return this.fetcher<{ isFavorited: boolean }>('/favorites/news/toggle', {
       method: 'POST',
@@ -461,10 +509,17 @@ class ApiClient {
     });
   }
 
-  async getChatHistory() {
-    return this.fetcher<{ success: boolean; buyerProfileId: string; sessionId: string; history: any[] }>('/system/chat/history', {
-      method: 'GET',
-    });
+  async getChatHistory(projectId?: string, listingId?: string) {
+    const params = new URLSearchParams();
+    if (projectId) params.set('projectId', projectId);
+    if (listingId) params.set('listingId', listingId);
+    const queryString = params.toString();
+    return this.fetcher<{ success: boolean; buyerProfileId: string; sessionId: string; history: any[] }>(
+      `/system/chat/history${queryString ? `?${queryString}` : ''}`,
+      {
+        method: 'GET',
+      }
+    );
   }
 }
 

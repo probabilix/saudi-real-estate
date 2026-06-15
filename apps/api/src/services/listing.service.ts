@@ -36,10 +36,11 @@ export class ListingService {
   /**
    * Search and filter listings
    */
-  static async searchListings(filters: ListingSearchInput & { ownerId?: string; firmId?: string; status?: string; q?: string; userId?: string }) {
+  static async searchListings(filters: ListingSearchInput & { ownerId?: string; firmId?: string; status?: string; q?: string; userId?: string; requesterRole?: string; requesterId?: string; excludeProjects?: string }) {
     const {
       city, type, purpose, minPrice, maxPrice, bedrooms,
-      foreignerEligible, isFeatured, ownerId, firmId, status, q, limit = 20, cursor, userId
+      foreignerEligible, isFeatured, ownerId, firmId, status, q, limit = 20, cursor, userId,
+      requesterRole, requesterId, excludeProjects
     } = filters;
 
     const conditions: any[] = [];
@@ -53,6 +54,7 @@ export class ListingService {
     if (bedrooms) conditions.push(gte(listings.bedrooms, bedrooms));
     if (foreignerEligible !== undefined) conditions.push(eq(listings.foreignerEligible, foreignerEligible));
     if (isFeatured !== undefined) conditions.push(eq(listings.isFeatured, isFeatured));
+    if (excludeProjects !== 'false') conditions.push(isNull(listings.projectId));
 
     // Keyword Search (Includes Short ID)
     if (q) {
@@ -81,6 +83,24 @@ export class ListingService {
       conditions.push(eq(listings.status, 'ACTIVE'));
     }
 
+    // Enforce visibility permissions:
+    // If not ADMIN, requester can only see ACTIVE listings, OR listings they own, OR listings in their firm
+    if (requesterRole !== 'ADMIN') {
+      const visibilityOrs: SQL[] = [eq(listings.status, 'ACTIVE')];
+      
+      if (requesterId) {
+        visibilityOrs.push(eq(listings.ownerId, requesterId));
+        if (requesterRole === 'FIRM') {
+          const firmCollaborators = await this.getFirmCollaboratorIds(requesterId);
+          if (firmCollaborators.length > 0) {
+            visibilityOrs.push(inArray(listings.ownerId, firmCollaborators));
+          }
+        }
+      }
+      
+      conditions.push(or(...visibilityOrs));
+    }
+
     conditions.push(sql`${listings.deletedAt} IS NULL`);
 
     // Get total count
@@ -102,7 +122,8 @@ export class ListingService {
             avatarUrl: true,
             role: true,
           }
-        }
+        },
+        project: true
       },
       orderBy: [
         desc(listings.isFeatured),
@@ -162,8 +183,12 @@ export class ListingService {
    * Get a single listing by ID with full owner details and firm context
    */
   static async getListingById(id: string, requesterRole?: string, requesterId?: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     const result = await db.query.listings.findFirst({
-      where: and(eq(listings.id, id), sql`${listings.deletedAt} IS NULL`),
+      where: and(
+        isUuid ? eq(listings.id, id) : eq(listings.shortId, id),
+        sql`${listings.deletedAt} IS NULL`
+      ),
       with: {
         owner: {
           columns: {
@@ -178,11 +203,23 @@ export class ListingService {
             brokerProfile: true,
             firm: true,
           }
-        }
+        },
+        project: true
       }
     });
 
     if (!result) return null;
+
+    // Security check: if listing is not ACTIVE, only the owner, firm collaborator, or admin can access it.
+    if (result.status !== 'ACTIVE') {
+      const isOwner = requesterId && result.ownerId === requesterId;
+      const isFirmOwner = requesterRole === 'FIRM' && requesterId && (result.owner.firmId === requesterId || result.ownerId === requesterId);
+      const isAdmin = requesterRole === 'ADMIN';
+
+      if (!isOwner && !isFirmOwner && !isAdmin) {
+        return null;
+      }
+    }
 
     // Firm Owner Full Access Logic
     if (requesterRole === 'FIRM' && requesterId) {
@@ -218,11 +255,25 @@ export class ListingService {
           )
           .limit(1);
 
-        if (qualifiedLeads.length > 0) {
-          (result as any).isQualified = true;
-        } else {
-          (result as any).isQualified = false;
+        let isQualified = qualifiedLeads.length > 0;
+
+        // Shared compound qualification check: if they qualify for any layout in the compound, they qualify for all layouts
+        if (!isQualified && result.projectId) {
+          const qualifiedProjectLeads = await db.select({ id: leads.id })
+            .from(leads)
+            .innerJoin(buyerProfiles, eq(leads.buyerProfileId, buyerProfiles.id))
+            .where(
+              and(
+                eq(buyerProfiles.userId, requesterId),
+                eq(leads.projectId, result.projectId),
+                eq(leads.isQualified, true)
+              )
+            )
+            .limit(1);
+          isQualified = qualifiedProjectLeads.length > 0;
         }
+
+        (result as any).isQualified = isQualified;
       } catch (err) {
         console.error('Security check failed:', err);
         (result as any).isFavorited = false;
@@ -374,6 +425,10 @@ export class ListingService {
     static async createListing(requesterId: string, data: any) {
       const shortId = generateShortId();
 
+      // Check if creator is an ADMIN
+      const [dbUser] = await db.select({ role: users.role }).from(users).where(eq(users.id, requesterId));
+      const isCreatorAdmin = dbUser?.role === 'ADMIN';
+
       // Allow Firm Owners to specify a different owner (one of their agents)
       const finalOwnerId = data.ownerId || requesterId;
 
@@ -389,6 +444,7 @@ export class ListingService {
         ownerId: finalOwnerId,
         shortId,
         status: 'DRAFT',
+        verified: isCreatorAdmin ? true : (data.verified !== undefined ? Boolean(data.verified) : false),
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
@@ -527,9 +583,22 @@ export class ListingService {
     const isAdmin = user.role === 'ADMIN';
     if (!user.regaVerified && !isAdmin) throw new Error('Your REGA verification is required before publishing.');
 
-    // 2. Verified balance check
-    if ((user.creditsBalance ?? 0) < cost && !isAdmin) {
-      throw new Error(`Insufficient credits. You need ${cost} credits to publish.`);
+    // 2. Count user's total non-deleted listings (including this draft one)
+    const listingsCountResult = await db.select({ count: sql<number>`count(*)` })
+      .from(listings)
+      .where(and(eq(listings.ownerId, userId), isNull(listings.deletedAt)));
+    const countVal = Number(listingsCountResult[0]?.count) || 0;
+
+    // Check if free postings limit applies (default to 3)
+    const freePostingsLimitStr = await SystemService.getSetting('free_postings_limit', '3');
+    const freePostingsLimit = parseInt(freePostingsLimitStr, 10);
+
+    const isFree = countVal <= freePostingsLimit;
+    const finalCost = isFree ? 0 : cost;
+
+    // Verified balance check
+    if ((user.creditsBalance ?? 0) < finalCost && !isAdmin) {
+      throw new Error(`Insufficient credits. You need ${finalCost} credits to publish.`);
     }
 
     // 3. Fetch Listing to check ownership/firm permissions
@@ -550,11 +619,11 @@ export class ListingService {
     // 4. Update Listing Status & Deduct Credits Sequentially
     // Note: Neon HTTP driver doesn't support db.transaction()
 
-    // Deduct Credits from the user performing the action (Skip for ADMIN)
-    if (!isAdmin) {
+    // Deduct Credits from the user performing the action (Skip for ADMIN or Free)
+    if (!isAdmin && finalCost > 0) {
       await db.update(users)
         .set({
-          creditsBalance: sql`${users.creditsBalance} - ${cost}`,
+          creditsBalance: sql`${users.creditsBalance} - ${finalCost}`,
           updatedAt: new Date()
         })
         .where(eq(users.id, userId));
@@ -564,6 +633,7 @@ export class ListingService {
     const updated = await db.update(listings)
       .set({
         status: isAdmin ? 'ACTIVE' : 'FLAGGED', // Bypass review for ADMIN
+        verified: isAdmin ? true : undefined,
         updatedAt: new Date()
       })
       .where(eq(listings.id, id))
@@ -575,7 +645,7 @@ export class ListingService {
 
     return {
       listing: result,
-      newBalance: (user.creditsBalance ?? 0) - cost
+      newBalance: (user.creditsBalance ?? 0) - finalCost
     };
   }
 

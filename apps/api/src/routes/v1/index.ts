@@ -9,6 +9,7 @@ import newsRoutes from './news.routes';
 import legalRoutes from './legal.routes';
 import adminRoutes from './admin.routes';
 import systemRoutes from './system.routes';
+import crmRoutes from './crm.routes';
 
 /**
  * API v1 Route Registration
@@ -53,6 +54,6 @@ export default async function v1Routes(app: FastifyInstance) {
   // ── System Module (Public Settings) ──
   await app.register(systemRoutes, { prefix: '/system' });
 
-  // ── Lead Module (Placeholder for next implementation) ──
-  // app.register(leadRoutes, { prefix: '/leads' });
+  // ── CRM Module ──
+  await app.register(crmRoutes, { prefix: '/crm' });
 }

@@ -2,7 +2,7 @@
 // Platform-wide constants
 // ──────────────────────────────────────────────
 
-export const USER_ROLES = ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER'] as const;
+export const USER_ROLES = ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER', 'SALES_AGENT'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export const LISTING_CATEGORIES = ['RESIDENTIAL', 'COMMERCIAL'] as const;
@@ -64,7 +64,7 @@ export type BrokerExperienceLevel = (typeof BROKER_EXPERIENCE_LEVELS)[number];
 
 // Saudi cities
 export const CITIES = [
-  'Riyadh', 'Jeddah', 'Dammam', 'Mecca', 'Medina',
+  'Riyadh', 'Jeddah', 'Dammam', 'Mecca', 'Madinah',
   'Khobar', 'Dhahran', 'Tabuk', 'Abha', 'Jubail',
   'NEOM', 'KAEC', 'Yanbu',
 ] as const;

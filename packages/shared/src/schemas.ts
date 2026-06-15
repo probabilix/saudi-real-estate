@@ -89,6 +89,7 @@ export const createListingSchema = z.object({
     thumbnailUrl: z.string().nullable(),
   })).default([]),
   ownerId: z.string().uuid().optional(),
+  projectId: z.string().uuid().optional().nullable(),
 });
 
 export const updateListingSchema = createListingSchema.partial();

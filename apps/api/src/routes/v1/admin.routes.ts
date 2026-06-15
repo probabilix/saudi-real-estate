@@ -1,7 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages } from '../../db/schema';
+import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
+import { AuthService } from '../../services/auth.service';
+import { EmailService } from '../../services/email.service';
 import { eq, desc, asc, count, sql, and, or, ilike, isNull, inArray } from 'drizzle-orm';
 
 /**
@@ -82,7 +84,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   // ── Users List ──
   app.get('/users', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
-    const query = request.query as { role?: string; status?: string; search?: string; page?: string; limit?: string };
+    const query = request.query as { role?: string; status?: string; search?: string; page?: string; limit?: string; hasLicense?: string };
     const page = parseInt(query.page || '1');
     const limit = Math.min(parseInt(query.limit || '20'), 100);
     const offset = (page - 1) * limit;
@@ -90,9 +92,20 @@ export default async function adminRoutes(app: FastifyInstance) {
     try {
       const conditions: any[] = [];
       if (query.role) conditions.push(eq(users.role, query.role as any));
-      if (query.status === 'active') conditions.push(eq(users.isActive, true));
-      if (query.status === 'inactive') conditions.push(eq(users.isActive, false));
-      if (query.status === 'pending') conditions.push(eq(users.verificationStatus, 'PENDING'));
+      
+      if (query.status) {
+        if (query.status === 'active') {
+          conditions.push(eq(users.isActive, true));
+        } else if (query.status === 'inactive') {
+          conditions.push(eq(users.isActive, false));
+        } else if (['pending', 'verified', 'rejected', 'unverified'].includes(query.status.toLowerCase())) {
+          conditions.push(eq(users.verificationStatus, query.status.toUpperCase() as any));
+        }
+      }
+
+      if (query.hasLicense === 'true') {
+        conditions.push(and(sql`${users.regaLicence} IS NOT NULL`, sql`${users.regaLicence} != ''`));
+      }
 
       if (query.search) {
         const searchPattern = `%${query.search.toLowerCase()}%`;
@@ -112,11 +125,18 @@ export default async function adminRoutes(app: FastifyInstance) {
           verificationStatus: users.verificationStatus,
           regaLicence: users.regaLicence,
           regaVerified: users.regaVerified,
+          isReapplied: users.isReapplied,
           subscriptionTier: users.subscriptionTier,
           creditsBalance: users.creditsBalance,
           createdAt: users.createdAt,
+          gender: users.gender,
+          nationality: users.nationality,
+          city: users.city,
+          bioEn: brokerProfiles.bioEn,
+          bioAr: brokerProfiles.bioAr,
         })
           .from(users)
+          .leftJoin(brokerProfiles, eq(users.id, brokerProfiles.userId))
           .where(whereClause)
           .orderBy(desc(users.createdAt))
           .limit(limit)
@@ -142,10 +162,28 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.post('/users/:id/approve', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
+      const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      if (!user) {
+        return reply.code(404).send({ success: false, message: 'User not found' });
+      }
+
+      const isUserAdmin = user.role === 'ADMIN';
+      const targetRole = isUserAdmin ? 'ADMIN' : 'SOLO_BROKER';
+
       await db.update(users)
-        .set({ isActive: true, verificationStatus: 'VERIFIED', regaVerified: true, updatedAt: new Date() })
+        .set({
+          isActive: true,
+          verificationStatus: 'VERIFIED',
+          regaVerified: true,
+          role: targetRole,
+          isReapplied: false,
+          updatedAt: new Date()
+        })
         .where(eq(users.id, id));
-      return reply.send({ success: true, message: 'User approved successfully' });
+
+      await EmailService.sendCrmAccessApprovalEmail(user.email, user.name || 'Broker');
+
+      return reply.send({ success: true, message: 'User approved successfully and welcomed to CRM.' });
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to approve user' });
@@ -156,10 +194,30 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.post('/users/:id/reject', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
+      const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      if (!user) {
+        return reply.code(404).send({ success: false, message: 'User not found' });
+      }
+
+      // Revert broker/agent roles back to BUYER to revoke CRM and broker portal access
+      const isUserAdmin = user.role === 'ADMIN';
+      const targetRole = isUserAdmin ? 'ADMIN' : 'BUYER';
+
       await db.update(users)
-        .set({ isActive: false, verificationStatus: 'REJECTED', updatedAt: new Date() })
+        .set({ 
+          isActive: true, // Rejection does not suspend the user account; they can still access as buyer
+          verificationStatus: 'REJECTED', 
+          regaVerified: false, // Revoke REGA verification
+          role: targetRole,
+          isReapplied: false,
+          updatedAt: new Date() 
+        })
         .where(eq(users.id, id));
-      return reply.send({ success: true, message: 'User rejected' });
+
+      // Send rejection notification email
+      await EmailService.sendRejectionEmail(user.email, user.name || 'User');
+
+      return reply.send({ success: true, message: 'User verification rejected successfully, role reverted to BUYER' });
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to reject user' });
@@ -258,6 +316,7 @@ export default async function adminRoutes(app: FastifyInstance) {
           createdAt: listings.createdAt,
           ownerId: listings.ownerId,
           aiQualificationActive: listings.aiQualificationActive,
+          projectId: listings.projectId,
         })
           .from(listings)
           .where(and(...conditions))
@@ -300,8 +359,12 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const { status } = request.body as { status: string };
     try {
+      const updateFields: any = { status: status as any, updatedAt: new Date() };
+      if (status === 'ACTIVE') {
+        updateFields.verified = true;
+      }
       await db.update(listings)
-        .set({ status: status as any, updatedAt: new Date() })
+        .set(updateFields)
         .where(eq(listings.id, id));
       return reply.send({ success: true, message: 'Listing status updated' });
     } catch (err) {
@@ -867,6 +930,78 @@ export default async function adminRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to update lead status' });
+    }
+  });
+
+  // ── Create User ──
+  app.post('/users', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { name, email: rawEmail, phone, role, password, regaLicence } = request.body as any;
+    if (!rawEmail || !password || !role) {
+      return reply.code(400).send({ success: false, message: 'Email, password, and role are required' });
+    }
+    const email = rawEmail.toLowerCase().trim();
+    try {
+      const existingUser = await db.query.users.findFirst({
+        where: eq(users.email, email),
+      });
+      if (existingUser) {
+        return reply.code(400).send({ success: false, message: 'User with this email already exists' });
+      }
+
+      const passwordHash = await AuthService.hashPassword(password);
+      const newUsers = await db.insert(users).values({
+        email,
+        passwordHash,
+        name,
+        role: role as any,
+        phone,
+        regaLicence,
+        isActive: true,
+        verificationStatus: 'VERIFIED',
+        regaVerified: false,
+      }).returning();
+
+      const { passwordHash: _, ...userWithoutPassword } = newUsers[0];
+      return reply.send({ success: true, data: userWithoutPassword });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to create user' });
+    }
+  });
+
+  // ── Update User Profile / Role / Password ──
+  app.patch('/users/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { name, phone, role, password, regaLicence } = request.body as any;
+    try {
+      const existingUser = await db.query.users.findFirst({
+        where: eq(users.id, id),
+      });
+      if (!existingUser) {
+        return reply.code(404).send({ success: false, message: 'User not found' });
+      }
+
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+      if (name !== undefined) updateData.name = name;
+      if (phone !== undefined) updateData.phone = phone;
+      if (role !== undefined) updateData.role = role as any;
+      if (regaLicence !== undefined) updateData.regaLicence = regaLicence;
+      if (password) {
+        updateData.passwordHash = await AuthService.hashPassword(password);
+      }
+
+      const updatedUsers = await db.update(users)
+        .set(updateData)
+        .where(eq(users.id, id))
+        .returning();
+
+      const { passwordHash: _, ...userWithoutPassword } = updatedUsers[0];
+      return reply.send({ success: true, data: userWithoutPassword });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to update user' });
     }
   });
 }

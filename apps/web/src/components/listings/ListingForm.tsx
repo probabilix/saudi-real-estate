@@ -5,8 +5,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useForm, FormProvider, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createListingSchema, updateListingSchema, LISTING_TYPES } from '@saudi-re/shared';
-import { api } from '@/lib/api';
-import { useAuth } from '@/hooks/use-auth';
+import { api } from '../../lib/api';
+import { useAuth } from '../../hooks/use-auth';
 import {
   Building2, MapPin, Ruler, Banknote, ShieldCheck,
   Image as ImageIcon, Loader2, Save, Send, AlertCircle,
@@ -18,8 +18,11 @@ import {
   Zap, Flame, Tv, Coffee, Utensils, AlignLeft,
   Plus, Users, Briefcase, Glasses, Trash2, Home,
   Refrigerator, Shirt, Calendar, TrendingUp, X,
-  Building2 as AgencyIcon, BookOpen, Map as MapIcon
+  BookOpen, Map
 } from 'lucide-react';
+
+const AgencyIcon = Building2;
+const MapIcon = Map;
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MediaUpload } from './MediaUpload';
@@ -146,6 +149,7 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
   const params = useParams();
   const searchParams = useSearchParams();
   const fromAdmin = searchParams.get('from') === 'admin';
+  const fromCrm = searchParams.get('from') === 'crm';
   const locale = params.locale as string || 'en';
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -419,9 +423,9 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       type: data.type,
       purpose: data.purpose,
       city: data.city,
-      arCity: data.arCity || undefined,
+      arCity: (data.arCity as string) || (data.city as string) || undefined,
       district: data.district || undefined,
-      arDistrict: data.arDistrict || undefined,
+      arDistrict: (data.arDistrict as string) || (data.district as string) || undefined,
       price: data.price,
       areaSqm: data.areaSqm || undefined,
       bedrooms: data.bedrooms ?? undefined,
@@ -490,7 +494,11 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
         const res = await api.createListing({ ...payload, status: 'DRAFT' });
         if (res.success && res.data?.shortId) shortId = res.data.shortId;
       }
-      if (fromAdmin) {
+      if (fromCrm) {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const crmBase = process.env.NEXT_PUBLIC_CRM_URL || (isLocal ? 'http://localhost:3003' : 'https://saudi-real-estate-crm.vercel.app');
+        window.location.href = `${crmBase}/my-listings?success=drafted&shortId=${shortId || ''}`;
+      } else if (fromAdmin) {
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || (isLocal ? 'http://localhost:3002' : 'https://saudi-real-estate-admin.vercel.app');
         window.location.href = `${adminBase}/listings?success=drafted&shortId=${shortId || ''}`;
@@ -538,11 +546,30 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
         }
       }
 
-      if (fromAdmin) {
+      if (fromCrm) {
+        const type = isEdit ? 'updated' : 'created';
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const crmBase = process.env.NEXT_PUBLIC_CRM_URL || (isLocal ? 'http://localhost:3003' : 'https://saudi-real-estate-crm.vercel.app');
+        if (isEdit) {
+          window.location.href = `${crmBase}/my-listings?success=${type}&shortId=${shortId || ''}`;
+        } else {
+          setIsSuccess(true);
+          setTimeout(() => {
+            window.location.href = `${crmBase}/my-listings?success=${type}&shortId=${shortId || ''}`;
+          }, 2000);
+        }
+      } else if (fromAdmin) {
         const type = isEdit ? 'updated' : 'created';
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || (isLocal ? 'http://localhost:3002' : 'https://saudi-real-estate-admin.vercel.app');
-        window.location.href = `${adminBase}/listings?success=${type}&shortId=${shortId || ''}`;
+        if (isEdit) {
+          window.location.href = `${adminBase}/listings?success=${type}&shortId=${shortId || ''}`;
+        } else {
+          setIsSuccess(true);
+          setTimeout(() => {
+            window.location.href = `${adminBase}/listings?success=${type}&shortId=${shortId || ''}`;
+          }, 2000);
+        }
       } else {
         setIsSuccess(true);
         router.refresh();
@@ -818,19 +845,12 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12">
                 <section className="bg-white p-8 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    {/* Left Column: Bilingual Locations */}
+                    {/* Left Column: Location */}
                     <div className="space-y-6">
                       <div className="flex items-center gap-2 mb-2">
                         <MapPin className="w-5 h-5 text-emerald-900" />
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Bilingual Location</h3>
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Location</h3>
                       </div>
-                      <InputField label="City (Arabic - Required)" dir="rtl" error={errors.arCity}>
-                        <input {...methods.register('arCity')} dir="rtl" placeholder="الرياض..." className="w-full bg-transparent text-xl font-bold text-slate-900 text-right outline-none" />
-                      </InputField>
-                      <InputField label="District (Arabic)" dir="rtl" error={errors.arDistrict}>
-                        <input {...methods.register('arDistrict')} dir="rtl" placeholder="حي النرجس..." className="w-full bg-transparent text-xl font-bold text-slate-900 text-right outline-none" />
-                      </InputField>
-                      <hr className="border-slate-100 my-2" />
                       <InputField label="City (English - Required)" error={errors.city}>
                         <input {...methods.register('city')} placeholder="Riyadh..." className="w-full bg-transparent text-xl font-bold text-slate-900 outline-none" />
                       </InputField>
@@ -883,28 +903,30 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                         )}
                       />
 
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 ml-4">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-900" />
-                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Verification Status</label>
-                        </div>
-                        <label className={`w-full flex items-center justify-between transition-all rounded-[1.5rem] border-2 shadow-sm p-4 md:p-6 cursor-pointer ${
-                          watch('verified')
-                            ? 'bg-emerald-900/5 border-emerald-900/30'
-                            : 'bg-white border-slate-300 hover:border-emerald-950/30'
-                        }`}>
-                          <div>
-                            <p className="font-black text-sm uppercase text-slate-900">Verified Property</p>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Display verified badge on main site</p>
+                      {(fromAdmin || user?.role === 'ADMIN') && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 ml-4">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-900" />
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Verification Status</label>
                           </div>
-                          <div className="relative">
-                            <input type="checkbox" {...methods.register('verified')} className="sr-only" />
-                            <div className={`w-12 h-6 rounded-full transition-colors relative ${watch('verified') ? 'bg-emerald-950' : 'bg-slate-200'}`}>
-                              <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${watch('verified') ? 'translate-x-6' : ''}`} />
+                          <label className={`w-full flex items-center justify-between transition-all rounded-[1.5rem] border-2 shadow-sm p-4 md:p-6 cursor-pointer ${
+                            watch('verified')
+                              ? 'bg-emerald-900/5 border-emerald-900/30'
+                              : 'bg-white border-slate-300 hover:border-emerald-950/30'
+                          }`}>
+                            <div>
+                              <p className="font-black text-sm uppercase text-slate-900">Verified Property</p>
+                              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Display verified badge on main site</p>
                             </div>
-                          </div>
-                        </label>
-                      </div>
+                            <div className="relative">
+                              <input type="checkbox" {...methods.register('verified')} className="sr-only" />
+                              <div className={`w-12 h-6 rounded-full transition-colors relative ${watch('verified') ? 'bg-emerald-950' : 'bg-slate-200'}`}>
+                                <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${watch('verified') ? 'translate-x-6' : ''}`} />
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </section>
@@ -1408,7 +1430,19 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                   </p>
                   <button
                     type="button"
-                    onClick={() => router.push(`/${locale}/dashboard/listings`)}
+                    onClick={() => {
+                      if (fromCrm) {
+                        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                        const crmBase = process.env.NEXT_PUBLIC_CRM_URL || (isLocal ? 'http://localhost:3003' : 'https://saudi-real-estate-crm.vercel.app');
+                        window.location.href = `${crmBase}/my-listings?success=${isEdit ? 'updated' : 'created'}`;
+                      } else if (fromAdmin) {
+                        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                        const adminBase = process.env.NEXT_PUBLIC_ADMIN_URL || (isLocal ? 'http://localhost:3002' : 'https://saudi-real-estate-admin.vercel.app');
+                        window.location.href = `${adminBase}/listings?success=${isEdit ? 'updated' : 'created'}`;
+                      } else {
+                        router.push(`/${locale}/dashboard/listings`);
+                      }
+                    }}
                     className="w-full py-5 bg-emerald-900 text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] hover:scale-[1.02] transition-all shadow-xl"
                   >
                     Go to Portal

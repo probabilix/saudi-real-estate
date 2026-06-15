@@ -309,7 +309,7 @@ export default function SettingsPage({ params: { locale } }: { params: { locale:
 
   const verStatus = user?.verificationStatus || 'UNVERIFIED';
 
-  const CITIES = ['Riyadh', 'Jeddah', 'Khobar', 'Dammam', 'Mecca', 'Medina'];
+  const CITIES = ['Riyadh', 'Jeddah', 'Khobar', 'Dammam', 'Mecca', 'Madinah'];
   const LANGUAGES = ['English', 'Arabic', 'Urdu', 'Hindi', 'French'];
 
   return (

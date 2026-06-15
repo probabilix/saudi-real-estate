@@ -98,7 +98,10 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
       <div className="bg-white border border-surface-200 rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 transform hover:-translate-y-1 relative h-full flex flex-col">
         {/* Link Overlay for the whole card area EXCEPT buttons */}
         <Link
-          href={`/${locale}/listings/${listing.id}`}
+          href={listing.projectId
+            ? `/${locale}/projects/${listing.projectId}?layout=${listing.shortId || listing.id}`
+            : `/${locale}/listings/${listing.id}`
+          }
           className="absolute inset-0 z-0"
           aria-label={title}
         />

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { users, buyerProfiles, leads, listings } from '../db/schema';
@@ -24,11 +25,19 @@ async function masterSync() {
         console.log(`Creating profile for ${user.name || user.email}...`);
         await db.insert(buyerProfiles).values({
           userId: user.id,
-          sessionId: 'auto-sync',
+          sessionId: user.id,
           lastSeen: new Date()
         });
       }
     }
+
+    // Clean up any existing auto-sync session IDs to isolate sessions
+    console.log('Migrating existing auto-sync session IDs to unique IDs...');
+    await db.execute(sql`
+      UPDATE buyer_profiles
+      SET session_id = COALESCE(user_id::varchar, id::varchar)
+      WHERE session_id = 'auto-sync';
+    `);
 
     // 4. Force Qualify Nabeel
     console.log('3. Force qualifying Nabeel (probabilix.ai@gmail.com)...');

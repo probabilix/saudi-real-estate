@@ -193,7 +193,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
           const l = res.data as ListingWithOwner & { isFavorited?: boolean; isQualified?: boolean };
           if (l.projectId) {
             setIsRedirecting(true);
-            router.replace(`/${locale}/projects/${l.projectId}?layout=${l.id}`);
+            router.replace(`/${locale}/projects/${l.projectId}?layout=${l.shortId || l.id}`);
             return;
           }
           setListing(l);

@@ -115,7 +115,15 @@ const bootstrap = async () => {
           SELECT 1 FROM buyer_profiles bp WHERE bp.user_id = u.id
         );
       `);
-      app.log.info('Database schema self-healing verified: sync_user_to_buyer_profile trigger and user backfill executed.');
+
+      // Clean up any existing auto-sync session IDs in the database
+      await db.execute(sql`
+        UPDATE buyer_profiles
+        SET session_id = COALESCE(user_id::varchar, id::varchar)
+        WHERE session_id = 'auto-sync';
+      `);
+
+      app.log.info('Database schema self-healing verified: sync_user_to_buyer_profile trigger, user backfill, and auto-sync session cleanup executed.');
     } catch (schemaErr) {
       app.log.error(schemaErr, 'Failed to verify database schemas on startup');
     }

@@ -561,7 +561,10 @@ export default function MyListingsPage() {
                           </button>
 
                           <a
-                            href={`${WEB_URL}/${listing.arTitle ? 'ar' : 'en'}/listings/${listing.id}${token ? `?token=${token}` : ''}`}
+                            href={listing.projectId
+                              ? `${WEB_URL}/${listing.arTitle ? 'ar' : 'en'}/projects/${listing.projectId}?layout=${listing.shortId || listing.id}${token ? `&token=${token}` : ''}`
+                              : `${WEB_URL}/${listing.arTitle ? 'ar' : 'en'}/listings/${listing.id}${token ? `?token=${token}` : ''}`
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-2 text-slate-400 hover:text-[#064e4b] hover:bg-slate-100 rounded-lg transition-colors inline-block"

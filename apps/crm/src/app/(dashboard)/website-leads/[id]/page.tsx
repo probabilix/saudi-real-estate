@@ -538,7 +538,10 @@ export default function WebsiteLeadDetailPage() {
                     <div className="text-[10px] text-surface-400 mt-1">{listing.city} {listing.district ? `· ${listing.district}` : ''}</div>
                     <div className="text-xs font-bold text-primary-600 mt-1">{listing.price?.toLocaleString()} SAR</div>
                     <a
-                      href={`${WEB_URL}/en/listings/${listing.id}`}
+                      href={listing.projectId
+                        ? `${WEB_URL}/en/projects/${listing.projectId}?layout=${listing.shortId || listing.id}`
+                        : `${WEB_URL}/en/listings/${listing.id}`
+                      }
                       target="_blank"
                       className="inline-flex items-center gap-1 text-[10px] text-primary-500 hover:underline mt-1"
                     >

@@ -266,8 +266,9 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
       if (typeof window !== 'undefined') {
         const searchParams = new URLSearchParams(window.location.search);
         const layoutParam = searchParams.get('layout');
-        if (layoutParam && layouts.some(l => l.id === layoutParam)) {
-          initialId = layoutParam;
+        const matchedLayout = layouts.find(l => l.id === layoutParam || l.shortId === layoutParam);
+        if (layoutParam && matchedLayout) {
+          initialId = matchedLayout.id;
           
           // Smooth scroll to floor plans layout
           setTimeout(() => {
@@ -299,6 +300,12 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
 
   const scrollToLayout = (layoutId: string) => {
     setSelectedLayoutId(layoutId);
+    const layout = layouts.find(l => l.id === layoutId);
+    if (layout && typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('layout', layout.shortId || layout.id);
+      window.history.replaceState(null, '', url.pathname + url.search);
+    }
     setTimeout(() => {
       const el = document.getElementById('project-floor-plans');
       if (el) {
@@ -955,7 +962,14 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                         return (
                           <button
                             key={layout.id}
-                            onClick={() => setSelectedLayoutId(layout.id)}
+                            onClick={() => {
+                              setSelectedLayoutId(layout.id);
+                              if (typeof window !== 'undefined') {
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('layout', layout.shortId || layout.id);
+                                window.history.replaceState(null, '', url.pathname + url.search);
+                              }
+                            }}
                             className={clsx(
                               "w-56 px-4 py-3.5 rounded-xl border transition-all flex flex-col gap-1 shrink-0 font-sans text-start relative group",
                               isActive 
@@ -999,7 +1013,14 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                         return (
                           <button
                             key={layout.id}
-                            onClick={() => setSelectedLayoutId(layout.id)}
+                            onClick={() => {
+                              setSelectedLayoutId(layout.id);
+                              if (typeof window !== 'undefined') {
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('layout', layout.shortId || layout.id);
+                                window.history.replaceState(null, '', url.pathname + url.search);
+                              }
+                            }}
                             className={clsx(
                               "w-full px-5 py-4 rounded-2xl border transition-all flex flex-col gap-1.5 font-sans text-start relative group shadow-sm",
                               isActive 

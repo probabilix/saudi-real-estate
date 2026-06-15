@@ -168,22 +168,33 @@ export default function DashboardPage() {
                   <p className="text-xs text-surface-400 mt-0.5">Leads by stage</p>
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={funnelData} barSize={28}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }}
-                    cursor={{ fill: '#f8fafb' }}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {funnelData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="overflow-x-auto custom-scrollbar">
+                <div className="min-w-[800px]">
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={funnelData} barSize={28} margin={{ top: 10, right: 15, left: -20, bottom: 25 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 10, fill: '#94a3b8' }} 
+                        interval={0} 
+                        height={45} 
+                        axisLine={false} 
+                        tickLine={false} 
+                      />
+                      <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }}
+                        cursor={{ fill: '#f8fafb' }}
+                      />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                        {funnelData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
 
             {/* Source Donut */}
@@ -229,23 +240,34 @@ export default function DashboardPage() {
                   <p className="text-xs text-surface-400 mt-0.5">Leads by stage</p>
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={websiteFunnelData} barSize={28} margin={{ top: 10, right: 10, left: -20, bottom: 15 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} interval={0} height={40} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }}
-                    cursor={{ fill: '#f8fafb' }}
-                    formatter={(value, name, props) => [value, props.payload.fullName]}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {websiteFunnelData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="overflow-x-auto custom-scrollbar">
+                <div className="min-w-[900px]">
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={websiteFunnelData} barSize={28} margin={{ top: 10, right: 15, left: -20, bottom: 25 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 9, fill: '#94a3b8' }} 
+                        interval={0} 
+                        height={45} 
+                        axisLine={false} 
+                        tickLine={false} 
+                      />
+                      <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }}
+                        cursor={{ fill: '#f8fafb' }}
+                        formatter={(value, name, props) => [value, props.payload.fullName]}
+                      />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                        {websiteFunnelData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
         )}

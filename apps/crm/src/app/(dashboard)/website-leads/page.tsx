@@ -220,84 +220,86 @@ export default function WebsiteLeadsPage() {
                 <p className="text-xs mt-1">Leads from AI conversations will appear here</p>
               </div>
             ) : (
-              <table className="crm-table">
-                <thead>
-                  <tr>
-                    <th>Lead</th>
-                    <th>Property / Project</th>
-                    <th>Intent Score</th>
-                    <th>Budget</th>
-                    <th>Status</th>
-                    <th>Agent</th>
-                    <th>Date</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leads.map(({ lead, listing, buyer, agent, project }) => (
-                    <tr key={lead.id}>
-                      <td>
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
-                            <span className="text-xs font-bold text-primary-600">
-                              {(buyer?.name || 'Anonymous Visitor').charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold text-surface-800">
-                              {lead.isQualified && <Sparkles className="inline w-2.5 h-2.5 text-gold mr-1" />}
-                              {buyer?.name || 'Anonymous Visitor'}
-                            </div>
-                            <div className="text-[10px] text-surface-400">{new Date(lead.createdAt).toLocaleDateString()}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        {listing ? (
-                          <div className="flex items-center gap-2">
-                            {listing.photos?.[0] && (
-                              <img src={listing.photos[0]} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
-                            )}
-                            <div className="min-w-0">
-                              <div className="text-xs font-semibold text-surface-700 truncate max-w-[140px]">
-                                {project ? (
-                                  <>
-                                    {project.nameEn} — {(() => {
-                                      const label = listing.enTitle ? listing.enTitle.replace(`${project.nameEn} - `, '') : '';
-                                      return label.toLowerCase().includes('layout') ? label : `${label} Layout`;
-                                    })()}
-                                  </>
-                                ) : (
-                                  listing.enTitle || listing.arTitle
-                                )}
-                              </div>
-                              <div className="text-[10px] text-surface-400">{listing.city} · {listing.price?.toLocaleString()} SAR</div>
-                            </div>
-                          </div>
-                        ) : <span className="text-surface-300 text-xs">—</span>}
-                      </td>
-                      <td>
-                        {buyer ? <IntentScore score={buyer.intentScore} /> : <span className="text-surface-300 text-xs">—</span>}
-                      </td>
-                      <td>
-                        <span className="text-xs text-surface-600">{lead.buyerBudgetDisplay ?? '—'}</span>
-                      </td>
-                      <td><StatusBadge status={lead.status} /></td>
-                      <td>
-                        <span className="text-xs text-surface-600">{agent?.name ?? '—'}</span>
-                      </td>
-                      <td>
-                        <span className="text-xs text-surface-400">{new Date(lead.createdAt).toLocaleDateString()}</span>
-                      </td>
-                      <td>
-                        <Link href={`/website-leads/${lead.id}`} className="btn-ghost text-xs px-2.5 py-1.5 gap-1">
-                          View <ExternalLink className="w-3 h-3" />
-                        </Link>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="crm-table">
+                  <thead>
+                    <tr>
+                      <th>Lead</th>
+                      <th>Property / Project</th>
+                      <th>Intent Score</th>
+                      <th>Budget</th>
+                      <th>Status</th>
+                      <th>Agent</th>
+                      <th>Date</th>
+                      <th></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {leads.map(({ lead, listing, buyer, agent, project }) => (
+                      <tr key={lead.id}>
+                        <td>
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
+                              <span className="text-xs font-bold text-primary-600">
+                                {(buyer?.name || 'Anonymous Visitor').charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold text-surface-800">
+                                {lead.isQualified && <Sparkles className="inline w-2.5 h-2.5 text-gold mr-1" />}
+                                {buyer?.name || 'Anonymous Visitor'}
+                              </div>
+                              <div className="text-[10px] text-surface-400">{new Date(lead.createdAt).toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          {listing ? (
+                            <div className="flex items-center gap-2">
+                              {listing.photos?.[0] && (
+                                <img src={listing.photos[0]} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-xs font-semibold text-surface-700 truncate max-w-[140px]">
+                                  {project ? (
+                                    <>
+                                      {project.nameEn} — {(() => {
+                                        const label = listing.enTitle ? listing.enTitle.replace(`${project.nameEn} - `, '') : '';
+                                        return label.toLowerCase().includes('layout') ? label : `${label} Layout`;
+                                      })()}
+                                    </>
+                                  ) : (
+                                    listing.enTitle || listing.arTitle
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-surface-400">{listing.city} · {listing.price?.toLocaleString()} SAR</div>
+                              </div>
+                            </div>
+                          ) : <span className="text-surface-300 text-xs">—</span>}
+                        </td>
+                        <td>
+                          {buyer ? <IntentScore score={buyer.intentScore} /> : <span className="text-surface-300 text-xs">—</span>}
+                        </td>
+                        <td>
+                          <span className="text-xs text-surface-600">{lead.buyerBudgetDisplay ?? '—'}</span>
+                        </td>
+                        <td><StatusBadge status={lead.status} /></td>
+                        <td>
+                          <span className="text-xs text-surface-600">{agent?.name ?? '—'}</span>
+                        </td>
+                        <td>
+                          <span className="text-xs text-surface-400">{new Date(lead.createdAt).toLocaleDateString()}</span>
+                        </td>
+                        <td>
+                          <Link href={`/website-leads/${lead.id}`} className="btn-ghost text-xs px-2.5 py-1.5 gap-1">
+                            View <ExternalLink className="w-3 h-3" />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             {/* Pagination */}

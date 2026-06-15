@@ -211,54 +211,56 @@ export default function CampaignLeadsPage() {
                 <p className="text-xs mt-1">Add a lead manually or connect Meta Ads webhook</p>
               </div>
             ) : (
-              <table className="crm-table">
-                <thead>
-                  <tr>
-                    <th>Lead</th>
-                    <th>Source</th>
-                    <th>Status</th>
-                    <th>Score</th>
-                    <th>City</th>
-                    <th>Agent</th>
-                    <th>Date</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allLeads.map(({ lead, agent }) => {
-                    const stage = CRM_STAGES.find(s => s.key === lead.status);
-                    return (
-                      <tr key={lead.id}>
-                        <td>
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-surface-100">
-                              <span className="text-xs font-bold text-surface-600">{lead.name.charAt(0).toUpperCase()}</span>
+              <div className="overflow-x-auto">
+                <table className="crm-table">
+                  <thead>
+                    <tr>
+                      <th>Lead</th>
+                      <th>Source</th>
+                      <th>Status</th>
+                      <th>Score</th>
+                      <th>City</th>
+                      <th>Agent</th>
+                      <th>Date</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allLeads.map(({ lead, agent }) => {
+                      const stage = CRM_STAGES.find(s => s.key === lead.status);
+                      return (
+                        <tr key={lead.id}>
+                          <td>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-surface-100">
+                                <span className="text-xs font-bold text-surface-600">{lead.name.charAt(0).toUpperCase()}</span>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold text-surface-800">{lead.name}</div>
+                                <div className="text-[10px] text-surface-400">{lead.phone}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-xs font-semibold text-surface-800">{lead.name}</div>
-                              <div className="text-[10px] text-surface-400">{lead.phone}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td><SourceBadge source={lead.source} /></td>
-                        <td>
-                          <span className={clsx('badge border', stage?.colorClass)}>
-                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: stage?.dotColor }} />
-                            {stage?.label ?? lead.status}
-                          </span>
-                        </td>
-                        <td><LeadScorePill score={lead.leadScore} /></td>
-                        <td><span className="text-xs text-surface-600">{lead.cityPreference ?? '—'}</span></td>
-                        <td><span className="text-xs text-surface-600">{agent?.name ?? <span className="text-red-400 font-medium">Unassigned</span>}</span></td>
-                        <td><span className="text-xs text-surface-400">{new Date(lead.createdAt).toLocaleDateString()}</span></td>
-                        <td>
-                          <Link href={`/campaign-leads/${lead.id}`} className="btn-ghost text-xs px-2.5 py-1">View</Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td><SourceBadge source={lead.source} /></td>
+                          <td>
+                            <span className={clsx('badge border', stage?.colorClass)}>
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: stage?.dotColor }} />
+                              {stage?.label ?? lead.status}
+                            </span>
+                          </td>
+                          <td><LeadScorePill score={lead.leadScore} /></td>
+                          <td><span className="text-xs text-surface-600">{lead.cityPreference ?? '—'}</span></td>
+                          <td><span className="text-xs text-surface-600">{agent?.name ?? <span className="text-red-400 font-medium">Unassigned</span>}</span></td>
+                          <td><span className="text-xs text-surface-400">{new Date(lead.createdAt).toLocaleDateString()}</span></td>
+                          <td>
+                            <Link href={`/campaign-leads/${lead.id}`} className="btn-ghost text-xs px-2.5 py-1">View</Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

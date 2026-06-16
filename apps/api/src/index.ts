@@ -205,7 +205,26 @@ const bootstrap = async () => {
       return { 
         status: 'online', 
         message: 'Saudi Real Estate API is running',
-        environment: process.env.NODE_ENV 
+        environment: process.env.NODE_ENV,
+        version: '0.1.0',
+        deployment: {
+          commitSha: process.env.VERCEL_GIT_COMMIT_SHA || 'dev',
+          branch: process.env.VERCEL_GIT_COMMIT_REF || 'dev',
+          commitMessage: process.env.VERCEL_GIT_COMMIT_MESSAGE || 'local development',
+          commitAuthor: process.env.VERCEL_GIT_COMMIT_AUTHOR_NAME || 'local'
+        }
+      };
+    });
+
+    // ── Dedicated Version Endpoint ──
+    app.get('/version', async () => {
+      return {
+        version: '0.1.0',
+        commitSha: process.env.VERCEL_GIT_COMMIT_SHA || 'dev',
+        branch: process.env.VERCEL_GIT_COMMIT_REF || 'dev',
+        commitMessage: process.env.VERCEL_GIT_COMMIT_MESSAGE || 'local development',
+        commitAuthor: process.env.VERCEL_GIT_COMMIT_AUTHOR_NAME || 'local',
+        timestamp: new Date().toISOString()
       };
     });
 

@@ -20,7 +20,13 @@ export default async function v1Routes(app: FastifyInstance) {
     return { 
       success: true, 
       status: 'authenticated-core-online',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      version: '0.1.0',
+      deployment: {
+        commitSha: process.env.VERCEL_GIT_COMMIT_SHA || 'dev',
+        branch: process.env.VERCEL_GIT_COMMIT_REF || 'dev',
+        commitMessage: process.env.VERCEL_GIT_COMMIT_MESSAGE || 'local development'
+      }
     };
   });
 

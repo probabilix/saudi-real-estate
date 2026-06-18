@@ -61,6 +61,8 @@ async function fixDb() {
     await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "completion_status" "completion_status";`);
     await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "expected_delivery" varchar(50);`);
     await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "total_units" integer;`);
+    await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "is_featured" boolean DEFAULT false;`);
+    await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "featured_order" integer DEFAULT 0;`);
 
     console.log('⏳ Creating indexes and foreign keys...');
     

@@ -38,10 +38,10 @@ export default function FooterCTAStrip() {
             className="flex-shrink-0"
           >
             <Link
-              href={`/${locale}/listings`}
+              href={`/${locale}/projects`}
               className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-xl bg-white text-primary-700 font-extrabold text-sm hover:bg-primary-50 hover:-translate-y-0.5 shadow-lg shadow-primary-800/25 transition-all duration-300 group"
             >
-              {isRTL ? 'تصفح جميع العقارات' : 'Browse All Listings'}
+              {isRTL ? 'تصفح جميع المشاريع' : 'Browse All Projects'}
               <ArrowRight className={`w-4 h-4 transition-transform ${isRTL ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
             </Link>
           </motion.div>

@@ -223,6 +223,11 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  patchProject: (id: string, data: Partial<AdminProject>) =>
+    request<{ success: boolean; data: AdminProject }>(`/listings/projects/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
   createProject: (data: { nameEn: string; nameAr: string; descriptionEn?: string; descriptionAr?: string; city: string; district?: string; mapEmbedUrl?: string }) =>
     request<AdminProject>('/listings/projects', {
       method: 'POST',
@@ -463,6 +468,8 @@ export interface AdminProject {
   completionStatus?: 'READY' | 'OFF_PLAN' | 'UNDER_CONSTRUCTION' | null;
   expectedDelivery?: string | null;
   totalUnits?: number | null;
+  isFeatured?: boolean;
+  featuredOrder?: number;
   createdAt: string;
   updatedAt: string;
 }

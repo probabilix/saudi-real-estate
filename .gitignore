@@ -38,3 +38,7 @@ coverage
 audit_listings.ts
 seed-news.ts
 scratch/
+
+# Mobile docs
+MOBILE_API_REQUIREMENTS.md
+MOBILE_API_RESPONSES.md

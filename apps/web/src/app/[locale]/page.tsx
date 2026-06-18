@@ -28,6 +28,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
 
   let featuredLimit = 6;
   let featuredListings: Listing[] = [];
+  let featuredProjects: any[] = [];
   const cityCounts: Record<string, number> = { Riyadh: 0, Jeddah: 0, Dammam: 0, AlUla: 0 };
   let recentArticles = [];
   let homeFaqs = [];
@@ -73,8 +74,9 @@ export default async function HomePage({ params: { locale } }: { params: { local
   }
 
   try {
-    const [listingsRes, newsRes, faqsRes, ...cityResponses] = await Promise.all([
+    const [listingsRes, projectsRes, newsRes, faqsRes, ...cityResponses] = await Promise.all([
       fetch(`${API_BASE_URL}/listings?limit=${featuredLimit}&isFeatured=true`, { cache: 'no-store' }).catch(() => null),
+      fetch(`${API_BASE_URL}/system/projects?limit=${featuredLimit}&isFeatured=true`, { cache: 'no-store' }).catch(() => null),
       fetch(`${API_BASE_URL}/news`, { cache: 'no-store' }).catch(() => null),
       fetch(`${API_BASE_URL}/system/faqs`, { cache: 'no-store' }).catch(() => null),
       ...['Riyadh', 'Jeddah', 'Dammam', 'AlUla'].map(city =>
@@ -85,6 +87,11 @@ export default async function HomePage({ params: { locale } }: { params: { local
     if (listingsRes?.ok) {
       const json = await listingsRes.json();
       featuredListings = json?.data?.items || json?.items || [];
+    }
+
+    if (projectsRes?.ok) {
+      const json = await projectsRes.json();
+      featuredProjects = json?.data?.items || json?.items || [];
     }
 
     if (newsRes?.ok) {
@@ -121,7 +128,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
   return (
     <>
       <HeroSection contactPhone={contactPhone} />
-      <FeaturedSection listings={featuredListings} />
+      <FeaturedSection listings={featuredListings} projects={featuredProjects} />
       <HowItWorksSection />
       <TrustSection stats={homepageStats} />
       <CitySpotlightSection counts={cityCounts} />

@@ -111,7 +111,7 @@ export default function Footer() {
             </h3>
             <ul className="space-y-4">
               <li>
-                <Link href={`/${locale}/listings`} className="text-sm text-surface-400 hover:text-primary-400 transition-colors">
+                <Link href={`/${locale}/projects`} className="text-sm text-surface-400 hover:text-primary-400 transition-colors">
                   {tNav('listings')}
                 </Link>
               </li>

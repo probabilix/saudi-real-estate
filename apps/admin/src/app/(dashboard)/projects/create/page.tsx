@@ -9,7 +9,7 @@ import { CldUploadWidget } from 'next-cloudinary';
 import {
   Layers, Plus, Trash2, Save, ArrowLeft, Loader2,
   Upload, Image as ImageIcon, Check, AlertCircle, Building2,
-  MapPin, FileText, ShieldCheck, Calendar, Hash
+  MapPin, FileText, ShieldCheck, Calendar, Hash, Star
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -83,6 +83,8 @@ export default function CreateProjectPage() {
   const [amenities, setAmenities] = useState<Record<string, boolean>>(initialAmenities);
   const [customAmenity, setCustomAmenity] = useState('');
   const [dynamicAmenities, setDynamicAmenities] = useState<string[]>([]);
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [featuredOrder, setFeaturedOrder] = useState('');
 
   // Section B — Layouts
   const [layouts, setLayouts] = useState<LayoutRow[]>([
@@ -150,6 +152,8 @@ export default function CreateProjectPage() {
           brochureUrl, regaFalLicense, completionStatus, expectedDelivery,
           totalUnits: totalUnits ? Number(totalUnits) : undefined,
           mapEmbedUrl, photos, amenities: cleanAmenities,
+          isFeatured,
+          featuredOrder: featuredOrder ? Number(featuredOrder) : 0,
         },
         layouts: layouts.map(l => ({
           labelEn: l.labelEn,
@@ -282,6 +286,40 @@ export default function CreateProjectPage() {
               <div>
                 <label className="admin-label">Google Maps Embed URL</label>
                 <input type="url" className="admin-input" placeholder="https://www.google.com/maps/embed?pb=..." value={mapEmbedUrl} onChange={e => setMapEmbedUrl(e.target.value)} />
+              </div>
+
+              {/* Featured Status (Admin/CRM settings) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="isFeatured"
+                    checked={isFeatured}
+                    onChange={(e) => setIsFeatured(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-surface-300"
+                  />
+                  <div>
+                    <label htmlFor="isFeatured" className="text-xs font-bold text-surface-900 cursor-pointer flex items-center gap-1.5">
+                      <Star className={clsx("w-4 h-4", isFeatured ? "text-amber-500 fill-amber-500" : "text-surface-400")} />
+                      Feature this project
+                    </label>
+                    <p className="text-[10px] text-surface-500 mt-0.5">Show this project in the featured section of home page and top of project searches.</p>
+                  </div>
+                </div>
+                {isFeatured && (
+                  <div>
+                    <label className="admin-label">Featured Order (Sorting Rank)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 1"
+                      className="admin-input"
+                      value={featuredOrder}
+                      onChange={(e) => setFeaturedOrder(e.target.value)}
+                    />
+                    <p className="text-[10px] text-surface-500 mt-1">Lower values rank higher (e.g., 1 is shown before 2).</p>
+                  </div>
+                )}
               </div>
 
               {/* Project Photos */}

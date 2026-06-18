@@ -42,7 +42,7 @@ export default function HeroSection({ contactPhone }: HeroSectionProps) {
     if (purpose) params.set('purpose', purpose);
     if (minPrice) params.set('minPrice', String(minPrice));
     if (maxPrice) params.set('maxPrice', String(maxPrice));
-    router.push(`/${locale}/listings?${params.toString()}`);
+    router.push(`/${locale}/projects?${params.toString()}`);
   }
 
   return (
@@ -116,7 +116,7 @@ export default function HeroSection({ contactPhone }: HeroSectionProps) {
                   <ArrowRight className={`w-4 h-4 relative z-10 transition-transform duration-300 group-hover:translate-x-1 ${isRTL ? 'rotate-180 group-hover:-translate-x-1' : ''}`} />
                 </button>
                 <Link
-                  href={`/${locale}/listings`}
+                  href={`/${locale}/projects`}
                   className="sm:w-auto flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border-2 border-primary-600/30 text-primary-700 font-bold text-sm hover:border-primary-600 hover:bg-primary-50 transition-all duration-200"
                 >
                   {isRTL ? 'تصفح الكل' : 'Browse All'}

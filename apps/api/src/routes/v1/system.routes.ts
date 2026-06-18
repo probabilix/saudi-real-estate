@@ -1003,12 +1003,16 @@ ${historyText}
       const query = request.query as any;
       const city = query.city as string;
       const q = query.q as string;
+      const isFeatured = query.isFeatured === 'true';
       const page = Number(query.page || 1);
       const limit = Number(query.limit || 20);
 
       const conditions: any[] = [];
       if (city) {
         conditions.push(eq(projects.city, city));
+      }
+      if (isFeatured) {
+        conditions.push(eq(projects.isFeatured, true));
       }
       if (q) {
         const searchPattern = `%${q}%`;
@@ -1032,7 +1036,11 @@ ${historyText}
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .limit(limit)
         .offset((page - 1) * limit)
-        .orderBy(desc(projects.createdAt));
+        .orderBy(
+          desc(projects.isFeatured),
+          sql`CASE WHEN ${projects.featuredOrder} > 0 THEN ${projects.featuredOrder} ELSE 999999 END ASC`,
+          desc(projects.createdAt)
+        );
 
       const projectIds = allProjects.map(p => p.id);
       const layoutsMap: Record<string, any[]> = {};

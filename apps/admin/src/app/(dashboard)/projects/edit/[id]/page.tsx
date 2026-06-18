@@ -9,7 +9,7 @@ import { CldUploadWidget } from 'next-cloudinary';
 import {
   Plus, Trash2, Save, X, ArrowLeft, Loader2,
   Upload, Image as ImageIcon, Check,
-  AlertCircle, Sparkles, Building, Layers
+  AlertCircle, Sparkles, Building, Layers, Star
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -61,6 +61,8 @@ interface ProjectFormState {
   expectedDelivery: string;
   totalUnits: number;
   mapEmbedUrl: string;
+  isFeatured: boolean;
+  featuredOrder: number;
 }
 
 export default function EditProjectPage() {
@@ -89,6 +91,8 @@ export default function EditProjectPage() {
     expectedDelivery: '',
     totalUnits: 0,
     mapEmbedUrl: '',
+    isFeatured: false,
+    featuredOrder: 0,
   });
 
   // Custom dynamic amenities list
@@ -179,6 +183,8 @@ export default function EditProjectPage() {
           expectedDelivery: p.expectedDelivery || '',
           totalUnits: p.totalUnits || 0,
           mapEmbedUrl: p.mapEmbedUrl || '',
+          isFeatured: !!p.isFeatured,
+          featuredOrder: p.featuredOrder || 0,
         });
 
         // Pre-fill layouts
@@ -288,6 +294,7 @@ export default function EditProjectPage() {
         ...projectData,
         amenities: cleanAmenities,
         totalUnits: projectData.totalUnits ? Number(projectData.totalUnits) : null,
+        featuredOrder: projectData.featuredOrder ? Number(projectData.featuredOrder) : 0,
         layouts: layouts.map(l => ({
           id: l.id,
           labelEn: l.labelEn,
@@ -509,6 +516,40 @@ export default function EditProjectPage() {
                     onChange={(e) => handleProjectChange('mapEmbedUrl', e.target.value)}
                   />
                 </div>
+              </div>
+
+              {/* Featured Status (Admin/CRM settings) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="isFeatured"
+                    checked={projectData.isFeatured}
+                    onChange={(e) => handleProjectChange('isFeatured', e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-surface-300"
+                  />
+                  <div>
+                    <label htmlFor="isFeatured" className="text-xs font-bold text-surface-900 cursor-pointer flex items-center gap-1.5">
+                      <Star className={clsx("w-4 h-4", projectData.isFeatured ? "text-amber-500 fill-amber-500" : "text-surface-400")} />
+                      Feature this project
+                    </label>
+                    <p className="text-[10px] text-surface-500 mt-0.5">Show this project in the featured section of home page and top of project searches.</p>
+                  </div>
+                </div>
+                {projectData.isFeatured && (
+                  <div>
+                    <label className="admin-label">Featured Order (Sorting Rank)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 1"
+                      className="admin-input"
+                      value={projectData.featuredOrder}
+                      onChange={(e) => handleProjectChange('featuredOrder', e.target.value)}
+                    />
+                    <p className="text-[10px] text-surface-500 mt-1">Lower values rank higher (e.g., 1 is shown before 2).</p>
+                  </div>
+                )}
               </div>
 
               {/* Cover Photo Gallery */}

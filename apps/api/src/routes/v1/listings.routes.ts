@@ -333,7 +333,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
    * Create a new project
    */
   app.post('/projects', { preHandler: [authenticateJWT] }, async (request, reply) => {
-    const { nameEn, nameAr, descriptionEn, descriptionAr, city, district, mapEmbedUrl } = request.body as any;
+    const { nameEn, nameAr, descriptionEn, descriptionAr, city, district, mapEmbedUrl, isFeatured, featuredOrder } = request.body as any;
     if (!nameEn || !nameAr || !city) {
       return reply.code(400).send({ success: false, message: 'nameEn, nameAr and city are required' });
     }
@@ -346,6 +346,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         city,
         district,
         mapEmbedUrl,
+        isFeatured: isFeatured !== undefined ? !!isFeatured : false,
+        featuredOrder: featuredOrder !== undefined ? (featuredOrder === '' ? 0 : Number(featuredOrder)) : 0,
       }).returning();
       return reply.code(201).send({ success: true, data: newProject });
     } catch (err: any) {
@@ -375,6 +377,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         expectedDelivery?: string;
         totalUnits?: number;
         mapEmbedUrl?: string;
+        isFeatured?: boolean;
+        featuredOrder?: number;
       };
       layouts: Array<{
         labelEn: string;
@@ -421,6 +425,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         completionStatus: project.completionStatus,
         expectedDelivery: project.expectedDelivery,
         totalUnits: project.totalUnits,
+        isFeatured: project.isFeatured !== undefined ? !!project.isFeatured : false,
+        featuredOrder: project.featuredOrder !== undefined ? (project.featuredOrder === null ? 0 : Number(project.featuredOrder)) : 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
@@ -540,6 +546,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
       completionStatus,
       expectedDelivery,
       totalUnits,
+      isFeatured,
+      featuredOrder,
       layouts
     } = request.body as any;
 
@@ -564,6 +572,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
           completionStatus: completionStatus || null,
           expectedDelivery: expectedDelivery || null,
           totalUnits: totalUnits ? Number(totalUnits) : null,
+          isFeatured: isFeatured !== undefined ? !!isFeatured : undefined,
+          featuredOrder: featuredOrder !== undefined ? (featuredOrder === '' ? 0 : Number(featuredOrder)) : undefined,
           updatedAt: new Date(),
         })
         .where(eq(projects.id, id))
@@ -676,6 +686,67 @@ export default async function listingsRoutes(app: FastifyInstance) {
     } catch (err: any) {
       console.error('Update project error:', err);
       return reply.status(500).send({ success: false, message: 'Failed to update project', error: err.message });
+    }
+  });
+
+  /**
+   * PATCH /api/v1/listings/projects/:id
+   * Partial update project details (Authenticated)
+   */
+  app.patch('/projects/:id', { preHandler: [authenticateJWT] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as any;
+
+    try {
+      const [existing] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+      if (!existing) {
+        return reply.code(404).send({ success: false, message: 'Project not found' });
+      }
+
+      const updateData: any = {
+        updatedAt: new Date()
+      };
+
+      if (body.nameEn !== undefined) updateData.nameEn = body.nameEn;
+      if (body.nameAr !== undefined) updateData.nameAr = body.nameAr;
+      if (body.descriptionEn !== undefined) updateData.descriptionEn = body.descriptionEn;
+      if (body.descriptionAr !== undefined) updateData.descriptionAr = body.descriptionAr;
+      if (body.city !== undefined) updateData.city = body.city;
+      if (body.district !== undefined) updateData.district = body.district;
+      if (body.mapEmbedUrl !== undefined) updateData.mapEmbedUrl = body.mapEmbedUrl;
+      if (body.brochureUrl !== undefined) updateData.brochureUrl = body.brochureUrl;
+      if (body.regaFalLicense !== undefined) updateData.regaFalLicense = body.regaFalLicense;
+      if (body.amenities !== undefined) updateData.amenities = body.amenities;
+      if (body.photos !== undefined) updateData.photos = body.photos;
+      if (body.completionStatus !== undefined) updateData.completionStatus = body.completionStatus;
+      if (body.expectedDelivery !== undefined) updateData.expectedDelivery = body.expectedDelivery;
+      if (body.totalUnits !== undefined) updateData.totalUnits = body.totalUnits !== null && body.totalUnits !== '' ? Number(body.totalUnits) : null;
+      if (body.isFeatured !== undefined) updateData.isFeatured = !!body.isFeatured;
+      if (body.featuredOrder !== undefined) updateData.featuredOrder = body.featuredOrder !== null && body.featuredOrder !== '' ? Number(body.featuredOrder) : 0;
+
+      const [updatedProject] = await db.update(projects)
+        .set(updateData)
+        .where(eq(projects.id, id))
+        .returning();
+
+      // propagate city, district, regaFalLicense, brochureUrl to all linked listings if changed
+      const propagateData: any = {};
+      if (body.city !== undefined) propagateData.city = body.city;
+      if (body.district !== undefined) propagateData.district = body.district;
+      if (body.regaFalLicense !== undefined) propagateData.regaFalLicense = body.regaFalLicense;
+      if (body.brochureUrl !== undefined) propagateData.brochureUrl = body.brochureUrl;
+
+      if (Object.keys(propagateData).length > 0) {
+        propagateData.updatedAt = new Date();
+        await db.update(listings)
+          .set(propagateData)
+          .where(eq(listings.projectId, id));
+      }
+
+      return reply.send({ success: true, data: updatedProject });
+    } catch (err: any) {
+      console.error('Patch project error:', err);
+      return reply.status(500).send({ success: false, message: 'Failed to patch project', error: err.message });
     }
   });
 

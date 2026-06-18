@@ -8,7 +8,7 @@ import {
   Layers, Plus, Search, MapPin, Loader2,
   ExternalLink, Download, Building2, ChevronDown, ChevronUp,
   CheckCircle, Clock, Construction, Edit, Trash2, Eye,
-  Bed, Square, DollarSign
+  Bed, Square, DollarSign, Star
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -28,6 +28,8 @@ interface ProjectListItem {
   layoutCount: number;
   leadCount: number;
   createdAt: string;
+  isFeatured?: boolean;
+  featuredOrder?: number;
 }
 
 interface LayoutItem {
@@ -50,10 +52,38 @@ export default function ProjectsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Accordion state
-  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
-  const [projectLayouts, setProjectLayouts] = useState<Record<string, LayoutItem[]>>({});
-  const [layoutsLoading, setLayoutsLoading] = useState<Record<string, boolean>>({});
+  const handleToggleFeatured = async (id: string, isCurrentlyFeatured: boolean) => {
+    try {
+      const res = await adminApi.patchProject(id, { isFeatured: !isCurrentlyFeatured });
+      if (res.success) {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, isFeatured: !isCurrentlyFeatured } : p));
+        setToast({
+          message: isCurrentlyFeatured
+            ? 'Project removed from featured section.'
+            : 'Project promoted to featured section.',
+          type: 'success'
+        });
+      } else {
+        setToast({ message: 'Failed to update project featured status.', type: 'error' });
+      }
+    } catch (err: any) {
+      setToast({ message: err.message || 'Error updating featured status.', type: 'error' });
+    }
+  };
+
+  const handleUpdateFeaturedOrder = async (id: string, order: number) => {
+    try {
+      const res = await adminApi.patchProject(id, { featuredOrder: order });
+      if (res.success) {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, featuredOrder: order } : p));
+        setToast({ message: 'Project featured order updated.', type: 'success' });
+      } else {
+        setToast({ message: 'Failed to update project featured order.', type: 'error' });
+      }
+    } catch (err: any) {
+      setToast({ message: err.message || 'Error updating featured order.', type: 'error' });
+    }
+  };
 
   useEffect(() => { loadProjects(); }, []);
 
@@ -104,6 +134,10 @@ export default function ProjectsPage() {
       }
     }
   };
+
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+  const [projectLayouts, setProjectLayouts] = useState<Record<string, LayoutItem[]>>({});
+  const [layoutsLoading, setLayoutsLoading] = useState<Record<string, boolean>>({});
 
   const filteredProjects = projects.filter(p => {
     const q = searchQuery.toLowerCase();
@@ -188,20 +222,21 @@ export default function ProjectsPage() {
                   <th>Status</th>
                   <th className="text-center">Layouts</th>
                   <th className="text-center">Leads</th>
+                  <th className="text-center">Featured</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-20 text-center">
+                    <td colSpan={7} className="py-20 text-center">
                       <Loader2 className="w-8 h-8 animate-spin text-primary-600 mx-auto" />
                       <p className="text-xs text-surface-500 mt-2">Loading projects...</p>
                     </td>
                   </tr>
                 ) : filteredProjects.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-20 text-center">
+                    <td colSpan={7} className="py-20 text-center">
                       <div className="w-12 h-12 bg-surface-50 rounded-full flex items-center justify-center mx-auto mb-3">
                         <Building2 className="w-6 h-6 text-surface-300" />
                       </div>
@@ -269,6 +304,42 @@ export default function ProjectsPage() {
                           </span>
                         </td>
 
+                        {/* Featured */}
+                        <td className="text-center">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <button
+                              onClick={() => handleToggleFeatured(project.id, !!project.isFeatured)}
+                              className={clsx(
+                                "p-1.5 rounded-lg border transition-all",
+                                project.isFeatured
+                                  ? "text-amber-600 bg-amber-50 border-amber-200 hover:bg-amber-100"
+                                  : "text-surface-400 hover:text-amber-600 hover:bg-amber-50 border-transparent"
+                              )}
+                              title={project.isFeatured ? "Remove from Featured" : "Mark as Featured"}
+                            >
+                              <Star className={clsx("w-4.5 h-4.5", project.isFeatured && "fill-amber-500 text-amber-500")} />
+                            </button>
+                            {project.isFeatured && (
+                              <div className="flex items-center gap-1 border border-surface-200 rounded px-1 py-0.5 bg-white max-w-[65px]">
+                                <span className="text-[9px] text-surface-400 font-bold uppercase select-none">Order:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  defaultValue={project.featuredOrder ?? 0}
+                                  onBlur={(e) => handleUpdateFeaturedOrder(project.id, Number(e.target.value))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleUpdateFeaturedOrder(project.id, Number((e.target as HTMLInputElement).value));
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                  className="w-8 text-center text-[10px] font-bold p-0 bg-transparent border-none focus:ring-0 outline-none"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
                         {/* Actions */}
                         <td className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -306,7 +377,7 @@ export default function ProjectsPage() {
                       {/* Expanded Layouts Accordion Row */}
                       {expandedProjectId === project.id && (
                         <tr>
-                          <td colSpan={6} className="bg-surface-50/80 px-6 py-4 border-t border-surface-100">
+                          <td colSpan={7} className="bg-surface-50/80 px-6 py-4 border-t border-surface-100">
                             {layoutsLoading[project.id] ? (
                               <div className="flex items-center gap-2 text-xs text-surface-500 py-2">
                                 <Loader2 className="w-4 h-4 animate-spin text-primary-600" />

@@ -91,10 +91,10 @@ export default function CTASection({ contactPhone, whatsappNumber }: CTASectionP
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Link
-                href={`/${locale}/listings`}
+                href={`/${locale}/projects`}
                 className="inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-xl bg-primary-600 text-white font-bold text-sm shadow-xl shadow-primary-600/25 hover:bg-primary-500 hover:-translate-y-0.5 transition-all duration-300 group"
               >
-                {isRTL ? 'تصفح العقارات' : 'Browse Properties'}
+                {isRTL ? 'تصفح المشاريع' : 'Browse Projects'}
                 <ArrowRight className={`w-4 h-4 transition-transform ${isRTL ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
               </Link>
 

@@ -140,6 +140,8 @@ export const projects = pgTable('projects', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  isFeatured: boolean('is_featured').default(false),
+  featuredOrder: integer('featured_order').default(0),
 });
 
 // ── Listings Table ──

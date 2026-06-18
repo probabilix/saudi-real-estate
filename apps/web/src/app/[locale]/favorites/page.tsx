@@ -262,7 +262,7 @@ export default function FavoritesPage() {
               </p>
               {!searchQuery && (
                 <Link
-                  href={`/${locale}/listings`}
+                  href={`/${locale}/projects`}
                   className="flex items-center gap-4 px-12 py-4 bg-charcoal text-white rounded-2xl font-bold hover:bg-primary-600 transition-all shadow-2xl shadow-charcoal/20 active:scale-95 group/btn"
                 >
                   {isRTL ? 'استكشف العقارات' : 'Explore Properties'}

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles, mortgageLeads } from '../../db/schema';
+import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles, mortgageLeads, projects } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import { AuthService } from '../../services/auth.service';
 import { EmailService } from '../../services/email.service';

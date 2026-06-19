@@ -438,20 +438,20 @@ export default function MortgageCalculator({
 
   return (
     <div className="w-full bg-white border border-surface-200/80 rounded-3xl p-6 lg:p-10 shadow-xl space-y-8 scroll-mt-24" id="loan-calculator">
-      <div className="flex items-center justify-between border-b border-surface-100 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-100 pb-5">
         <h3 className="text-2xl font-black text-charcoal font-serif tracking-tight flex items-center gap-2">
           <Coins className="w-6 h-6 text-[#006169]" />
           {t.title}
         </h3>
-        <span className="text-[10px] font-black uppercase bg-[#006169]/10 text-[#006169] px-3.5 py-1.5 rounded-full tracking-wider">
+        <span className="text-[10px] font-black uppercase bg-[#006169]/10 text-[#006169] px-3.5 py-1.5 rounded-full tracking-wider self-start sm:self-auto">
           {propertyExternalId}
         </span>
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Left Side: Inputs */}
-        <div className="lg:col-span-7 space-y-8">
+        <div className="col-span-1 lg:col-span-7 space-y-8">
           
           {/* Nationality & First Home Toggle Blocks (Stacked Vertically) */}
           <div className="flex flex-col gap-6">
@@ -757,7 +757,7 @@ export default function MortgageCalculator({
         </div>
 
         {/* Right Side: Calculation Breakdown (Interactive Panel) */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-surface-50/50 to-white rounded-3xl border border-surface-200 p-6 shadow-sm space-y-6 flex flex-col justify-between h-full min-h-[460px]">
+        <div className="col-span-1 lg:col-span-5 bg-gradient-to-br from-surface-50/50 to-white rounded-3xl border border-surface-200 p-6 shadow-sm space-y-6 flex flex-col justify-between h-full min-h-[460px]">
           
           <div className="space-y-6">
             <h4 className="text-xs font-black uppercase tracking-widest text-charcoal-muted text-center border-b border-surface-100 pb-3">

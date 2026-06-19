@@ -85,6 +85,21 @@ async function fixDb() {
       );
     `);
     console.log('✅ mortgage_leads table ensured');
+
+    // Create listing_reports table manually
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "listing_reports" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "listing_id" uuid NOT NULL REFERENCES "listings"("id") ON DELETE CASCADE,
+        "reason" varchar(255) NOT NULL,
+        "reporter_name" varchar(255) NOT NULL,
+        "reporter_email" varchar(255) NOT NULL,
+        "description" text,
+        "status" varchar(50) DEFAULT 'PENDING' NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+    `);
+    console.log('✅ listing_reports table ensured');
     
     // Add missing columns to broker_profiles
     await db.execute(sql`

@@ -7,7 +7,7 @@ import {
   Settings, FileText, LogOut, ChevronRight, ChevronLeft,
   ShieldCheck, Bell, Menu, X, CreditCard,
   BarChart3, Megaphone, Star, HelpCircle, Mail, Sparkles, Clock,
-  Layers
+  Layers, Flag
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -30,6 +30,7 @@ const NAV_GROUPS = [
       { href: '/verifications', label: 'Verifications', icon: ShieldCheck },
       { href: '/leads', label: 'Leads & CRM', icon: Sparkles },
       { href: '/mortgage-leads', label: 'Mortgage Leads', icon: CreditCard },
+      { href: '/reported-properties', label: 'Reported Properties', icon: Flag },
     ],
   },
   {

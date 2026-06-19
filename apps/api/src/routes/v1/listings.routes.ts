@@ -4,8 +4,8 @@ import { ListingService } from '../../services/listing.service';
 import { CloudinaryService } from '../../services/cloudinary.service';
 import { authenticateJWT, optionalAuthenticateJWT } from '../../middleware/auth.middleware';
 import { db } from '../../db';
-import { leads, buyerProfiles, listings, projects, projectUnits, users } from '../../db/schema';
-import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
+import { leads, buyerProfiles, listings, projects, projectUnits, users, listingReports } from '../../db/schema';
+import { eq, and, sql, desc, asc, inArray, or } from 'drizzle-orm';
 
 /**
  * Listings Routes
@@ -950,5 +950,54 @@ export default async function listingsRoutes(app: FastifyInstance) {
       return reply.status(500).send({ success: false, message: 'Failed to feature listing', error: err.message });
     }
   });
-}
 
+  /**
+   * POST /api/v1/listings/:id/report
+   * Report a listing for violations or inaccuracies
+   */
+  app.post('/:id/report', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { reason, reporterName, reporterEmail, description } = request.body as {
+      reason: string;
+      reporterName: string;
+      reporterEmail: string;
+      description?: string;
+    };
+
+    if (!reason || !reporterName || !reporterEmail) {
+      return reply.code(400).send({ success: false, message: 'Reason, reporter name, and email are required fields.' });
+    }
+
+    try {
+      // 1. Verify listing exists (match by ID or shortId)
+      const [listing] = await db.select({ id: listings.id })
+        .from(listings)
+        .where(or(eq(listings.id, id), eq(listings.shortId, id)))
+        .limit(1);
+
+      if (!listing) {
+        return reply.code(404).send({ success: false, message: 'Listing not found' });
+      }
+
+      // 2. Insert report entry
+      const [report] = await db.insert(listingReports)
+        .values({
+          listingId: listing.id,
+          reason,
+          reporterName,
+          reporterEmail,
+          description: description || null,
+        })
+        .returning();
+
+      return reply.send({
+        success: true,
+        message: 'Property report submitted successfully. Thank you for your feedback.',
+        data: report
+      });
+    } catch (err: any) {
+      console.error('Report property error:', err);
+      return reply.status(500).send({ success: false, message: 'Failed to submit report', error: err.message });
+    }
+  });
+}

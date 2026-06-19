@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles, mortgageLeads, projects } from '../../db/schema';
+import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles, mortgageLeads, projects, listingReports } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import { AuthService } from '../../services/auth.service';
 import { EmailService } from '../../services/email.service';
@@ -1339,6 +1339,111 @@ export default async function adminRoutes(app: FastifyInstance) {
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to update lead status.' });
+    }
+  });
+
+  /**
+   * GET /api/v1/admin/reported-properties
+   * Returns reported properties grouped by listing with report counts
+   */
+  app.get('/reported-properties', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    try {
+      // 1. Group reports by listingId with counts by status
+      const grouped = await db.select({
+        listingId: listingReports.listingId,
+        count: count(listingReports.id),
+        pendingCount: sql<number>`SUM(CASE WHEN ${listingReports.status} = 'PENDING' THEN 1 ELSE 0 END)::int`,
+        resolvedCount: sql<number>`SUM(CASE WHEN ${listingReports.status} = 'RESOLVED' THEN 1 ELSE 0 END)::int`,
+        dismissedCount: sql<number>`SUM(CASE WHEN ${listingReports.status} = 'DISMISSED' THEN 1 ELSE 0 END)::int`,
+      })
+        .from(listingReports)
+        .groupBy(listingReports.listingId);
+
+      if (grouped.length === 0) {
+        return reply.send({ success: true, data: [] });
+      }
+
+      const listingIds = grouped.map(g => g.listingId);
+
+      // 2. Fetch listings details
+      const matchedListings = await db.select({
+        id: listings.id,
+        shortId: listings.shortId,
+        enTitle: listings.enTitle,
+        arTitle: listings.arTitle,
+        city: listings.city,
+        price: listings.price
+      })
+        .from(listings)
+        .where(inArray(listings.id, listingIds));
+
+      const listingsMap = new Map<string, typeof matchedListings[0]>();
+      matchedListings.forEach(l => listingsMap.set(l.id, l));
+
+      // 3. Enrich the grouped data
+      const data = grouped.map(g => {
+        const listing = listingsMap.get(g.listingId);
+        return {
+          listingId: g.listingId,
+          reportCount: Number(g.count),
+          pendingCount: Number(g.pendingCount),
+          resolvedCount: Number(g.resolvedCount),
+          dismissedCount: Number(g.dismissedCount),
+          shortId: listing?.shortId || 'Unknown',
+          enTitle: listing?.enTitle || 'Untitled Listing',
+          arTitle: listing?.arTitle || 'عقار بدون عنوان',
+          city: listing?.city || '',
+          price: listing?.price || 0,
+        };
+      }).sort((a, b) => b.reportCount - a.reportCount);
+
+      return reply.send({ success: true, data });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch reported properties.' });
+    }
+  });
+
+  /**
+   * GET /api/v1/admin/reported-properties/:listingId/reports
+   * Returns individual report list for a specific listing
+   */
+  app.get('/reported-properties/:listingId/reports', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { listingId } = request.params as { listingId: string };
+    try {
+      const reports = await db.select()
+        .from(listingReports)
+        .where(eq(listingReports.listingId, listingId))
+        .orderBy(desc(listingReports.createdAt));
+
+      return reply.send({ success: true, data: reports });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch listing reports.' });
+    }
+  });
+
+  /**
+   * PATCH /api/v1/admin/reported-properties/:listingId/status
+   * Updates status of all reports for this property
+   */
+  app.patch('/reported-properties/:listingId/status', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { listingId } = request.params as { listingId: string };
+    const { status } = request.body as { status: string };
+
+    if (!['PENDING', 'RESOLVED', 'DISMISSED'].includes(status)) {
+      return reply.code(400).send({ success: false, message: 'Invalid status value.' });
+    }
+
+    try {
+      await db.update(listingReports)
+        .set({ status })
+        .where(eq(listingReports.listingId, listingId));
+
+      return reply.send({ success: true, message: `All reports for this property marked as ${status}.` });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to update reports status.' });
     }
   });
 }

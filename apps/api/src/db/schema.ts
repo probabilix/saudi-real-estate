@@ -756,4 +756,26 @@ export const crmLeadsRelations = relations(crmLeads, ({ one }) => ({
   }),
 }));
 
+// ── Property/Listing Reports Table ──
+export const listingReports = pgTable('listing_reports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  listingId: uuid('listing_id').references(() => listings.id, { onDelete: 'cascade' }).notNull(),
+  reason: varchar('reason', { length: 255 }).notNull(),
+  reporterName: varchar('reporter_name', { length: 255 }).notNull(),
+  reporterEmail: varchar('reporter_email', { length: 255 }).notNull(),
+  description: text('description'),
+  status: varchar('status', { length: 50 }).default('PENDING').notNull(), // 'PENDING', 'RESOLVED', 'DISMISSED'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const listingReportsRelations = relations(listingReports, ({ one }) => ({
+  listing: one(listings, {
+    fields: [listingReports.listingId],
+    references: [listings.id],
+  }),
+}));
+
+
+
+
 

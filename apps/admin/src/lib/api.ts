@@ -316,6 +316,19 @@ export const adminApi = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+
+  // ── Reported Properties ──
+  getReportedProperties: () =>
+    request<AdminReportedProperty[]>('/admin/reported-properties'),
+
+  getListingReports: (listingId: string) =>
+    request<AdminPropertyReport[]>(`/admin/reported-properties/${listingId}/reports`),
+
+  updateReportsStatus: (listingId: string, status: string) =>
+    request<{ success: boolean; message: string }>(`/admin/reported-properties/${listingId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
 };
 
 export interface ContactSubmission {
@@ -542,4 +555,28 @@ export interface AdminMortgageLead {
   createdAt: string;
   targetNameEn?: string;
   targetNameAr?: string;
+}
+
+export interface AdminReportedProperty {
+  listingId: string;
+  reportCount: number;
+  pendingCount: number;
+  resolvedCount: number;
+  dismissedCount: number;
+  shortId: string;
+  enTitle: string;
+  arTitle: string;
+  city: string;
+  price: number;
+}
+
+export interface AdminPropertyReport {
+  id: string;
+  listingId: string;
+  reason: string;
+  reporterName: string;
+  reporterEmail: string;
+  description: string | null;
+  status: string;
+  createdAt: string;
 }

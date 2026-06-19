@@ -443,8 +443,8 @@ export default function MortgageCalculator({
           <Coins className="w-6 h-6 text-[#006169]" />
           {t.title}
         </h3>
-        <span className="text-[10px] font-black uppercase bg-[#006169]/10 text-[#006169] px-3.5 py-1.5 rounded-full tracking-wider self-start sm:self-auto">
-          {propertyExternalId}
+        <span className="text-[10px] font-black uppercase bg-[#006169]/10 text-[#006169] px-3.5 py-1.5 rounded-full tracking-wider self-start sm:self-auto font-sans">
+          {isAr ? 'احسب تمويلك' : 'Estimate Payments'}
         </span>
       </div>
 

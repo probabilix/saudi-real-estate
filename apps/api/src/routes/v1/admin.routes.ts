@@ -1344,57 +1344,96 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   /**
    * GET /api/v1/admin/reported-properties
-   * Returns reported properties grouped by listing with report counts
+   * Returns reported properties grouped by listing or project with report counts
    */
   app.get('/reported-properties', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     try {
-      // 1. Group reports by listingId with counts by status
+      // 1. Group reports by listingId and projectId with counts by status
       const grouped = await db.select({
         listingId: listingReports.listingId,
+        projectId: listingReports.projectId,
         count: count(listingReports.id),
         pendingCount: sql<number>`SUM(CASE WHEN ${listingReports.status} = 'PENDING' THEN 1 ELSE 0 END)::int`,
         resolvedCount: sql<number>`SUM(CASE WHEN ${listingReports.status} = 'RESOLVED' THEN 1 ELSE 0 END)::int`,
         dismissedCount: sql<number>`SUM(CASE WHEN ${listingReports.status} = 'DISMISSED' THEN 1 ELSE 0 END)::int`,
       })
         .from(listingReports)
-        .groupBy(listingReports.listingId);
+        .groupBy(listingReports.listingId, listingReports.projectId);
 
       if (grouped.length === 0) {
         return reply.send({ success: true, data: [] });
       }
 
-      const listingIds = grouped.map(g => g.listingId);
+      const listingIds = grouped.map(g => g.listingId).filter(Boolean) as string[];
+      const projectIds = grouped.map(g => g.projectId).filter(Boolean) as string[];
 
-      // 2. Fetch listings details
-      const matchedListings = await db.select({
-        id: listings.id,
-        shortId: listings.shortId,
-        enTitle: listings.enTitle,
-        arTitle: listings.arTitle,
-        city: listings.city,
-        price: listings.price
-      })
-        .from(listings)
-        .where(inArray(listings.id, listingIds));
+      // 2. Fetch details in parallel
+      const [matchedListings, matchedProjects] = await Promise.all([
+        listingIds.length > 0
+          ? db.select({
+              id: listings.id,
+              shortId: listings.shortId,
+              enTitle: listings.enTitle,
+              arTitle: listings.arTitle,
+              city: listings.city,
+              price: listings.price
+            })
+              .from(listings)
+              .where(inArray(listings.id, listingIds))
+          : Promise.resolve([]),
+        projectIds.length > 0
+          ? db.select({
+              id: projects.id,
+              nameEn: projects.nameEn,
+              nameAr: projects.nameAr,
+              city: projects.city
+            })
+              .from(projects)
+              .where(inArray(projects.id, projectIds))
+          : Promise.resolve([])
+      ]);
 
       const listingsMap = new Map<string, typeof matchedListings[0]>();
       matchedListings.forEach(l => listingsMap.set(l.id, l));
 
+      const projectsMap = new Map<string, typeof matchedProjects[0]>();
+      matchedProjects.forEach(p => projectsMap.set(p.id, p));
+
       // 3. Enrich the grouped data
       const data = grouped.map(g => {
-        const listing = listingsMap.get(g.listingId);
-        return {
-          listingId: g.listingId,
-          reportCount: Number(g.count),
-          pendingCount: Number(g.pendingCount),
-          resolvedCount: Number(g.resolvedCount),
-          dismissedCount: Number(g.dismissedCount),
-          shortId: listing?.shortId || 'Unknown',
-          enTitle: listing?.enTitle || 'Untitled Listing',
-          arTitle: listing?.arTitle || 'عقار بدون عنوان',
-          city: listing?.city || '',
-          price: listing?.price || 0,
-        };
+        if (g.listingId) {
+          const listing = listingsMap.get(g.listingId);
+          return {
+            listingId: g.listingId,
+            projectId: null,
+            reportCount: Number(g.count),
+            pendingCount: Number(g.pendingCount),
+            resolvedCount: Number(g.resolvedCount),
+            dismissedCount: Number(g.dismissedCount),
+            shortId: listing?.shortId || 'Unknown',
+            enTitle: listing?.enTitle || 'Untitled Listing',
+            arTitle: listing?.arTitle || 'عقار بدون عنوان',
+            city: listing?.city || '',
+            price: listing?.price || 0,
+            type: 'listing',
+          };
+        } else {
+          const project = projectsMap.get(g.projectId!);
+          return {
+            listingId: null,
+            projectId: g.projectId,
+            reportCount: Number(g.count),
+            pendingCount: Number(g.pendingCount),
+            resolvedCount: Number(g.resolvedCount),
+            dismissedCount: Number(g.dismissedCount),
+            shortId: project?.id ? project.id.slice(0, 8) : 'Unknown',
+            enTitle: project?.nameEn || 'Untitled Project',
+            arTitle: project?.nameAr || 'مشروع بدون عنوان',
+            city: project?.city || '',
+            price: 0,
+            type: 'project',
+          };
+        }
       }).sort((a, b) => b.reportCount - a.reportCount);
 
       return reply.send({ success: true, data });
@@ -1406,14 +1445,14 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   /**
    * GET /api/v1/admin/reported-properties/:listingId/reports
-   * Returns individual report list for a specific listing
+   * Returns individual report list for a specific listing or project
    */
   app.get('/reported-properties/:listingId/reports', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { listingId } = request.params as { listingId: string };
     try {
       const reports = await db.select()
         .from(listingReports)
-        .where(eq(listingReports.listingId, listingId))
+        .where(or(eq(listingReports.listingId, listingId), eq(listingReports.projectId, listingId)))
         .orderBy(desc(listingReports.createdAt));
 
       return reply.send({ success: true, data: reports });
@@ -1425,7 +1464,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   /**
    * PATCH /api/v1/admin/reported-properties/:listingId/status
-   * Updates status of all reports for this property
+   * Updates status of all reports for this listing or project
    */
   app.patch('/reported-properties/:listingId/status', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { listingId } = request.params as { listingId: string };
@@ -1438,12 +1477,35 @@ export default async function adminRoutes(app: FastifyInstance) {
     try {
       await db.update(listingReports)
         .set({ status })
-        .where(eq(listingReports.listingId, listingId));
+        .where(or(eq(listingReports.listingId, listingId), eq(listingReports.projectId, listingId)));
 
-      return reply.send({ success: true, message: `All reports for this property marked as ${status}.` });
+      return reply.send({ success: true, message: `All reports marked as ${status}.` });
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to update reports status.' });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/admin/projects/:id
+   * Deletes a project completely (and all linked listings/layouts)
+   */
+  app.delete('/projects/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      // 1. Delete listings (layouts) linked to this project
+      await db.delete(listings).where(eq(listings.projectId, id));
+
+      // 2. Delete project
+      const [deleted] = await db.delete(projects).where(eq(projects.id, id)).returning();
+      if (!deleted) {
+        return reply.code(404).send({ success: false, message: 'Project not found.' });
+      }
+
+      return reply.send({ success: true, message: 'Project and all layout listings deleted successfully.' });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to delete project.', error: err.message });
     }
   });
 }

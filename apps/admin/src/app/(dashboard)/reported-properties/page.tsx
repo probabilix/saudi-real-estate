@@ -6,7 +6,7 @@ import { adminApi, AdminReportedProperty, AdminPropertyReport } from '@/lib/api'
 import {
   Flag, Search, AlertCircle, CheckCircle2,
   Clock, X, Loader2, Building2, ArrowUpRight,
-  Check, Trash2, EyeOff
+  Check, Trash2, EyeOff, Layers
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -53,21 +53,24 @@ export default function ReportedPropertiesPage() {
   // Load individual reports when selected property changes
   useEffect(() => {
     if (selectedProperty) {
-      loadListingReports(selectedProperty.listingId);
+      const targetId = selectedProperty.listingId || selectedProperty.projectId;
+      if (targetId) {
+        loadListingReports(targetId);
+      }
     } else {
       setReports([]);
     }
   }, [selectedProperty]);
 
-  async function loadListingReports(listingId: string) {
+  async function loadListingReports(itemId: string) {
     setLoadingReports(true);
     try {
-      const result = await adminApi.getListingReports(listingId);
+      const result = await adminApi.getListingReports(itemId);
       if (result.success && result.data) {
         setReports(result.data);
       }
     } catch (err) {
-      console.error('Failed to load listing reports:', err);
+      console.error('Failed to load reports:', err);
     } finally {
       setLoadingReports(false);
     }
@@ -75,9 +78,12 @@ export default function ReportedPropertiesPage() {
 
   const handleUpdateStatus = async (status: 'RESOLVED' | 'DISMISSED') => {
     if (!selectedProperty) return;
+    const targetId = selectedProperty.listingId || selectedProperty.projectId;
+    if (!targetId) return;
+
     setActionLoading(true);
     try {
-      const result = await adminApi.updateReportsStatus(selectedProperty.listingId, status);
+      const result = await adminApi.updateReportsStatus(targetId, status);
       if (result.success) {
         // Reload list and close drawer
         await loadReportedProperties();
@@ -90,21 +96,33 @@ export default function ReportedPropertiesPage() {
     }
   };
 
-  const handleDeleteListing = async () => {
+  const handleDeleteItem = async () => {
     if (!selectedProperty) return;
-    if (!confirm('Are you sure you want to permanently delete this listing? All corresponding reports will also be cleaned up.')) {
+    const targetId = selectedProperty.listingId || selectedProperty.projectId;
+    if (!targetId) return;
+
+    const isProject = selectedProperty.type === 'project';
+    const msg = isProject
+      ? 'Are you sure you want to permanently delete this project? All corresponding layouts and reports will also be cleaned up.'
+      : 'Are you sure you want to permanently delete this listing? All corresponding reports will also be cleaned up.';
+
+    if (!confirm(msg)) {
       return;
     }
+
     setActionLoading(true);
     try {
-      const result = await adminApi.deleteListing(selectedProperty.listingId);
+      const result = isProject
+        ? await adminApi.deleteProject(targetId)
+        : await adminApi.deleteListing(targetId);
+
       if (result.success) {
         // Reload list and close drawer
         await loadReportedProperties();
         setSelectedProperty(null);
       }
     } catch (err) {
-      console.error('Failed to delete listing:', err);
+      console.error(`Failed to delete ${selectedProperty.type}:`, err);
     } finally {
       setActionLoading(false);
     }
@@ -139,7 +157,7 @@ export default function ReportedPropertiesPage() {
 
   return (
     <div className="flex flex-col h-full bg-canvas/30">
-      <AdminTopBar title="Reported Properties Registry" />
+      <AdminTopBar title="Reported Properties & Projects Registry" />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Header section */}
@@ -147,10 +165,10 @@ export default function ReportedPropertiesPage() {
           <div>
             <h1 className="text-xl font-black text-slate-800 flex items-center gap-2">
               <Flag className="w-6 h-6 text-red-500 animate-pulse" />
-              Reported Inventory
+              Reported Inventory & Developer Projects
             </h1>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">
-              Review and act on property listings reported by site visitors for inaccuracies or copyright issues
+              Review and act on properties and projects reported by site visitors for inaccuracies or copyright issues
             </p>
           </div>
         </div>
@@ -164,7 +182,7 @@ export default function ReportedPropertiesPage() {
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Unresolved Issues</div>
               <div className="text-xl font-black text-slate-800 mt-1">
-                {properties.filter(p => p.pendingCount > 0).length} Listings
+                {properties.filter(p => p.pendingCount > 0).length} Items
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">{totalPendingReportsCount} pending user complaints</div>
             </div>
@@ -177,7 +195,7 @@ export default function ReportedPropertiesPage() {
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Handled</div>
               <div className="text-xl font-black text-slate-800 mt-1">
-                {properties.filter(p => p.pendingCount === 0 && (p.resolvedCount > 0 || p.dismissedCount > 0)).length} Listings
+                {properties.filter(p => p.pendingCount === 0 && (p.resolvedCount > 0 || p.dismissedCount > 0)).length} Items
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">Resolved or dismissed reports</div>
             </div>
@@ -205,7 +223,7 @@ export default function ReportedPropertiesPage() {
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
               <input
                 type="text"
-                placeholder="Search listing, short ID, city..."
+                placeholder="Search listing, project, city..."
                 className="bg-transparent border-none focus:ring-0 outline-none text-xs w-full text-slate-700 placeholder-slate-400"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -251,13 +269,13 @@ export default function ReportedPropertiesPage() {
           </div>
         </div>
 
-        {/* Listings Table */}
+        {/* Table list */}
         <div className="admin-card overflow-hidden border border-slate-100 shadow-sm rounded-2xl">
           <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Property Listing</th>
+                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Property Listing / Developer Project</th>
                   <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Short ID</th>
                   <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Location</th>
                   <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Price</th>
@@ -279,74 +297,94 @@ export default function ReportedPropertiesPage() {
                       <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-slate-100">
                         <Flag className="w-6 h-6 text-slate-300" />
                       </div>
-                      <p className="text-sm font-bold text-slate-700">No reported properties found</p>
-                      <p className="text-xs text-slate-400 mt-1">Properties flagged by users will list here</p>
+                      <p className="text-sm font-bold text-slate-700">No reported properties or projects found</p>
+                      <p className="text-xs text-slate-400 mt-1">Flagged entries will list here</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredProperties.map((prop) => (
-                    <tr
-                      key={prop.listingId}
-                      onClick={() => setSelectedProperty(prop)}
-                      className="group cursor-pointer hover:bg-slate-50/40 transition-colors"
-                    >
-                      <td>
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/10 to-pink-500/10 text-red-600 flex items-center justify-center font-bold text-sm border border-red-500/5 shadow-sm">
-                            <Building2 className="w-5 h-5 text-red-500" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold text-slate-800 truncate max-w-[280px]">
-                              {prop.enTitle || 'Untitled Listing'}
+                  filteredProperties.map((prop) => {
+                    const uniqueKey = prop.listingId || prop.projectId || '';
+                    const isProject = prop.type === 'project';
+                    return (
+                      <tr
+                        key={uniqueKey}
+                        onClick={() => setSelectedProperty(prop)}
+                        className="group cursor-pointer hover:bg-slate-50/40 transition-colors"
+                      >
+                        <td>
+                          <div className="flex items-center gap-3">
+                            <div className={clsx(
+                              "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border shadow-sm",
+                              isProject 
+                                ? "bg-gradient-to-br from-indigo-500/10 to-blue-500/10 text-indigo-600 border-indigo-500/5" 
+                                : "bg-gradient-to-br from-red-500/10 to-pink-500/10 text-red-600 border-red-500/5"
+                            )}>
+                              {isProject ? (
+                                <Layers className="w-5 h-5 text-indigo-600" />
+                              ) : (
+                                <Building2 className="w-5 h-5 text-red-500" />
+                              )}
                             </div>
-                            <div className="text-[10px] text-slate-400 font-medium">
-                              {prop.arTitle}
+                            <div className="min-w-0">
+                              <div className="text-sm font-bold text-slate-800 truncate max-w-[280px]">
+                                {prop.enTitle}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-medium">
+                                {prop.arTitle}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 py-0.5 px-1.5 rounded">
-                          {prop.shortId}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs font-semibold text-slate-500">
-                          {prop.city || 'N/A'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs font-black text-slate-700">
-                          {prop.price ? `${prop.price.toLocaleString()} SAR` : 'N/A'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1.5">
+                        </td>
+                        <td>
                           <span className={clsx(
-                            'badge font-black text-[10px] px-2 py-0.5 rounded-full',
-                            prop.pendingCount > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                            "text-xs font-mono font-bold py-0.5 px-1.5 rounded",
+                            isProject ? "text-indigo-600 bg-indigo-50" : "text-slate-600 bg-slate-100"
                           )}>
-                            {prop.reportCount} {prop.reportCount === 1 ? 'report' : 'reports'}
+                            {isProject ? `PROJ-${prop.shortId}` : prop.shortId}
                           </span>
-                          {prop.pendingCount > 0 && (
-                            <span className="text-[10px] font-semibold text-red-500">
-                              ({prop.pendingCount} pending)
+                        </td>
+                        <td>
+                          <span className="text-xs font-semibold text-slate-500">
+                            {prop.city || 'N/A'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="text-xs font-black text-slate-700">
+                            {isProject ? (
+                              <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Multiple Layouts</span>
+                            ) : (
+                              prop.price ? `${prop.price.toLocaleString()} SAR` : 'N/A'
+                            )}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-1.5">
+                            <span className={clsx(
+                              'badge font-black text-[10px] px-2 py-0.5 rounded-full',
+                              prop.pendingCount > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                            )}>
+                              {prop.reportCount} {prop.reportCount === 1 ? 'report' : 'reports'}
                             </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={clsx(
-                          'badge font-black uppercase tracking-wider text-[9px] py-1 px-2.5 border',
-                          prop.pendingCount > 0 && 'badge-red bg-red-50 text-red-700 border-red-100',
-                          prop.pendingCount === 0 && prop.resolvedCount > 0 && 'badge-green bg-emerald-50 text-emerald-700 border-emerald-100',
-                          prop.pendingCount === 0 && prop.dismissedCount > 0 && 'badge-gray bg-slate-100 text-slate-600 border-slate-200'
-                        )}>
-                          {getListingStatusLabel(prop)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                            {prop.pendingCount > 0 && (
+                              <span className="text-[10px] font-semibold text-red-500">
+                                ({prop.pendingCount} pending)
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={clsx(
+                            'badge font-black uppercase tracking-wider text-[9px] py-1 px-2.5 border',
+                            prop.pendingCount > 0 && 'badge-red bg-red-50 text-red-700 border-red-100',
+                            prop.pendingCount === 0 && prop.resolvedCount > 0 && 'badge-green bg-emerald-50 text-emerald-700 border-emerald-100',
+                            prop.pendingCount === 0 && prop.dismissedCount > 0 && 'badge-gray bg-slate-100 text-slate-600 border-slate-200'
+                          )}>
+                            {getListingStatusLabel(prop)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -354,7 +392,7 @@ export default function ReportedPropertiesPage() {
         </div>
       </div>
 
-      {/* Slide-Over Drawer for Reported Property Details */}
+      {/* Slide-Over Drawer for Reported Property/Project Details */}
       {selectedProperty && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div
@@ -366,15 +404,25 @@ export default function ReportedPropertiesPage() {
             {/* Drawer Header */}
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500 to-pink-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-red-100">
-                  <Flag className="w-5 h-5 text-white" />
+                <div className={clsx(
+                  "w-12 h-12 rounded-2xl text-white flex items-center justify-center font-bold text-lg shadow-md",
+                  selectedProperty.type === 'project'
+                    ? "bg-gradient-to-br from-indigo-500 to-blue-600 shadow-indigo-100"
+                    : "bg-gradient-to-br from-red-500 to-pink-600 shadow-red-100"
+                )}>
+                  {selectedProperty.type === 'project' ? (
+                    <Layers className="w-5 h-5 text-white" />
+                  ) : (
+                    <Flag className="w-5 h-5 text-white" />
+                  )}
                 </div>
                 <div>
                   <h2 className="text-base font-black text-slate-800 truncate max-w-[400px]" title={selectedProperty.enTitle}>
                     {selectedProperty.enTitle}
                   </h2>
                   <span className="text-[10px] text-slate-400 font-semibold">
-                    Short ID: {selectedProperty.shortId} | Database ID: {selectedProperty.listingId}
+                    {selectedProperty.type === 'project' ? 'Project' : 'Listing'} |
+                    Database ID: {selectedProperty.listingId || selectedProperty.projectId}
                   </span>
                 </div>
               </div>
@@ -391,7 +439,11 @@ export default function ReportedPropertiesPage() {
             <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <a
-                  href={`${WEB_URL}/en/listings/${selectedProperty.shortId}`}
+                  href={
+                    selectedProperty.type === 'project'
+                      ? `${WEB_URL}/en/projects/${selectedProperty.projectId}`
+                      : `${WEB_URL}/en/listings/${selectedProperty.shortId}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-secondary py-2 px-3 text-xs"
@@ -419,12 +471,12 @@ export default function ReportedPropertiesPage() {
                   Mark Resolved
                 </button>
                 <button
-                  onClick={handleDeleteListing}
+                  onClick={handleDeleteItem}
                   disabled={actionLoading}
                   className="btn-danger bg-red-600 hover:bg-red-700 text-xs py-2 px-3"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete Property
+                  {selectedProperty.type === 'project' ? 'Delete Project' : 'Delete Property'}
                 </button>
               </div>
             </div>

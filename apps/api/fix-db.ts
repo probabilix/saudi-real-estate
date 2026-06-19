@@ -90,7 +90,7 @@ async function fixDb() {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "listing_reports" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-        "listing_id" uuid NOT NULL REFERENCES "listings"("id") ON DELETE CASCADE,
+        "listing_id" uuid REFERENCES "listings"("id") ON DELETE CASCADE,
         "reason" varchar(255) NOT NULL,
         "reporter_name" varchar(255) NOT NULL,
         "reporter_email" varchar(255) NOT NULL,
@@ -99,7 +99,18 @@ async function fixDb() {
         "created_at" timestamp with time zone DEFAULT now() NOT NULL
       );
     `);
-    console.log('✅ listing_reports table ensured');
+    
+    // Alter listing_reports table to support polymorphic project reports
+    await db.execute(sql`ALTER TABLE "listing_reports" ALTER COLUMN "listing_id" DROP NOT NULL;`);
+    await db.execute(sql`ALTER TABLE "listing_reports" ADD COLUMN IF NOT EXISTS "project_id" uuid;`);
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'listing_reports_project_id_projects_id_fk') THEN
+          ALTER TABLE "listing_reports" ADD CONSTRAINT "listing_reports_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+    console.log('✅ listing_reports table and polymorphic columns ensured');
     
     // Add missing columns to broker_profiles
     await db.execute(sql`

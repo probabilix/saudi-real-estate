@@ -329,6 +329,11 @@ export const adminApi = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+
+  deleteProject: (projectId: string) =>
+    request(`/admin/projects/${projectId}`, {
+      method: 'DELETE',
+    }),
 };
 
 export interface ContactSubmission {
@@ -558,7 +563,8 @@ export interface AdminMortgageLead {
 }
 
 export interface AdminReportedProperty {
-  listingId: string;
+  listingId: string | null;
+  projectId: string | null;
   reportCount: number;
   pendingCount: number;
   resolvedCount: number;
@@ -568,11 +574,13 @@ export interface AdminReportedProperty {
   arTitle: string;
   city: string;
   price: number;
+  type: 'listing' | 'project';
 }
 
 export interface AdminPropertyReport {
   id: string;
-  listingId: string;
+  listingId: string | null;
+  projectId: string | null;
   reason: string;
   reporterName: string;
   reporterEmail: string;

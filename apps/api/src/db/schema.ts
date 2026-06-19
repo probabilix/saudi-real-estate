@@ -759,7 +759,8 @@ export const crmLeadsRelations = relations(crmLeads, ({ one }) => ({
 // ── Property/Listing Reports Table ──
 export const listingReports = pgTable('listing_reports', {
   id: uuid('id').primaryKey().defaultRandom(),
-  listingId: uuid('listing_id').references(() => listings.id, { onDelete: 'cascade' }).notNull(),
+  listingId: uuid('listing_id').references(() => listings.id, { onDelete: 'cascade' }),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
   reason: varchar('reason', { length: 255 }).notNull(),
   reporterName: varchar('reporter_name', { length: 255 }).notNull(),
   reporterEmail: varchar('reporter_email', { length: 255 }).notNull(),
@@ -772,6 +773,10 @@ export const listingReportsRelations = relations(listingReports, ({ one }) => ({
   listing: one(listings, {
     fields: [listingReports.listingId],
     references: [listings.id],
+  }),
+  project: one(projects, {
+    fields: [listingReports.projectId],
+    references: [projects.id],
   }),
 }));
 

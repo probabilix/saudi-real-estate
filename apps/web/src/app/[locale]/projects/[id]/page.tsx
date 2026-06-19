@@ -11,7 +11,7 @@ import {
   Square, Bed, Bath, ArrowLeft, ShieldCheck, Star,
   Sparkles, Loader2, ChevronRight, Lock, Mail, Phone,
   MessageSquare, BookOpen, ExternalLink, Zap, Map as MapIcon,
-  ChevronLeft, Share2, Heart, X
+  ChevronLeft, Share2, Heart, X, Flag, AlertTriangle
 } from 'lucide-react';
 import BrochureModal from '@/components/listings/BrochureModal';
 import MediaModal from '@/components/listings/MediaModal';
@@ -181,6 +181,58 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
   const [narrativeExpanded, setNarrativeExpanded] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [amenitiesModalOpen, setAmenitiesModalOpen] = useState(false);
+
+  // Project reporting modal states
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reporterName, setReporterName] = useState('');
+  const [reporterEmail, setReporterEmail] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+
+  const REPORT_REASONS = [
+    { value: 'INCORRECT_LOCATION', labelEn: 'Incorrect location details', labelAr: 'تفاصيل الموقع غير صحيحة' },
+    { value: 'MISLEADING_PHOTOS', labelEn: 'Misleading or outdated photos', labelAr: 'صور مضللة أو قديمة' },
+    { value: 'COPYRIGHT_VIOLATION', labelEn: 'Copyright violation / Copied media', labelAr: 'انتهاك حقوق الملكية / وسائط منسوخة' },
+    { value: 'UNAVAILABLE_SOLD', labelEn: 'Project sold out or unavailable', labelAr: 'المشروع مباع بالكامل أو غير متوفر' },
+    { value: 'OTHER', labelEn: 'Other issues', labelAr: 'مشاكل أخرى' },
+  ];
+
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportReason || !reporterName || !reporterEmail) {
+      setReportError(locale === 'ar' ? 'الرجاء تعبئة جميع الحقول المطلوبة' : 'Please fill in all required fields.');
+      return;
+    }
+    setSubmittingReport(true);
+    setReportError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/system/projects/${id}/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reason: reportReason,
+          reporterName,
+          reporterEmail,
+          description: reportDescription || null
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReportSuccess(true);
+      } else {
+        setReportError(data.message || 'Failed to submit report.');
+      }
+    } catch (err: any) {
+      setReportError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
 
   const handleToggleProjectFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -770,6 +822,21 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                 revealedContact={revealedContact}
                 t={tListing}
               />
+              <button
+                onClick={() => {
+                  setReportSuccess(false);
+                  setReportError(null);
+                  setReportReason('');
+                  setReporterName('');
+                  setReporterEmail('');
+                  setReportDescription('');
+                  setReportModalOpen(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-600 transition-all font-bold text-xs"
+              >
+                <Flag className="w-3.5 h-3.5 fill-current" />
+                {locale === 'ar' ? 'الإبلاغ عن هذا المشروع' : 'Report this project'}
+              </button>
             </div>
 
             {/* Property Types & Units Section */}
@@ -1429,6 +1496,22 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                   </Link>
                 ))}
               </div>
+              <div className="border-t border-surface-100 pt-3.5 mt-2" />
+              <button
+                onClick={() => {
+                  setReportSuccess(false);
+                  setReportError(null);
+                  setReportReason('');
+                  setReporterName('');
+                  setReporterEmail('');
+                  setReportDescription('');
+                  setReportModalOpen(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-600 transition-all font-bold text-xs"
+              >
+                <Flag className="w-3.5 h-3.5 fill-current" />
+                {locale === 'ar' ? 'الإبلاغ عن هذا المشروع' : 'Report this project'}
+              </button>
             </div>
 
           </div>
@@ -1443,6 +1526,172 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
           brochureUrl={project.brochureUrl}
         />
       )}
+
+      {/* Report Project Modal */}
+      <AnimatePresence>
+        {reportModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-[2px]"
+              onClick={() => {
+                if (!submittingReport) setReportModalOpen(false);
+              }}
+            />
+
+            {/* Dialog Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-md bg-white rounded-3xl p-6 lg:p-8 shadow-2xl border border-slate-100 transform z-10 font-sans"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setReportModalOpen(false)}
+                disabled={submittingReport}
+                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {reportSuccess ? (
+                <div className="text-center py-6 space-y-4">
+                  <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto border border-emerald-100 shadow-md">
+                    <CheckCircle className="w-8 h-8 text-emerald-600 animate-bounce" />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-800">
+                    {locale === 'ar' ? 'تم إرسال البلاغ!' : 'Report Submitted!'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-semibold leading-relaxed max-w-[280px] mx-auto">
+                    {locale === 'ar'
+                      ? 'شكراً لك. سنقوم بمراجعة هذا المشروع واتخاذ الإجراء المناسب في أقرب وقت.'
+                      : 'Thank you for your feedback. We will review this project details and verify it shortly.'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setReportModalOpen(false);
+                      setReportSuccess(false);
+                    }}
+                    className="mt-6 px-6 py-2.5 rounded-xl bg-charcoal text-white hover:bg-slate-800 text-xs font-black uppercase tracking-wider transition-all"
+                  >
+                    {locale === 'ar' ? 'إغلاق' : 'Close'}
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmitReport} className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-rose-500" />
+                      {locale === 'ar' ? 'الإبلاغ عن المشروع' : 'Report this project'}
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                      {locale === 'ar'
+                        ? 'الرجاء تزويدنا بتفاصيل المشكلة لنتمكن من الحفاظ على دقة منصتنا'
+                        : 'Help us maintain listing accuracy by reporting errors'}
+                    </p>
+                  </div>
+
+                  {reportError && (
+                    <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold rounded-xl flex items-center gap-2">
+                      <span>{reportError}</span>
+                    </div>
+                  )}
+
+                  {/* Dropdown: Reason */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                      {locale === 'ar' ? 'المشكلة الرئيسية *' : 'Select a problem *'}
+                    </label>
+                    <select
+                      required
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-700 outline-none focus:border-rose-500 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">{locale === 'ar' ? 'اختر المشكلة...' : 'Select a problem...'}</option>
+                      {REPORT_REASONS.map(r => (
+                        <option key={r.value} value={r.value}>
+                          {locale === 'ar' ? r.labelAr : r.labelEn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Reporter Name */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                      {locale === 'ar' ? 'الاسم بالكامل *' : 'Name *'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={reporterName}
+                      onChange={(e) => setReporterName(e.target.value)}
+                      placeholder={locale === 'ar' ? 'أدخل اسمك بالكامل' : 'Enter your full name'}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-rose-500 transition-all"
+                    />
+                  </div>
+
+                  {/* Reporter Email */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                      {locale === 'ar' ? 'البريد الإلكتروني *' : 'Email *'}
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={reporterEmail}
+                      onChange={(e) => setReporterEmail(e.target.value)}
+                      placeholder={locale === 'ar' ? 'name@example.com' : 'name@example.com'}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-rose-500 transition-all"
+                    />
+                  </div>
+
+                  {/* Description comment */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                      {locale === 'ar' ? 'شرح المشكلة (اختياري)' : 'Description'}
+                    </label>
+                    <textarea
+                      value={reportDescription}
+                      onChange={(e) => setReportDescription(e.target.value)}
+                      placeholder={locale === 'ar' ? 'اكتب وصفاً مختصراً للمشكلة...' : 'Write a short description of the problem'}
+                      rows={3}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-rose-500 transition-all resize-none"
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={submittingReport}
+                    className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-rose-600/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {submittingReport ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        {locale === 'ar' ? 'جاري الإرسال...' : 'Submitting...'}
+                      </>
+                    ) : (
+                      <>
+                        {locale === 'ar' ? 'إرسال البلاغ' : 'Send Report'}
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
 
       {project.photos && (
         <MediaModal

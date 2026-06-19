@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { systemSettings, users, buyerProfiles, leads, listings, chatMessages, faqs, contactSubmissions, projects, projectUnits, projectFavorites } from '../../db/schema';
+import { systemSettings, users, buyerProfiles, leads, listings, chatMessages, faqs, contactSubmissions, projects, projectUnits, projectFavorites, listingReports } from '../../db/schema';
 import { eq, inArray, sql, and, or, desc, gte, isNull } from 'drizzle-orm';
 import { SystemService } from '../../services/system.service';
 import { ListingService } from '../../services/listing.service';
@@ -1333,6 +1333,56 @@ ${historyText}
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to recalculate intent score.', error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/v1/system/projects/:id/report
+   * Report a project for violations or inaccuracies
+   */
+  app.post('/projects/:id/report', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { reason, reporterName, reporterEmail, description } = request.body as {
+      reason: string;
+      reporterName: string;
+      reporterEmail: string;
+      description?: string;
+    };
+
+    if (!reason || !reporterName || !reporterEmail) {
+      return reply.code(400).send({ success: false, message: 'Reason, reporter name, and email are required fields.' });
+    }
+
+    try {
+      // 1. Verify project exists
+      const [project] = await db.select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.id, id))
+        .limit(1);
+
+      if (!project) {
+        return reply.code(404).send({ success: false, message: 'Project not found' });
+      }
+
+      // 2. Insert report entry
+      const [report] = await db.insert(listingReports)
+        .values({
+          projectId: project.id,
+          reason,
+          reporterName,
+          reporterEmail,
+          description: description || null,
+        })
+        .returning();
+
+      return reply.send({
+        success: true,
+        message: 'Project report submitted successfully. Thank you for your feedback.',
+        data: report
+      });
+    } catch (err: any) {
+      console.error('Report project error:', err);
+      return reply.status(500).send({ success: false, message: 'Failed to submit report', error: err.message });
     }
   });
 }

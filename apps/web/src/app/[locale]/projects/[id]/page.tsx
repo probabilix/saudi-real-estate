@@ -22,6 +22,7 @@ import { api, API_BASE_URL } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { Listing } from '@saudi-re/shared';
 import clsx from 'clsx';
+import MortgageCalculator from '@/components/mortgage-calculator/MortgageCalculator';
 
 interface ProjectUnit {
   id: string;
@@ -1239,6 +1240,18 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                 </div>
               )}
             </div>
+
+            {/* Mortgage Calculator */}
+            {minPrice > 0 && (
+              <div className="scroll-mt-40 border-t border-surface-150 pt-10">
+                <MortgageCalculator
+                  price={minPrice}
+                  maxPriceAllowed={Math.round(maxPrice * 1.15)}
+                  propertyExternalId={project.id}
+                  locale={locale}
+                />
+              </div>
+            )}
 
             {/* Google Map Location */}
             <div id="project-map" className="space-y-4">

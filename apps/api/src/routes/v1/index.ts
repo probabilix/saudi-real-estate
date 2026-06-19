@@ -10,6 +10,7 @@ import legalRoutes from './legal.routes';
 import adminRoutes from './admin.routes';
 import systemRoutes from './system.routes';
 import crmRoutes from './crm.routes';
+import mortgageRoutes from './mortgage.routes';
 
 /**
  * API v1 Route Registration
@@ -62,4 +63,7 @@ export default async function v1Routes(app: FastifyInstance) {
 
   // ── CRM Module ──
   await app.register(crmRoutes, { prefix: '/crm' });
+
+  // ── Mortgage Module ──
+  await app.register(mortgageRoutes, { prefix: '/mortgage' });
 }

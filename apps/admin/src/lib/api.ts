@@ -284,6 +284,38 @@ export const adminApi = {
     request(`/listings/${listingId}/units/${unitId}`, {
       method: 'DELETE',
     }),
+
+  // ── Mortgage Leads ──
+  getMortgageLeads: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    bank?: string;
+    isCitizen?: string;
+    dateStart?: string;
+    dateEnd?: string;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    if (params?.status) q.set('status', params.status);
+    if (params?.bank) q.set('bank', params.bank);
+    if (params?.isCitizen) q.set('isCitizen', params.isCitizen);
+    if (params?.dateStart) q.set('dateStart', params.dateStart);
+    if (params?.dateEnd) q.set('dateEnd', params.dateEnd);
+    return request<{ leads: AdminMortgageLead[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>(`/admin/mortgage-leads?${q}`);
+  },
+
+  getMortgageLead: (id: string) =>
+    request<AdminMortgageLead>(`/admin/mortgage-leads/${id}`),
+
+  updateMortgageLeadStatus: (id: string, status: string) =>
+    request<AdminMortgageLead>(`/admin/mortgage-leads/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
 };
 
 export interface ContactSubmission {
@@ -485,4 +517,29 @@ export interface AdminProjectUnit {
   price: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminMortgageLead {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  monthlyIncome: string | null;
+  redfSupported: boolean | null;
+  monthlyObligations: string | null;
+  propertyExternalId: string;
+  propertyPrice: string;
+  isCitizen: boolean;
+  isFirstHome: boolean | null;
+  downPaymentAmount: string;
+  loanPeriodYears: number;
+  bankSlug: string;
+  bankNameEn: string;
+  appliedRatePct: string;
+  monthlyInstalment: string;
+  totalPayableValue: string;
+  totalLoanAmount: string;
+  status: string;
+  createdAt: string;
+  targetNameEn?: string;
+  targetNameAr?: string;
 }

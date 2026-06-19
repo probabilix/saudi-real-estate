@@ -2,7 +2,7 @@
 // Saudi Real Estate — Drizzle Schema Definition
 // ──────────────────────────────────────────────
 
-import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, decimal, bigint, smallint, text, integer, jsonb, customType, index, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, decimal, bigint, smallint, text, integer, jsonb, customType, index, foreignKey, unique } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 
 /**
@@ -589,6 +589,62 @@ export const contactSubmissions = pgTable('contact_submissions', {
   isReplied: boolean('is_replied').default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+// ── Mortgage Calculator Tables ──
+
+export const mortgageBanks = pgTable('mortgage_banks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: varchar('slug', { length: 100 }).unique().notNull(),
+  externalId: varchar('external_id', { length: 50 }).notNull(),
+  nameEn: varchar('name_en', { length: 255 }).notNull(),
+  nameAr: varchar('name_ar', { length: 255 }).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+});
+
+export const mortgageBankRates = pgTable('mortgage_bank_rates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  bankId: uuid('bank_id').references(() => mortgageBanks.id, { onDelete: 'cascade' }).notNull(),
+  loanPeriodYears: integer('loan_period_years').notNull(),
+  annualRatePct: decimal('annual_rate_pct', { precision: 5, scale: 2 }).notNull(),
+}, (table) => ({
+  bankYearIdx: index('bank_year_idx').on(table.bankId, table.loanPeriodYears),
+  unq: unique('unique_bank_year').on(table.bankId, table.loanPeriodYears),
+}));
+
+export const mortgageLeads = pgTable('mortgage_leads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  fullName: varchar('full_name', { length: 255 }).notNull(),
+  phoneNumber: varchar('phone_number', { length: 50 }).notNull(),
+  monthlyIncome: decimal('monthly_income', { precision: 12, scale: 2 }),
+  redfSupported: boolean('redf_supported').default(true),
+  monthlyObligations: decimal('monthly_obligations', { precision: 12, scale: 2 }),
+  propertyExternalId: varchar('property_external_id', { length: 100 }).notNull(),
+  propertyPrice: decimal('property_price', { precision: 12, scale: 2 }).notNull(),
+  isCitizen: boolean('is_citizen').notNull(),
+  isFirstHome: boolean('is_first_home'),
+  downPaymentAmount: decimal('down_payment_amount', { precision: 12, scale: 2 }).notNull(),
+  loanPeriodYears: integer('loan_period_years').notNull(),
+  bankSlug: varchar('bank_slug', { length: 100 }).notNull(),
+  bankNameEn: varchar('bank_name_en', { length: 255 }).notNull(),
+  appliedRatePct: decimal('applied_rate_pct', { precision: 5, scale: 2 }).notNull(),
+  monthlyInstalment: decimal('monthly_instalment', { precision: 12, scale: 2 }).notNull(),
+  totalPayableValue: decimal('total_payable_value', { precision: 12, scale: 2 }).notNull(),
+  totalLoanAmount: decimal('total_loan_amount', { precision: 12, scale: 2 }).notNull(),
+  status: varchar('status', { length: 50 }).default('new').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const mortgageBanksRelations = relations(mortgageBanks, ({ many }) => ({
+  rates: many(mortgageBankRates),
+}));
+
+export const mortgageBankRatesRelations = relations(mortgageBankRates, ({ one }) => ({
+  bank: one(mortgageBanks, {
+    fields: [mortgageBankRates.bankId],
+    references: [mortgageBanks.id],
+  }),
+}));
+
 
 
 // ─────────────────────────────────────────────────────────────

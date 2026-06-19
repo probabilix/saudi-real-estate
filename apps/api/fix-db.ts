@@ -30,6 +30,61 @@ async function fixDb() {
       );
     `);
     console.log('✅ legal_pages table ensured');
+
+    // Create mortgage_banks table manually
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "mortgage_banks" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "slug" varchar(100) NOT NULL UNIQUE,
+        "external_id" varchar(50) NOT NULL,
+        "name_en" varchar(255) NOT NULL,
+        "name_ar" varchar(255) NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL
+      );
+    `);
+    console.log('✅ mortgage_banks table ensured');
+
+    // Create mortgage_bank_rates table manually
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "mortgage_bank_rates" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "bank_id" uuid NOT NULL REFERENCES "mortgage_banks"("id") ON DELETE CASCADE,
+        "loan_period_years" integer NOT NULL,
+        "annual_rate_pct" numeric(5,2) NOT NULL,
+        CONSTRAINT "unique_bank_year" UNIQUE ("bank_id", "loan_period_years")
+      );
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "bank_year_idx" ON "mortgage_bank_rates" ("bank_id", "loan_period_years");
+    `);
+    console.log('✅ mortgage_bank_rates table and index ensured');
+
+    // Create mortgage_leads table manually
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "mortgage_leads" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "full_name" varchar(255) NOT NULL,
+        "phone_number" varchar(50) NOT NULL,
+        "monthly_income" numeric(12,2),
+        "redf_supported" boolean DEFAULT true,
+        "monthly_obligations" numeric(12,2),
+        "property_external_id" varchar(100) NOT NULL,
+        "property_price" numeric(12,2) NOT NULL,
+        "is_citizen" boolean NOT NULL,
+        "is_first_home" boolean,
+        "down_payment_amount" numeric(12,2) NOT NULL,
+        "loan_period_years" integer NOT NULL,
+        "bank_slug" varchar(100) NOT NULL,
+        "bank_name_en" varchar(255) NOT NULL,
+        "applied_rate_pct" numeric(5,2) NOT NULL,
+        "monthly_instalment" numeric(12,2) NOT NULL,
+        "total_payable_value" numeric(12,2) NOT NULL,
+        "total_loan_amount" numeric(12,2) NOT NULL,
+        "status" varchar(50) DEFAULT 'new' NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+    `);
+    console.log('✅ mortgage_leads table ensured');
     
     // Add missing columns to broker_profiles
     await db.execute(sql`

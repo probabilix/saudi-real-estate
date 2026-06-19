@@ -22,6 +22,7 @@ import ListingCard from '@/components/listings/ListingCard';
 import MediaModal from '@/components/listings/MediaModal';
 import BrochureModal from '@/components/listings/BrochureModal';
 import ChatWidget from '@/components/chat/ChatWidget';
+import MortgageCalculator from '@/components/mortgage-calculator/MortgageCalculator';
 
 const AMENITY_METADATA: Record<string, { labelEn: string; labelAr: string }> = {
   swimming_pool: { labelEn: 'Swimming Pool', labelAr: 'مسبح' },
@@ -79,7 +80,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const [shortlisted, setShortlisted] = useState(false);
   const [descLang, setDescLang] = useState<'ar' | 'en'>(locale as 'ar' | 'en');
   const [activeTab, setActiveTab] = useState('overview');
-  const [mortgageType, setMortgageType] = useState<'resident' | 'expat'>('resident');
   const [amenitiesModalOpen, setAmenitiesModalOpen] = useState(false);
   const [isQualified, setIsQualified] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -133,8 +133,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   // Additional State & Refs
   const [similarListings, setSimilarListings] = useState<Listing[]>([]);
   const [siblingLayouts, setSiblingLayouts] = useState<any[]>([]);
-  const [loanAmount, setLoanAmount] = useState(0);
-  const [loanPeriod, setLoanPeriod] = useState(15);
   const [isToggling, setIsToggling] = useState(false);
 
   useEffect(() => {
@@ -280,13 +278,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
     fetchSimilar();
   }, [listing]);
 
-
-  useEffect(() => {
-    if (listing?.price) {
-      setLoanAmount(listing.price * 0.9);
-    }
-  }, [listing?.price]);
-
   if (loading || isRedirecting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white">
@@ -308,9 +299,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   };
 
   const areaSqFt = l.areaSqm ? Math.round(Number(l.areaSqm) * 10.764) : null;
-  const rate = mortgageType === 'resident' ? 4.5 : 5.5;
-  const maxTerm = mortgageType === 'resident' ? 35 : 25;
-  const monthlyPayment = (loanAmount * (rate / 100 / 12)) / (1 - Math.pow(1 + (rate / 100 / 12), -loanPeriod * 12));
 
   return (
     <div className="min-h-screen bg-white text-charcoal pb-32">
@@ -424,8 +412,8 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             { id: 'overview', label: t('tabOverview'), icon: Info },
             ...(!MANAGED_MODE ? [
               { id: 'rega', label: t('tabCompliance'), icon: ShieldCheck },
-              { id: 'calculator', label: t('tabMortgage'), icon: Calculator },
             ] : []),
+            { id: 'calculator', label: t('tabMortgage'), icon: Calculator },
             { id: 'location', label: t('tabLocation'), icon: MapIcon },
           ].map((tab) => (
             <button key={tab.id} onClick={() => scrollToSection(tab.id as keyof typeof sectionRefs)}
@@ -688,58 +676,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               </div>
             )}
 
-            {/* Loan Calculator */}
-            {!MANAGED_MODE && (
-              <div ref={sectionRefs.calculator} className="scroll-mt-40">
-                <div className="bg-surface-50 border border-surface-200 rounded-3xl p-10 lg:p-14 space-y-12">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
-                    <div>
-                      <h3 className="text-3xl font-bold font-serif text-charcoal mb-2">{t('financeCalculator')}</h3>
-                      <p className="text-charcoal-muted font-medium">{t('financeSubtitle')}</p>
-                    </div>
-                    <div className="flex gap-2 p-1.5 bg-white border border-surface-200 rounded-full shadow-sm">
-                      <button onClick={() => setMortgageType('resident')} className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mortgageType === 'resident' ? 'bg-primary-600 text-white shadow-lg' : 'text-charcoal-muted hover:text-charcoal'}`}>{t('saudiResident')}</button>
-                      <button onClick={() => setMortgageType('expat')} className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mortgageType === 'expat' ? 'bg-primary-600 text-white shadow-lg' : 'text-charcoal-muted hover:text-charcoal'}`}>{t('nonResident')}</button>
-                    </div>
-                  </div>
-
-                  <div className="grid lg:grid-cols-2 gap-12 items-center">
-                    <div className="space-y-10">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted">{t('loanPrincipal')}</label>
-                          <span className="text-lg font-bold text-charcoal">{loanAmount.toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')} {tCommon('sar')}</span>
-                        </div>
-                        <div className="relative h-2">
-                          <div className="absolute inset-0 bg-surface-200 rounded-full" />
-                          <div className="absolute left-0 top-0 h-full bg-primary-600 rounded-full transition-all" style={{ width: `${listing.price > 0 ? (loanAmount / listing.price) * 100 : 0}%` }} />
-                          <input type="range" min="0" max={listing.price} value={loanAmount} onChange={(e) => setLoanAmount(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted">{t('tenurePeriod')}</label>
-                          <span className="text-lg font-bold text-charcoal">{loanPeriod} {t('years')}</span>
-                        </div>
-                        <div className="relative h-2">
-                          <div className="absolute inset-0 bg-surface-200 rounded-full" />
-                          <div className="absolute left-0 top-0 h-full bg-primary-600 rounded-full transition-all" style={{ width: `${((loanPeriod - 5) / (maxTerm - 5)) * 100}%` }} />
-                          <input type="range" min="5" max={maxTerm} value={loanPeriod} onChange={(e) => setLoanPeriod(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                        </div>
-                      </div>
-                      <p className="text-[11px] font-bold text-charcoal-muted uppercase tracking-widest">
-                        {t('fixedRate', { rate: rate })}
-                      </p>
-                    </div>
-                    <div className="bg-white rounded-3xl p-8 text-center space-y-3 shadow-xl border border-surface-100">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-charcoal-muted">{t('monthlyInstallment')}</p>
-                      <h4 className="text-4xl font-bold text-primary-600 tracking-tight font-serif">{tCommon('sar')} {Math.round(monthlyPayment).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}</h4>
-                      <p className="text-xs text-charcoal-muted font-bold">{rate}% APR • {loanPeriod} {t('years')}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Old Loan Calculator Removed */}
 
             {/* Sibling Layouts in Project */}
             {(listing as any).projectId && siblingLayouts.length > 0 && (
@@ -791,6 +728,15 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 </div>
               </div>
             )}
+
+            {/* Mortgage Calculator */}
+            <div ref={sectionRefs.calculator} className="scroll-mt-40 border-t border-surface-200 pt-12">
+              <MortgageCalculator
+                price={listing.price}
+                propertyExternalId={listing.shortId || listing.id}
+                locale={locale}
+              />
+            </div>
 
             {/* Related Properties */}
             {similarListings.length > 0 && (

@@ -1,10 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles } from '../../db/schema';
+import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles, mortgageLeads } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import { AuthService } from '../../services/auth.service';
 import { EmailService } from '../../services/email.service';
-import { eq, desc, asc, count, sql, and, or, ilike, isNull, inArray } from 'drizzle-orm';
+import { eq, desc, asc, count, sql, and, or, ilike, isNull, inArray, gte } from 'drizzle-orm';
 
 /**
  * Admin Routes — All protected by ADMIN role
@@ -1002,6 +1002,343 @@ export default async function adminRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to update user' });
+    }
+  });
+
+  // ── Mortgage Leads Management ──
+
+  app.get('/mortgage-leads', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const query = request.query as {
+      page?: string;
+      limit?: string;
+      search?: string;
+      status?: string;
+      bank?: string;
+      isCitizen?: string;
+      dateStart?: string;
+      dateEnd?: string;
+    };
+    const page = parseInt(query.page || '1');
+    const limit = Math.min(parseInt(query.limit || '20'), 100);
+    const offset = (page - 1) * limit;
+
+    try {
+      const conditions: any[] = [];
+
+      if (query.status) {
+        conditions.push(eq(mortgageLeads.status, query.status));
+      }
+      if (query.bank) {
+        conditions.push(eq(mortgageLeads.bankSlug, query.bank));
+      }
+      if (query.isCitizen !== undefined) {
+        conditions.push(eq(mortgageLeads.isCitizen, query.isCitizen === 'true'));
+      }
+      if (query.search) {
+        const searchPattern = `%${query.search}%`;
+        conditions.push(or(
+          ilike(mortgageLeads.fullName, searchPattern),
+          ilike(mortgageLeads.phoneNumber, searchPattern)
+        ));
+      }
+      if (query.dateStart) {
+        conditions.push(gte(mortgageLeads.createdAt, new Date(query.dateStart)));
+      }
+      if (query.dateEnd) {
+        conditions.push(sql`${mortgageLeads.createdAt} <= ${new Date(query.dateEnd)}`);
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const totalResult = await db.select({ count: count() })
+        .from(mortgageLeads)
+        .where(whereClause);
+      const total = Number(totalResult[0]?.count ?? 0);
+
+      const data = await db.select()
+        .from(mortgageLeads)
+        .where(whereClause)
+        .orderBy(desc(mortgageLeads.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      // Fetch corresponding listings and projects for target name resolution
+      const propertyIds = [...new Set(data.map(l => l.propertyExternalId))].filter(Boolean);
+
+      const matchedListings = propertyIds.length > 0
+        ? await db.select({ id: listings.id, shortId: listings.shortId, enTitle: listings.enTitle, arTitle: listings.arTitle })
+            .from(listings)
+            .where(or(
+              inArray(listings.id, propertyIds),
+              inArray(listings.shortId, propertyIds)
+            ))
+        : [];
+
+      const matchedProjects = propertyIds.length > 0
+        ? await db.select({ id: projects.id, nameEn: projects.nameEn, nameAr: projects.nameAr })
+            .from(projects)
+            .where(inArray(projects.id, propertyIds))
+        : [];
+
+      const listingsMap = new Map<string, typeof matchedListings[0]>();
+      matchedListings.forEach(l => {
+        listingsMap.set(l.id, l);
+        if (l.shortId) {
+          listingsMap.set(l.shortId, l);
+        }
+      });
+
+      const projectsMap = new Map<string, typeof matchedProjects[0]>();
+      matchedProjects.forEach(p => {
+        projectsMap.set(p.id, p);
+      });
+
+      const enrichedLeads = data.map(l => {
+        const listing = listingsMap.get(l.propertyExternalId);
+        const project = projectsMap.get(l.propertyExternalId);
+
+        let targetNameEn = '';
+        let targetNameAr = '';
+
+        if (listing) {
+          targetNameEn = listing.enTitle || 'Untitled Listing';
+          targetNameAr = listing.arTitle || 'عقار بدون عنوان';
+        } else if (project) {
+          targetNameEn = project.nameEn || 'Untitled Project';
+          targetNameAr = project.nameAr || 'مشروع بدون عنوان';
+        }
+
+        return {
+          ...l,
+          targetNameEn,
+          targetNameAr
+        };
+      });
+
+      return reply.send({
+        success: true,
+        data: {
+          leads: enrichedLeads,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+          }
+        }
+      });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch mortgage leads' });
+    }
+  });
+
+  app.get('/mortgage-leads/export', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const query = request.query as {
+      search?: string;
+      status?: string;
+      bank?: string;
+      isCitizen?: string;
+      dateStart?: string;
+      dateEnd?: string;
+    };
+
+    try {
+      const conditions: any[] = [];
+
+      if (query.status) {
+        conditions.push(eq(mortgageLeads.status, query.status));
+      }
+      if (query.bank) {
+        conditions.push(eq(mortgageLeads.bankSlug, query.bank));
+      }
+      if (query.isCitizen !== undefined) {
+        conditions.push(eq(mortgageLeads.isCitizen, query.isCitizen === 'true'));
+      }
+      if (query.search) {
+        const searchPattern = `%${query.search}%`;
+        conditions.push(or(
+          ilike(mortgageLeads.fullName, searchPattern),
+          ilike(mortgageLeads.phoneNumber, searchPattern)
+        ));
+      }
+      if (query.dateStart) {
+        conditions.push(gte(mortgageLeads.createdAt, new Date(query.dateStart)));
+      }
+      if (query.dateEnd) {
+        conditions.push(sql`${mortgageLeads.createdAt} <= ${new Date(query.dateEnd)}`);
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const leadsData = await db.select()
+        .from(mortgageLeads)
+        .where(whereClause)
+        .orderBy(desc(mortgageLeads.createdAt));
+
+      // Fetch corresponding listings and projects for target name resolution in CSV export
+      const propertyIds = [...new Set(leadsData.map(l => l.propertyExternalId))].filter(Boolean);
+
+      const matchedListings = propertyIds.length > 0
+        ? await db.select({ id: listings.id, shortId: listings.shortId, enTitle: listings.enTitle })
+            .from(listings)
+            .where(or(
+              inArray(listings.id, propertyIds),
+              inArray(listings.shortId, propertyIds)
+            ))
+        : [];
+
+      const matchedProjects = propertyIds.length > 0
+        ? await db.select({ id: projects.id, nameEn: projects.nameEn })
+            .from(projects)
+            .where(inArray(projects.id, propertyIds))
+        : [];
+
+      const listingsMap = new Map<string, typeof matchedListings[0]>();
+      matchedListings.forEach(l => {
+        listingsMap.set(l.id, l);
+        if (l.shortId) {
+          listingsMap.set(l.shortId, l);
+        }
+      });
+
+      const projectsMap = new Map<string, typeof matchedProjects[0]>();
+      matchedProjects.forEach(p => {
+        projectsMap.set(p.id, p);
+      });
+
+      const headers = [
+        'ID', 'Full Name', 'Phone Number', 'Monthly Income', 'REDF Supported',
+        'Monthly Obligations', 'Property ID', 'Property Target Name', 'Property Price', 'Is Citizen',
+        'Is First Home', 'Down Payment Amount', 'Loan Period Years', 'Bank Name',
+        'Applied Rate %', 'Monthly Installment', 'Total Loan Amount', 'Total Payable Value',
+        'Status', 'Created At'
+      ];
+
+      const csvRows = [headers.join(',')];
+
+      for (const lead of leadsData) {
+        const listing = listingsMap.get(lead.propertyExternalId);
+        const project = projectsMap.get(lead.propertyExternalId);
+
+        let targetName = '';
+        if (listing) {
+          targetName = listing.enTitle || 'Untitled Listing';
+        } else if (project) {
+          targetName = project.nameEn || 'Untitled Project';
+        } else {
+          targetName = lead.propertyExternalId;
+        }
+
+        const row = [
+          lead.id,
+          `"${(lead.fullName || '').replace(/"/g, '""')}"`,
+          `"${(lead.phoneNumber || '').replace(/"/g, '""')}"`,
+          lead.monthlyIncome || '',
+          lead.redfSupported ? 'Yes' : 'No',
+          lead.monthlyObligations || '',
+          lead.propertyExternalId,
+          `"${targetName.replace(/"/g, '""')}"`,
+          lead.propertyPrice,
+          lead.isCitizen ? 'Yes' : 'No',
+          lead.isFirstHome === null ? 'N/A' : (lead.isFirstHome ? 'Yes' : 'No'),
+          lead.downPaymentAmount,
+          lead.loanPeriodYears,
+          `"${(lead.bankNameEn || '').replace(/"/g, '""')}"`,
+          lead.appliedRatePct,
+          lead.monthlyInstalment,
+          lead.totalLoanAmount,
+          lead.totalPayableValue,
+          lead.status,
+          lead.createdAt ? new Date(lead.createdAt).toISOString() : ''
+        ];
+        csvRows.push(row.join(','));
+      }
+
+      const csvString = csvRows.join('\n');
+
+      reply.header('Content-Type', 'text/csv; charset=utf-8');
+      reply.header('Content-Disposition', 'attachment; filename=mortgage_leads_export.csv');
+      
+      return reply.send(csvString);
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to export mortgage leads.' });
+    }
+  });
+
+  app.get('/mortgage-leads/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const [lead] = await db.select().from(mortgageLeads).where(eq(mortgageLeads.id, id)).limit(1);
+      if (!lead) {
+        return reply.code(404).send({ success: false, message: 'Lead not found.' });
+      }
+
+      // Fetch corresponding listing or project details
+      const [listing] = lead.propertyExternalId
+        ? await db.select({ enTitle: listings.enTitle, arTitle: listings.arTitle })
+            .from(listings)
+            .where(or(
+              eq(listings.id, lead.propertyExternalId),
+              eq(listings.shortId, lead.propertyExternalId)
+            ))
+            .limit(1)
+        : [null];
+
+      const [project] = lead.propertyExternalId && !listing
+        ? await db.select({ nameEn: projects.nameEn, nameAr: projects.nameAr })
+            .from(projects)
+            .where(eq(projects.id, lead.propertyExternalId))
+            .limit(1)
+        : [null];
+
+      let targetNameEn = '';
+      let targetNameAr = '';
+
+      if (listing) {
+        targetNameEn = listing.enTitle || 'Untitled Listing';
+        targetNameAr = listing.arTitle || 'عقار بدون عنوان';
+      } else if (project) {
+        targetNameEn = project.nameEn || 'Untitled Project';
+        targetNameAr = project.nameAr || 'مشروع بدون عنوان';
+      }
+
+      const enrichedLead = {
+        ...lead,
+        targetNameEn,
+        targetNameAr
+      };
+
+      return reply.send({ success: true, data: enrichedLead });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch mortgage lead details.' });
+    }
+  });
+
+  app.patch('/mortgage-leads/:id/status', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { status } = request.body as { status: string };
+
+    if (!status) {
+      return reply.code(400).send({ success: false, message: 'Status is required.' });
+    }
+
+    try {
+      const [updated] = await db.update(mortgageLeads)
+        .set({ status })
+        .where(eq(mortgageLeads.id, id))
+        .returning();
+
+      if (!updated) {
+        return reply.code(404).send({ success: false, message: 'Lead not found.' });
+      }
+
+      return reply.send({ success: true, data: updated });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to update lead status.' });
     }
   });
 }

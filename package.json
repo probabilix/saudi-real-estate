@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
 
-    "dev": "cmd /C \"set NODE_OPTIONS=--max-old-space-size=2048&& turbo dev\"",
+    "dev": "cmd /C \"set NODE_OPTIONS=--max-old-space-size=4096&& turbo dev\"",
     "build": "turbo build",
     "lint": "turbo lint",
 

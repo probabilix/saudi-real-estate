@@ -292,7 +292,7 @@ export default function InboxPage() {
                   </div>
 
                   <a
-                    href={`mailto:${selectedSubmission.email}?subject=Re: Saudi RE Enquiry&body=Hi ${selectedSubmission.name},%0D%0A%0D%0AThank you for contacting Saudi Real Estate. In regards to your message:%0D%0A%0D%0A"${selectedSubmission.message}"%0D%0A%0D%0A...`}
+                    href={`mailto:${selectedSubmission.email}?subject=Re: Tamleeq Enquiry&body=Hi ${selectedSubmission.name},%0D%0A%0D%0AThank you for contacting Tamleeq. In regards to your message:%0D%0A%0D%0A"${selectedSubmission.message}"%0D%0A%0D%0A...`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => {

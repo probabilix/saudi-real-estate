@@ -19,14 +19,14 @@ async function seedSettings() {
 
     // 2. Social Links
     const socialLinks = JSON.stringify({
-      twitter: 'https://twitter.com/saudi_re',
-      instagram: 'https://instagram.com/saudi_re',
-      linkedin: 'https://linkedin.com/company/saudi-re',
-      whatsapp: '+966500000000',
-      tiktok: 'https://tiktok.com/@saudi_re',
-      snapchat: 'https://snapchat.com/add/saudi_re',
-      youtube: 'https://youtube.com/@saudi_re',
-      facebook: 'https://facebook.com/saudi_re'
+      twitter: 'https://twitter.com/tamleeq_sa',
+      instagram: 'https://instagram.com/tamleeq_sa',
+      linkedin: 'https://linkedin.com/company/tamleeq',
+      whatsapp: '+966538498580',
+      tiktok: 'https://tiktok.com/@tamleeq_sa',
+      snapchat: 'https://snapchat.com/add/tamleeq_sa',
+      youtube: 'https://youtube.com/@tamleeq_sa',
+      facebook: 'https://facebook.com/tamleeq_sa'
     });
     await db.insert(systemSettings).values({
       key: 'social_links',
@@ -58,11 +58,11 @@ async function seedSettings() {
 
     await db.insert(systemSettings).values({
       key: 'contact_email',
-      value: 'sales@saudi-re.com',
+      value: 'sales@tamleeq.sa',
       description: 'Primary platform contact email address.'
     }).onConflictDoUpdate({
       target: systemSettings.key,
-      set: { value: 'sales@saudi-re.com' }
+      set: { value: 'sales@tamleeq.sa' }
     });
 
     await db.insert(systemSettings).values({
@@ -137,6 +137,25 @@ async function seedSettings() {
     }).onConflictDoUpdate({
       target: systemSettings.key,
       set: { value: 'auto' }
+    });
+
+    // 8. Platform Logo and Favicon Settings
+    await db.insert(systemSettings).values({
+      key: 'logo_url',
+      value: '',
+      description: 'The uploaded image URL of the platform brand logo.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { description: 'The uploaded image URL of the platform brand logo.' }
+    });
+
+    await db.insert(systemSettings).values({
+      key: 'favicon_url',
+      value: '',
+      description: 'The uploaded image URL of the platform brand favicon.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { description: 'The uploaded image URL of the platform brand favicon.' }
     });
 
     console.log('✅ Successfully seeded system settings');

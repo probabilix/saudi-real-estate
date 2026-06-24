@@ -16,7 +16,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '1. Introduction',
           body: [
-            'Saudi Real Estate ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our platform saudi-re.com.',
+            'Tamleeq ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our platform tamleeq.sa.',
             'Please read this policy carefully. If you disagree with its terms, please discontinue use of the site.',
           ],
         },
@@ -62,13 +62,13 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '6. Your Rights',
           body: [
-            'You have the right to access, update, or delete your personal data at any time by contacting us at privacy@saudi-re.com. You may also opt out of marketing communications through your account settings.',
+            'You have the right to access, update, or delete your personal data at any time by contacting us at privacy@tamleeq.sa. You may also opt out of marketing communications through your account settings.',
           ],
         },
         {
           heading: '7. Contact Us',
           body: [
-            'If you have questions about this Privacy Policy, contact us at: privacy@saudi-re.com or call +966 53 849 8580.',
+            'If you have questions about this Privacy Policy, contact us at: privacy@tamleeq.sa or call +966 53 849 8580.',
           ],
         },
       ],
@@ -79,7 +79,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '1. مقدمة',
           body: [
-            'سعودي عقار ("نحن" أو "لنا") ملتزمون بحماية خصوصيتك. توضح سياسة الخصوصية هذه كيفية جمع معلوماتك واستخدامها والإفصاح عنها وحمايتها عند زيارة منصتنا saudi-re.com.',
+            'تمليك ("نحن" أو "لنا") ملتزمون بحماية خصوصيتك. توضح سياسة الخصوصية هذه كيفية جمع معلوماتك واستخدامها والإفصاح عنها وحمايتها عند زيارة منصتنا tamleeq.sa.',
             'يرجى قراءة هذه السياسة بعناية. إذا كنت لا توافق على شروطها، يرجى التوقف عن استخدام الموقع.',
           ],
         },
@@ -123,13 +123,13 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '6. حقوقك',
           body: [
-            'يحق لك الوصول إلى بياناتك الشخصية أو تحديثها أو حذفها في أي وقت عبر التواصل معنا على privacy@saudi-re.com.',
+            'يحق لك الوصول إلى بياناتك الشخصية أو تحديثها أو حذفها في أي وقت عبر التواصل معنا على privacy@tamleeq.sa.',
           ],
         },
         {
           heading: '7. تواصل معنا',
           body: [
-            'إذا كان لديك أسئلة حول سياسة الخصوصية، تواصل معنا على: privacy@saudi-re.com أو اتصل على +966 53 849 8580.',
+            'إذا كان لديك أسئلة حول سياسة الخصوصية، تواصل معنا على: privacy@tamleeq.sa أو اتصل على +966 53 849 8580.',
           ],
         },
       ],
@@ -142,13 +142,13 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '1. Acceptance of Terms',
           body: [
-            'By accessing and using Saudi Real Estate (saudi-re.com), you accept and agree to be bound by these Terms of Service. If you do not agree to these terms, you must not use our platform.',
+            'By accessing and using Tamleeq (tamleeq.sa), you accept and agree to be bound by these Terms of Service. If you do not agree to these terms, you must not use our platform.',
           ],
         },
         {
           heading: '2. Platform Description',
           body: [
-            'Saudi Real Estate is a licensed real estate marketplace operating under Saudi regulations. We connect property buyers, sellers, landlords, and tenants with REGA-verified brokers and agencies across the Kingdom.',
+            'Tamleeq is a licensed real estate marketplace operating under Saudi regulations. We connect property buyers, sellers, landlords, and tenants with REGA-verified brokers and agencies across the Kingdom.',
           ],
         },
         {
@@ -181,13 +181,13 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '6. Intellectual Property',
           body: [
-            'All content on saudi-re.com including text, graphics, logos, and software is the property of Saudi Real Estate and protected by applicable intellectual property laws.',
+            'All content on tamleeq.sa including text, graphics, logos, and software is the property of Tamleeq and protected by applicable intellectual property laws.',
           ],
         },
         {
           heading: '7. Limitation of Liability',
           body: [
-            'Saudi Real Estate is a marketplace platform and is not a party to transactions between buyers and sellers. We are not liable for any losses arising from transactions conducted through the platform.',
+            'Tamleeq is a marketplace platform and is not a party to transactions between buyers and sellers. We are not liable for any losses arising from transactions conducted through the platform.',
           ],
         },
         {
@@ -204,13 +204,13 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '1. قبول الشروط',
           body: [
-            'بالوصول إلى سعودي عقار (saudi-re.com) واستخدامه، فإنك توافق على الالتزام بشروط الخدمة هذه. إذا كنت لا توافق، يجب عليك عدم استخدام المنصة.',
+            'بالوصول إلى تمليك (tamleeq.sa) واستخدامه، فإنك توافق على الالتزام بشروط الخدمة هذه. إذا كنت لا توافق، يجب عليك عدم استخدام المنصة.',
           ],
         },
         {
           heading: '2. وصف المنصة',
           body: [
-            'سعودي عقار هي منصة عقارية مرخصة تعمل وفق الأنظمة السعودية، تربط المشترين والبائعين والملاك والمستأجرين بوسطاء ووكالات معتمدة من هيئة العقار عبر المملكة.',
+            'تمليك هي منصة عقارية مرخصة تعمل وفق الأنظمة السعودية، تربط المشترين والبائعين والملاك والمستأجرين بوسطاء ووكالات معتمدة من هيئة العقار عبر المملكة.',
           ],
         },
         {
@@ -241,7 +241,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '6. الملكية الفكرية',
           body: [
-            'جميع المحتويات على saudi-re.com بما في ذلك النصوص والرسومات والشعارات والبرامج هي ملك لسعودي عقار ومحمية بموجب قوانين الملكية الفكرية.',
+            'جميع المحتويات على tamleeq.sa بما في ذلك النصوص والرسومات والشعارات والبرامج هي ملك لتمليك ومحمية بموجب قوانين الملكية الفكرية.',
           ],
         },
         {
@@ -325,7 +325,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '8. Contact & Assistance',
           body: [
-            'Our REGA-certified brokers can guide you through every step of the process. Contact us at foreign@saudi-re.com or call +966 53 849 8580 for dedicated foreign investment support.',
+            'Our REGA-certified brokers can guide you through every step of the process. Contact us at foreign@tamleeq.sa or call +966 53 849 8580 for dedicated foreign investment support.',
           ],
         },
       ],
@@ -390,7 +390,7 @@ const LEGAL_CONTENT: Record<string, {
         {
           heading: '7. التواصل والدعم',
           body: [
-            'يمكن لوسطائنا المعتمدين من هيئة العقار إرشادك في كل خطوة. تواصل معنا على foreign@saudi-re.com أو اتصل على +966 53 849 8580.',
+            'يمكن لوسطائنا المعتمدين من هيئة العقار إرشادك في كل خطوة. تواصل معنا على foreign@tamleeq.sa أو اتصل على +966 53 849 8580.',
           ],
         },
       ],
@@ -560,7 +560,7 @@ export default function LegalPage({ params: { locale, slug } }: { params: { loca
             {isRTL ? 'فريقنا جاهز لمساعدتك في أي استفسار قانوني.' : 'Our team is ready to assist with any legal inquiries.'}
           </p>
           <a
-            href="mailto:support@saudi-re.com"
+            href="mailto:support@tamleeq.sa"
             className={`inline-block px-10 py-4 bg-primary-600 text-white rounded-2xl font-black hover:bg-primary-500 transition-all ${isRTL ? 'font-arabic' : ''}`}
           >
             {isRTL ? 'تواصل معنا' : 'Contact Us'}

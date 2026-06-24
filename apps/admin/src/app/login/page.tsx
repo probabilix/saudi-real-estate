@@ -47,7 +47,7 @@ export default function LoginPage() {
             <Building2 className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Admin Panel</h1>
-          <p className="text-surface-400 text-sm">Saudi Real Estate Platform</p>
+          <p className="text-surface-400 text-sm">Tamleeq Platform</p>
         </div>
 
         {/* Card */}
@@ -129,7 +129,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-surface-600 mt-6">
-          © {new Date().getFullYear()} Saudi Real Estate. All rights reserved.
+          © {new Date().getFullYear()} Tamleeq. All rights reserved.
         </p>
       </div>
     </div>

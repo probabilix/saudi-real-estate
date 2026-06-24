@@ -240,6 +240,10 @@ export interface CrmLead {
 
 export type CrmLeadStatus =
   | 'NEW'
+  | 'AI_ATTEMPTING'
+  | 'AI_QUALIFIED'
+  | 'AI_DISQUALIFIED'
+  | 'AI_UNREACHED'
   | 'ATTEMPTED_CONTACT'
   | 'CONTACTED'
   | 'SITE_VISIT_SCHEDULED'
@@ -249,14 +253,18 @@ export type CrmLeadStatus =
   | 'CLOSED_LOST';
 
 export const CRM_STAGES: { key: CrmLeadStatus; label: string; colorClass: string; dotColor: string }[] = [
-  { key: 'NEW',                   label: 'New',               colorClass: 'stage-new',       dotColor: '#6366f1' },
-  { key: 'ATTEMPTED_CONTACT',     label: 'Attempted Contact', colorClass: 'stage-attempted', dotColor: '#f59e0b' },
-  { key: 'CONTACTED',             label: 'Contacted',         colorClass: 'stage-contacted', dotColor: '#3b82f6' },
-  { key: 'SITE_VISIT_SCHEDULED',  label: 'Site Visit',        colorClass: 'stage-visit',     dotColor: '#8b5cf6' },
-  { key: 'PROPERTY_VIEWING',      label: 'Viewing',           colorClass: 'stage-viewing',   dotColor: '#ec4899' },
-  { key: 'OFFER_SUBMITTED',       label: 'Offer Submitted',   colorClass: 'stage-offer',     dotColor: '#f97316' },
-  { key: 'CLOSED_WON',            label: 'Closed Won',        colorClass: 'stage-won',       dotColor: '#10b981' },
-  { key: 'CLOSED_LOST',           label: 'Closed Lost',       colorClass: 'stage-lost',      dotColor: '#6b7280' },
+  { key: 'NEW',                   label: 'New',                  colorClass: 'stage-new',            dotColor: '#6366f1' },
+  { key: 'AI_ATTEMPTING',         label: 'AI Attempting',        colorClass: 'stage-ai-attempting',  dotColor: '#f59e0b' },
+  { key: 'AI_QUALIFIED',          label: 'AI Qualified',         colorClass: 'stage-ai-qualified',   dotColor: '#10b981' },
+  { key: 'AI_DISQUALIFIED',       label: 'AI Disqualified',      colorClass: 'stage-ai-disqualified',dotColor: '#ef4444' },
+  { key: 'AI_UNREACHED',          label: 'AI Unreached',         colorClass: 'stage-ai-unreached',   dotColor: '#9ca3af' },
+  { key: 'ATTEMPTED_CONTACT',     label: 'Attempted Contact',    colorClass: 'stage-attempted',      dotColor: '#f97316' },
+  { key: 'CONTACTED',             label: 'Contacted',            colorClass: 'stage-contacted',      dotColor: '#3b82f6' },
+  { key: 'SITE_VISIT_SCHEDULED',  label: 'Site Visit',           colorClass: 'stage-visit',          dotColor: '#8b5cf6' },
+  { key: 'PROPERTY_VIEWING',      label: 'Viewing',              colorClass: 'stage-viewing',        dotColor: '#ec4899' },
+  { key: 'OFFER_SUBMITTED',       label: 'Offer Submitted',      colorClass: 'stage-offer',          dotColor: '#f97316' },
+  { key: 'CLOSED_WON',            label: 'Closed Won',           colorClass: 'stage-won',            dotColor: '#10b981' },
+  { key: 'CLOSED_LOST',           label: 'Closed Lost',          colorClass: 'stage-lost',           dotColor: '#6b7280' },
 ];
 
 export const WEBSITE_LEAD_STATUSES = [

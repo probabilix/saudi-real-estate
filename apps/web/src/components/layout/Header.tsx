@@ -23,16 +23,19 @@ export default function Header({ locale }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
   const [contactPhone, setContactPhone] = useState(tCommon('supportPhone'));
 
-  // Fetch live contact phone from DB settings
+  // Fetch live contact phone and logo from DB settings
   useEffect(() => {
     fetch(`${API_BASE_URL}/system/settings`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(json => {
         const phone = json?.data?.contact_phone;
         if (phone) setContactPhone(phone);
+        const logo = json?.data?.logo_url;
+        if (logo) setLogoUrl(logo);
       })
       .catch(() => { });
   }, []);
@@ -118,12 +121,18 @@ export default function Header({ locale }: HeaderProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Logo */}
           <Link href={`/${locale}`} className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-all">
-              <Building2 className="w-6 h-6 text-white" />
-            </div>
-            <span className={`text-2xl font-bold tracking-tight text-gray-900 ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
-              {tCommon('appName')}
-            </span>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Tamleeq" className="h-8 w-auto object-contain animate-in fade-in duration-300" />
+            ) : (
+              <>
+                <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-all">
+                  <Building2 className="w-6 h-6 text-white" />
+                </div>
+                <span className={`text-2xl font-bold tracking-tight text-gray-900 ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
+                  {tCommon('appName')}
+                </span>
+              </>
+            )}
           </Link>
 
           {/* Desktop Nav */}
@@ -264,9 +273,13 @@ export default function Header({ locale }: HeaderProps) {
                 className={`fixed top-0 bottom-0 ${isRTL ? 'left-0' : 'right-0'} w-[280px] bg-white z-[120] lg:hidden shadow-2xl flex flex-col`}
               >
                 <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-                  <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-white" />
-                  </div>
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Tamleeq" className="h-8 w-auto object-contain" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
+                      <Building2 className="w-5 h-5 text-white" />
+                    </div>
+                  )}
                   <button onClick={() => setMobileOpen(false)} className="p-2 text-gray-400 hover:text-gray-900 transition-colors">
                     <X className="w-6 h-6" />
                   </button>

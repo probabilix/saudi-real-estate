@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Saudi Real Estate | AI-Powered Property Marketplace',
-    template: '%s | Saudi Real Estate',
+    default: 'Tamleeq | AI-Powered Property Marketplace',
+    template: '%s | Tamleeq',
   },
   description:
     'Find your perfect property in Saudi Arabia. AI-powered search, qualified leads for brokers, personalized experience for buyers.',

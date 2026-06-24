@@ -109,7 +109,7 @@ export default function ChatWidget({
             role: 'assistant',
             content: (mode === 'qualification' || mode === 'project_qualification')
               ? (locale === 'ar' ? 'مرحباً! أنا مساعدك العقاري. هل ترغب في معرفة المزيد عن هذا العقار؟' : 'Hello! I am your real estate assistant. Would you like to know more about this property?')
-              : (locale === 'ar' ? 'مرحباً! أنا مساعدك في منصة عقارات السعودية. كيف يمكنني مساعدتك في استكشاف العقارات أو الإجابة على استفساراتك؟' : 'Welcome! I am your Saudi RE assistant. How can I help you explore properties or answer questions about our platform?'),
+              : (locale === 'ar' ? 'مرحباً! أنا مساعدك في منصة تمليك. كيف يمكنني مساعدتك في استكشاف العقارات أو الإجابة على استفساراتك؟' : 'Welcome! I am your Tamleeq assistant. How can I help you explore properties or answer questions about our platform?'),
             timestamp: new Date(),
           },
         ]);
@@ -140,7 +140,7 @@ export default function ChatWidget({
                   role: 'assistant',
                   content: (mode === 'qualification' || mode === 'project_qualification')
                     ? (locale === 'ar' ? 'مرحباً! أنا مساعدك العقاري. هل ترغب في معرفة المزيد عن هذا العقار؟' : 'Hello! I am your real estate assistant. Would you like to know more about this property?')
-                    : (locale === 'ar' ? 'مرحباً! أنا مساعدك في منصة عقارات السعودية. كيف يمكنني مساعدتك في استكشاف العقارات أو الإجابة على استفساراتك؟' : 'Welcome! I am your Saudi RE assistant. How can I help you explore properties or answer questions about our platform?'),
+                    : (locale === 'ar' ? 'مرحباً! أنا مساعدك في منصة تمليك. كيف يمكنني مساعدتك في استكشاف العقارات أو الإجابة على استفساراتك؟' : 'Welcome! I am your Tamleeq assistant. How can I help you explore properties or answer questions about our platform?'),
                   timestamp: new Date(),
                 },
               ]);
@@ -260,7 +260,7 @@ export default function ChatWidget({
             <h3 className="text-sm font-bold text-charcoal">
               {(mode === 'qualification' || mode === 'project_qualification')
                 ? (locale === 'ar' ? 'مساعد العقارات' : 'Property Advisor')
-                : (locale === 'ar' ? 'مساعد منصة عقارات السعودية' : 'Saudi RE Assistant')
+                : (locale === 'ar' ? 'مساعد منصة تمليك' : 'Tamleeq Assistant')
               }
             </h3>
           </div>
@@ -326,7 +326,7 @@ export default function ChatWidget({
             <h3 className="text-sm font-bold text-charcoal">
               {(mode === 'qualification' || mode === 'project_qualification')
                 ? (locale === 'ar' ? 'مساعد العقارات' : 'Property Advisor')
-                : (locale === 'ar' ? 'مساعد منصة عقارات السعودية' : 'Saudi RE Assistant')
+                : (locale === 'ar' ? 'مساعد منصة تمليك' : 'Tamleeq Assistant')
               }
             </h3>
             <div className="flex items-center gap-1.5">

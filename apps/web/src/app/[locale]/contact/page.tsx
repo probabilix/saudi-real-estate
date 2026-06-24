@@ -13,7 +13,7 @@ export default function ContactPage() {
   
   const [contactPhone, setContactPhone] = useState('+966 53 849 8580');
   const [contactLocation, setContactLocation] = useState('Riyadh, Saudi Arabia');
-  const [contactEmail, setContactEmail] = useState('sales@saudi-re.com');
+  const [contactEmail, setContactEmail] = useState('sales@tamleeq.sa');
   const [whatsapp, setWhatsapp] = useState('');
 
   // Form State
@@ -257,7 +257,7 @@ export default function ContactPage() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="w-full h-12 bg-gray-50 border-2 border-gray-100/80 rounded-xl px-4 text-sm font-bold focus:border-primary-600/50 focus:bg-white focus:ring-4 focus:ring-primary-500/5 transition-all outline-none"
-                          placeholder="faisal@saudi-re.com"
+                          placeholder="faisal@tamleeq.sa"
                         />
                       </div>
                     </div>

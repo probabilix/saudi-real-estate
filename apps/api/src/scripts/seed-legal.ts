@@ -25,7 +25,7 @@ async function seedLegal() {
       titleEn: 'Privacy Policy',
       titleAr: 'سياسة الخصوصية',
       contentEn: `## 1. Introduction
-Welcome to Saudi Real Estate. We are committed to protecting your personal information and your right to privacy. If you have any questions or concerns about our policy, or our practices with regards to your personal information, please contact us at support@saudi-re.com.
+Welcome to Tamleeq. We are committed to protecting your personal information and your right to privacy. If you have any questions or concerns about our policy, or our practices with regards to your personal information, please contact us at support@tamleeq.sa.
 
 ## 2. Information We Collect
 We collect personal information that you voluntarily provide to us when registering on the platform, expressing an interest in obtaining information about us or our products and services, or otherwise contacting us.
@@ -48,7 +48,7 @@ We only share information with your consent, to comply with laws, to provide you
 ## 5. Data Security
 We have implemented appropriate technical and organizational security measures designed to protect the security of any personal information we process. However, please also remember that we cannot guarantee that the internet itself is 100% secure.`,
       contentAr: `## 1. مقدمة
-مرحباً بكم في سعودي عقار. نحن ملتزمون بحماية معلوماتكم الشخصية وحقكم في الخصوصية. إذا كان لديكم أي أسئلة أو استفسارات حول سياستنا، أو ممارساتنا فيما يتعلق بمعلوماتكم الشخصية، يرجى الاتصال بنا على support@saudi-re.com.
+مرحباً بكم في تمليك. نحن ملتزمون بحماية معلوماتكم الشخصية وحقكم في الخصوصية. إذا كان لديكم أي أسئلة أو استفسارات حول سياستنا، أو ممارساتنا فيما يتعلق بمعلوماتكم الشخصية، يرجى الاتصال بنا على support@tamleeq.sa.
 
 ## 2. المعلومات التي نجمعها
 نحن نجمع المعلومات الشخصية التي تقدمها لنا طواعية عند التسجيل في المنصة، أو التعبير عن اهتمامك بالحصول على معلومات عنا أو عن منتجاتنا وخدماتنا، أو عند الاتصال بنا بأي طريقة أخرى.
@@ -76,7 +76,7 @@ We have implemented appropriate technical and organizational security measures d
       titleEn: 'Terms of Service',
       titleAr: 'شروط الخدمة',
       contentEn: `## 1. Agreement to Terms
-These Terms of Service constitute a legally binding agreement made between you, whether personally or on behalf of an entity and Saudi Real Estate, concerning your access to and use of the saudi-re.com website as well as any other media form, media channel, mobile website or mobile application related, linked, or otherwise connected thereto.
+These Terms of Service constitute a legally binding agreement made between you, whether personally or on behalf of an entity and Tamleeq, concerning your access to and use of the tamleeq.sa website as well as any other media form, media channel, mobile website or mobile application related, linked, or otherwise connected thereto.
 
 ## 2. Intellectual Property Rights
 Unless otherwise indicated, the Site is our proprietary property and all source code, databases, functionality, software, website designs, audio, video, text, photographs, and graphics on the Site and the trademarks, service marks, and logos contained therein are owned or controlled by us or licensed to us.
@@ -94,7 +94,7 @@ You may not access or use the Site for any purpose other than that for which we 
 ## 5. Governing Law
 These Terms of Service and your use of the Site are governed by and construed in accordance with the laws of the Kingdom of Saudi Arabia applicable to agreements made and to be entirely performed within the Kingdom.`,
       contentAr: `## 1. الموافقة على الشروط
-تشكل شروط الخدمة هذه اتفاقية ملزمة قانوناً مبرمة بينك، سواء شخصياً أو بالنيابة عن كيان، وبين سعودي عقار، فيما يتعلق بوصولك إلى واستخدامك لموقع saudi-re.com بالإضافة إلى أي نموذج وسائط آخر أو قناة وسائط أو موقع ويب للجوال أو تطبيق جوال ذي صلة أو مرتبط أو متصل به بأي طريقة أخرى.
+تشكل شروط الخدمة هذه اتفاقية ملزمة قانوناً مبرمة بينك، سواء شخصياً أو بالنيابة عن كيان، وبين تمليك، فيما يتعلق بوصولك إلى واستخدامك لموقع tamleeq.sa بالإضافة إلى أي نموذج وسائط آخر أو قناة وسائط أو موقع ويب للجوال أو تطبيق جوال ذي صلة أو مرتبط أو متصل به بأي طريقة أخرى.
 
 ## 2. حقوق الملكية الفكرية
 ما لم ينص على خلاف ذلك، فإن الموقع هو ملكية خاصة بنا وجميع أكواد المصدر وقواعد البيانات والوظائف والبرامج وتصاميم المواقع والصوت والفيديو والنصوص والصور والرسومات الموجودة على الموقع والعلامات التجارية وعلامات الخدمة والشعارات الواردة فيه مملوكة لنا أو خاضعة لسيطرتنا أو مرخصة لنا.

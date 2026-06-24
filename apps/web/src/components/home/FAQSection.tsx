@@ -89,7 +89,7 @@ export default function FAQSection({ faqs = [] }: FAQSectionProps) {
             <div className="relative aspect-[4/5] rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl hidden sm:block">
               <img
                 src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=600&q=85"
-                alt="Premium Saudi Real Estate"
+                alt="Premium Tamleeq Real Estate"
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-charcoal/60 via-transparent to-transparent" />

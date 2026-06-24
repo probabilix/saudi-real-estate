@@ -3,7 +3,7 @@ import './globals.css';
 import { CrmAuthProvider } from '@/hooks/use-crm-auth';
 
 export const metadata: Metadata = {
-  title: 'Saudi RE — CRM Workspace',
+  title: 'Tamleeq — CRM Workspace',
   description: 'Real Estate CRM for managing leads and sales pipelines.',
 };
 

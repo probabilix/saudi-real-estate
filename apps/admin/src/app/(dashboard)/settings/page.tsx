@@ -66,7 +66,9 @@ export default function SettingsPage() {
         homepage_featured_articles: 'Homepage Featured Articles',
         google_client_id: 'Google Client ID',
         google_client_secret: 'Google Client Secret',
-        resend_api_key: 'Resend API Key'
+        resend_api_key: 'Resend API Key',
+        logo_url: 'Platform Logo',
+        favicon_url: 'Platform Favicon'
       };
       const friendlyName = SETTING_NAMES[key] || key;
       setSuccess(`Updated ${friendlyName} successfully`);
@@ -107,6 +109,135 @@ export default function SettingsPage() {
             {success}
           </div>
         )}
+
+        {/* Section: Platform Branding */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+              <ImageIcon className="w-4 h-4 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-surface-900">Platform Branding</h2>
+              <p className="text-xs text-surface-500">Configure your dynamic platform logo and browser favicon</p>
+            </div>
+          </div>
+          
+          <div className="admin-card p-6 grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0 w-full">
+            {/* Logo URL */}
+            <div className="min-w-0 w-full flex flex-col gap-1.5">
+              <label className="admin-label flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-surface-400" />
+                Platform Logo URL
+              </label>
+              
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-surface-50 border border-surface-200 overflow-hidden flex items-center justify-center shrink-0 shadow-sm p-1">
+                  {getSettingValue('logo_url') ? (
+                    <img 
+                      src={getSettingValue('logo_url')} 
+                      alt="Logo Preview" 
+                      className="max-w-full max-h-full object-contain" 
+                    />
+                  ) : (
+                    <span className="text-[9px] text-surface-400 font-bold uppercase">No Logo</span>
+                  )}
+                </div>
+
+                <div className="flex-1 flex gap-2 min-w-0">
+                  <input 
+                    type="text" 
+                    className="admin-input min-w-0 w-full" 
+                    value={getSettingValue('logo_url')}
+                    placeholder="Paste logo URL or upload"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSettings(prev => prev.map(s => s.key === 'logo_url' ? { ...s, value: val } : s));
+                    }}
+                    onBlur={(e) => handleUpdateSetting('logo_url', e.target.value)}
+                  />
+                  <CldUploadWidget 
+                    uploadPreset="saudi_re_listing" 
+                    onSuccess={(result: any) => {
+                      if (result.event === 'success' && result.info?.secure_url) {
+                        handleUpdateSetting('logo_url', result.info.secure_url);
+                      }
+                    }}
+                  >
+                    {({ open }) => (
+                      <button 
+                        type="button"
+                        onClick={() => open()}
+                        className="btn-secondary whitespace-nowrap px-3 shrink-0 flex items-center gap-1"
+                        title="Upload Logo"
+                      >
+                        <ImageIcon className="w-4 h-4 text-surface-500" />
+                        <span>Upload</span>
+                      </button>
+                    )}
+                  </CldUploadWidget>
+                </div>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-1">Fallback: A building icon with brand text "Tamleeq" is displayed.</p>
+            </div>
+
+            {/* Favicon URL */}
+            <div className="min-w-0 w-full flex flex-col gap-1.5">
+              <label className="admin-label flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-surface-400" />
+                Platform Favicon URL
+              </label>
+              
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-surface-50 border border-surface-200 overflow-hidden flex items-center justify-center shrink-0 shadow-sm p-2">
+                  {getSettingValue('favicon_url') ? (
+                    <img 
+                      src={getSettingValue('favicon_url')} 
+                      alt="Favicon Preview" 
+                      className="max-w-full max-h-full object-contain" 
+                    />
+                  ) : (
+                    <span className="text-[9px] text-surface-400 font-bold uppercase">No Icon</span>
+                  )}
+                </div>
+
+                <div className="flex-1 flex gap-2 min-w-0">
+                  <input 
+                    type="text" 
+                    className="admin-input min-w-0 w-full" 
+                    value={getSettingValue('favicon_url')}
+                    placeholder="Paste favicon URL or upload"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSettings(prev => prev.map(s => s.key === 'favicon_url' ? { ...s, value: val } : s));
+                    }}
+                    onBlur={(e) => handleUpdateSetting('favicon_url', e.target.value)}
+                  />
+                  <CldUploadWidget 
+                    uploadPreset="saudi_re_listing" 
+                    onSuccess={(result: any) => {
+                      if (result.event === 'success' && result.info?.secure_url) {
+                        handleUpdateSetting('favicon_url', result.info.secure_url);
+                      }
+                    }}
+                  >
+                    {({ open }) => (
+                      <button 
+                        type="button"
+                        onClick={() => open()}
+                        className="btn-secondary whitespace-nowrap px-3 shrink-0 flex items-center gap-1"
+                        title="Upload Favicon"
+                      >
+                        <ImageIcon className="w-4 h-4 text-surface-500" />
+                        <span>Upload</span>
+                      </button>
+                    )}
+                  </CldUploadWidget>
+                </div>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-1">Fallback: The default /favicon.ico is loaded.</p>
+            </div>
+          </div>
+        </section>
 
         {/* Section: Social Media */}
         <section className="space-y-4">

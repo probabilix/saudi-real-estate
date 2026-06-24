@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
+import { adminApi } from '@/lib/api';
 
 const NAV_GROUPS = [
   {
@@ -58,6 +59,22 @@ export function AdminSidebar() {
   const { user, logout } = useAdminAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchLogo() {
+      try {
+        const result = await adminApi.getAllSettings();
+        if (result.success && result.data) {
+          const logo = result.data.find((s: any) => s.key === 'logo_url')?.value;
+          if (logo) setLogoUrl(logo);
+        }
+      } catch (e) {
+        console.error('Failed to fetch logo setting', e);
+      }
+    }
+    fetchLogo();
+  }, []);
 
   useEffect(() => {
     const handleToggle = () => setMobileOpen(prev => !prev);
@@ -95,12 +112,18 @@ export function AdminSidebar() {
       >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border relative">
-        <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
-          <Building2 className="w-4 h-4 text-white" />
-        </div>
+        {logoUrl ? (
+          <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-white p-0.5 animate-in fade-in duration-300">
+            <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+          </div>
+        ) : (
+          <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
+            <Building2 className="w-4 h-4 text-white" />
+          </div>
+        )}
         {!collapsed && (
           <div className="min-w-0">
-            <div className="text-sm font-bold text-white truncate">Saudi RE</div>
+            <div className="text-sm font-bold text-white truncate">Tamleeq</div>
             <div className="text-[10px] text-primary-400 font-semibold uppercase tracking-wider">Admin Panel</div>
           </div>
         )}

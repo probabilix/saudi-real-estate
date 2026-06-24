@@ -3,7 +3,7 @@ import { AdminAuthProvider } from '@/hooks/use-admin-auth';
 import '../globals.css';
 
 export const metadata: Metadata = {
-  title: 'Admin Login — Saudi Real Estate',
+  title: 'Admin Login — Tamleeq',
   robots: 'noindex, nofollow',
 };
 

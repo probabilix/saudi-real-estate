@@ -187,7 +187,7 @@ export default function NewsArticlePage({ params: { locale, slug } }: { params: 
                 </div>
                 <div>
                   <p className={`font-bold text-gray-900 ${isRTL ? 'font-arabic' : ''}`}>
-                    {isRTL ? 'فريق سعودي عقار' : 'Saudi RE Team'}
+                    {isRTL ? 'فريق تمليك' : 'Tamleeq Team'}
                   </p>
                   <p className={`text-xs text-gray-400 ${isRTL ? 'font-arabic' : ''}`}>
                     {isRTL ? 'قسم التحرير' : 'Editorial Department'}

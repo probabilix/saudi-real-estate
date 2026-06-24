@@ -43,7 +43,7 @@ export default function CrmLoginPage() {
               <Building2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="text-white font-bold text-lg">Saudi Real Estate</div>
+              <div className="text-white font-bold text-lg">Tamleeq</div>
               <div className="text-primary-400 text-xs font-semibold tracking-widest uppercase">CRM Workspace</div>
             </div>
           </div>
@@ -77,7 +77,7 @@ export default function CrmLoginPage() {
 
         {/* Footer */}
         <div className="relative text-xs text-surface-600">
-          © {new Date().getFullYear()} Saudi Real Estate Platform
+          © {new Date().getFullYear()} Tamleeq Platform
         </div>
       </div>
 
@@ -95,7 +95,7 @@ export default function CrmLoginPage() {
               <Building2 className="w-4.5 h-4.5 text-white" />
             </div>
             <div>
-              <div className="text-sm font-bold text-surface-800">Saudi RE CRM</div>
+              <div className="text-sm font-bold text-surface-800">Tamleeq CRM</div>
               <div className="text-[10px] text-surface-400 font-semibold tracking-widest uppercase">Workspace</div>
             </div>
           </div>

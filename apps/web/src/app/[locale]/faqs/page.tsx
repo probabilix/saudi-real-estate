@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, Home } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Frequently Asked Questions | Saudi RE',
+  title: 'Frequently Asked Questions | Tamleeq',
   description: 'Find answers to common questions about our exclusive real estate portfolio, AI qualification process, REGA compliance, and purchasing property in Saudi Arabia.',
 };
 

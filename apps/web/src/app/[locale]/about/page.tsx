@@ -43,9 +43,9 @@ export default function AboutPage() {
                 transition={{ delay: 0.1 }}
                 className={`text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] ${isRTL ? 'font-arabic' : 'font-serif'}`}
               >
-                {isRTL ? 'نحن نقود التحول' : 'Leading the Future of'} <br />
+                {isRTL ? 'نحن نقود التحول العقاري مع' : 'Leading the Future of Real Estate with'} <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-light to-gold">
-                  {isRTL ? 'العقاري الذكي' : 'Saudi Real Estate'}
+                  {isRTL ? 'تمليك' : 'Tamleeq'}
                 </span>
               </motion.h1>
 
@@ -81,7 +81,7 @@ export default function AboutPage() {
 
                 <div className="space-y-4">
                   <h3 className={`text-xl font-bold ${isRTL ? 'font-arabic' : 'font-serif'}`}>
-                    {isRTL ? 'سعودي عقار في أرقام' : 'Saudi Real Estate by the Numbers'}
+                    {isRTL ? 'تمليك في أرقام' : 'Tamleeq by the Numbers'}
                   </h3>
                   <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
                     <div>

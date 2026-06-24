@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Saudi Real Estate",
+    "appName": "Tamleeq",
     "tagline": "AI-Powered Property Marketplace",
     "search": "Search",
     "supportPhone": "+966 53 849 8580",
@@ -391,7 +391,7 @@
     "continueWithFacebook": "Continue with Facebook",
     "continueWithEmail": "Continue with Email",
     "or": "or",
-    "brandingTitle": "Experience the Future of Saudi Real Estate",
+    "brandingTitle": "Experience the Future of Real Estate with Tamleeq",
     "brandingSubtitle": "Join the Kingdom's most advanced property ecosystem. AI-powered search, verified leads, and premium insights.",
     "trustedExperts": "Trusted by Experts",
     "verifiedListings": "100% Verified Listings",
@@ -444,7 +444,7 @@
     "forBuyers": "For Buyers"
   },
   "metadata": {
-    "title": "Saudi Real Estate | AI-Powered Property Marketplace",
+    "title": "Tamleeq | AI-Powered Property Marketplace",
     "description": "Find your perfect property in Saudi Arabia. AI-powered search, qualified leads for brokers, personalized experience for buyers. Browse Riyadh, Jeddah, Dammam and more."
   },
   "citySpotlight": {

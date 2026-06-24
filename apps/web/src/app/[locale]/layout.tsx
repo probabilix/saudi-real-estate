@@ -8,6 +8,7 @@ import { AuthProvider } from '@/hooks/use-auth';
 import NavWrapper from '@/components/layout/NavWrapper';
 import ChatWidget from '@/components/chat/ChatWidget';
 import type { Locale } from '@/i18n';
+import { API_BASE_URL } from '@/lib/api';
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -65,9 +66,24 @@ export default async function LocaleLayout({
   // Use DM Sans for English, IBM Plex for Arabic
   const fontClass = locale === 'ar' ? ibmPlexArabic.variable : dmSans.variable;
 
+  let faviconUrl = '/favicon.ico';
+  try {
+    const res = await fetch(`${API_BASE_URL}/system/settings`, { next: { revalidate: 60 } });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data?.favicon_url) {
+        faviconUrl = json.data.favicon_url;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch favicon on server', err);
+  }
+
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning>
-      <head />
+      <head>
+        <link rel="icon" href={faviconUrl} />
+      </head>
       <body
         className={`${playfair.variable} ${dmSans.variable} ${ibmPlexArabic.variable} ${fontClass} font-sans bg-white text-charcoal antialiased min-h-screen flex flex-col`}
       >

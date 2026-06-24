@@ -64,6 +64,23 @@ export function CrmSidebar({ unassigned = 0 }: CrmSidebarProps) {
   const { user, logout, isAdmin } = useCrmAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchLogo() {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+        const res = await fetch(`${apiBase}/system/settings`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          setLogoUrl(json.data.logo_url || null);
+        }
+      } catch (e) {
+        console.error('Failed to fetch dynamic logo', e);
+      }
+    }
+    fetchLogo();
+  }, []);
 
   const nav = isAdmin ? NAV_ADMIN : NAV_AGENT;
 
@@ -98,12 +115,18 @@ export function CrmSidebar({ unassigned = 0 }: CrmSidebarProps) {
 
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border relative">
-          <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
-            <Building2 className="w-4 h-4 text-white" />
-          </div>
+          {logoUrl ? (
+            <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-white p-0.5 animate-in fade-in duration-300">
+              <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
+              <Building2 className="w-4 h-4 text-white" />
+            </div>
+          )}
           {!collapsed && (
             <div className="min-w-0">
-              <div className="text-sm font-bold text-white truncate">Saudi RE</div>
+              <div className="text-sm font-bold text-white truncate">Tamleeq</div>
               <div className="text-[10px] text-primary-400 font-semibold uppercase tracking-wider">CRM Workspace</div>
             </div>
           )}

@@ -12,7 +12,7 @@ export default function NewListingPage() {
             Create New Listing
           </h1>
           <p className="text-slate-500">
-            Fill in the details below to list your property on Saudi RE.
+            Fill in the details below to list your property on Tamleeq.
           </p>
         </div>
 

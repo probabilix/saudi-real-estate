@@ -169,15 +169,17 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="overflow-x-auto custom-scrollbar">
-                <div className="min-w-[800px]">
+                <div className="min-w-[1000px]">
                   <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={funnelData} barSize={28} margin={{ top: 10, right: 15, left: -20, bottom: 25 }}>
+                    <BarChart data={funnelData} barSize={28} margin={{ top: 10, right: 15, left: -20, bottom: 35 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis 
                         dataKey="name" 
-                        tick={{ fontSize: 10, fill: '#94a3b8' }} 
+                        tick={{ fontSize: 9, fill: '#94a3b8' }} 
                         interval={0} 
-                        height={45} 
+                        height={60} 
+                        angle={-30}
+                        textAnchor="end"
                         axisLine={false} 
                         tickLine={false} 
                       />
@@ -241,15 +243,17 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="overflow-x-auto custom-scrollbar">
-                <div className="min-w-[900px]">
+                <div className="min-w-[1000px]">
                   <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={websiteFunnelData} barSize={28} margin={{ top: 10, right: 15, left: -20, bottom: 25 }}>
+                    <BarChart data={websiteFunnelData} barSize={28} margin={{ top: 10, right: 15, left: -20, bottom: 35 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis 
                         dataKey="name" 
                         tick={{ fontSize: 9, fill: '#94a3b8' }} 
                         interval={0} 
-                        height={45} 
+                        height={60} 
+                        angle={-30}
+                        textAnchor="end"
                         axisLine={false} 
                         tickLine={false} 
                       />

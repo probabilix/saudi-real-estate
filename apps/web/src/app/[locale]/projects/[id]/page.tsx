@@ -398,8 +398,8 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
     e.preventDefault();
     e.stopPropagation();
     const shareData = {
-      title: title || 'Saudi Real Estate Project',
-      text: `Check out this project on Saudi Real Estate: ${title}`,
+      title: title || 'Tamleeq Project',
+      text: `Check out this project on Tamleeq: ${title}`,
       url: typeof window !== 'undefined' ? window.location.href : '',
     };
 
@@ -1406,7 +1406,7 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                   <ShieldCheck className="w-7 h-7 text-primary-400 shrink-0" />
                   <div>
                     <h4 className="text-sm font-bold leading-none">REGA Legal Compliance</h4>
-                    <p className="text-[9px] uppercase tracking-wider text-white/50 mt-1">Saudi RE Verified Project</p>
+                    <p className="text-[9px] uppercase tracking-wider text-white/50 mt-1">Tamleeq Verified Project</p>
                   </div>
                 </div>
                 <div className="space-y-1 relative z-10">
@@ -1468,7 +1468,7 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={sidebarAdImage || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'}
-                  alt="Saudi Real Estate Dynamic Banner Advertisement"
+                  alt="Tamleeq Dynamic Banner Advertisement"
                   className={`w-full object-cover group-hover:scale-105 transition-transform duration-500 ${sidebarAdAspectRatio === '16_9' ? 'aspect-[16/9] max-h-[320px]' :
                       sidebarAdAspectRatio === '1_1' ? 'aspect-[1/1] max-h-[400px]' :
                         sidebarAdAspectRatio === '3_4' ? 'aspect-[3/4] max-h-[450px]' :

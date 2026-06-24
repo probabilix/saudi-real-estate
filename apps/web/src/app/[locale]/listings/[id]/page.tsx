@@ -159,7 +159,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
     e.stopPropagation();
     const shareData = {
       title: title,
-      text: `Check out this property listing on Saudi Real Estate: ${title}`,
+      text: `Check out this property listing on Tamleeq: ${title}`,
       url: typeof window !== 'undefined' ? window.location.href : '',
     };
 
@@ -212,7 +212,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
     setLightboxOpen(false);
     if (isQualified && revealedContact) {
       if (type === 'phone') window.location.href = `tel:${revealedContact.phone || '+966538498580'}`;
-      if (type === 'email') window.location.href = `mailto:${revealedContact.email || 'info@saudire.com'}?subject=Inquiry: ${title}`;
+      if (type === 'email') window.location.href = `mailto:${revealedContact.email || 'info@tamleeq.sa'}?subject=Inquiry: ${title}`;
       if (type === 'whatsapp') window.open(`https://wa.me/${revealedContact.phone?.replace(/[+\s\-]/g, '') || '966538498580'}?text=I am interested in: ${title}`, '_blank');
     } else {
       setChatOpen(true);
@@ -925,7 +925,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               >
                 <img
                   src={sidebarAdImage || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'}
-                  alt="Saudi Real Estate Dynamic Banner Advertisement"
+                  alt="Tamleeq Dynamic Banner Advertisement"
                   className={`w-full object-cover group-hover:scale-105 transition-transform duration-500 ${sidebarAdAspectRatio === '16_9' ? 'aspect-[16/9] max-h-[320px]' :
                       sidebarAdAspectRatio === '1_1' ? 'aspect-[1/1] max-h-[400px]' :
                         sidebarAdAspectRatio === '3_4' ? 'aspect-[3/4] max-h-[450px]' :

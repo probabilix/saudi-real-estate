@@ -27,14 +27,19 @@
   .crm-card-hover { @apply crm-card hover:shadow-card-hover transition-shadow; }
 
   /* ── Pipeline stage colors ── */
-  .stage-new       { @apply bg-indigo-50  text-indigo-700  border-indigo-200; }
-  .stage-attempted { @apply bg-amber-50   text-amber-700   border-amber-200; }
-  .stage-contacted { @apply bg-blue-50    text-blue-700    border-blue-200; }
-  .stage-visit     { @apply bg-violet-50  text-violet-700  border-violet-200; }
-  .stage-viewing   { @apply bg-pink-50    text-pink-700    border-pink-200; }
-  .stage-offer     { @apply bg-orange-50  text-orange-700  border-orange-200; }
-  .stage-won       { @apply bg-emerald-50 text-emerald-700 border-emerald-200; }
-  .stage-lost      { @apply bg-surface-100 text-surface-500 border-surface-200; }
+  .stage-new              { @apply bg-indigo-50  text-indigo-700  border-indigo-200; }
+  .stage-attempted        { @apply bg-amber-50   text-amber-700   border-amber-200; }
+  .stage-contacted        { @apply bg-blue-50    text-blue-700    border-blue-200; }
+  .stage-visit            { @apply bg-violet-50  text-violet-700  border-violet-200; }
+  .stage-viewing          { @apply bg-pink-50    text-pink-700    border-pink-200; }
+  .stage-offer            { @apply bg-orange-50  text-orange-700  border-orange-200; }
+  .stage-won              { @apply bg-emerald-50 text-emerald-700 border-emerald-200; }
+  .stage-lost             { @apply bg-surface-100 text-surface-500 border-surface-200; }
+  /* AI pipeline stages */
+  .stage-ai-attempting    { @apply bg-amber-50   text-amber-700   border-amber-200; }
+  .stage-ai-qualified     { @apply bg-emerald-50 text-emerald-700 border-emerald-200; }
+  .stage-ai-disqualified  { @apply bg-red-50     text-red-600     border-red-200; }
+  .stage-ai-unreached     { @apply bg-surface-100 text-surface-400 border-surface-200; }
 
   /* ── Badges ── */
   .badge { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border; }

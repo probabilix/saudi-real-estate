@@ -662,6 +662,10 @@ export const crmLeadSourceEnum = pgEnum('crm_lead_source', [
 
 export const crmLeadStatusEnum = pgEnum('crm_lead_status', [
   'NEW',
+  'AI_ATTEMPTING',
+  'AI_QUALIFIED',
+  'AI_DISQUALIFIED',
+  'AI_UNREACHED',
   'ATTEMPTED_CONTACT',
   'CONTACTED',
   'SITE_VISIT_SCHEDULED',
@@ -670,6 +674,7 @@ export const crmLeadStatusEnum = pgEnum('crm_lead_status', [
   'CLOSED_WON',
   'CLOSED_LOST',
 ]);
+
 
 export const crmActivityTypeEnum = pgEnum('crm_activity_type', [
   'CREATED',

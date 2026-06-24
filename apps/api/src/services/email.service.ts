@@ -17,9 +17,9 @@ export class EmailService {
     try {
       const resend = await getResendClient();
       await resend.emails.send({
-        from: `Saudi Real Estate Project <${DEFAULT_SYSTEM_EMAIL}>`,
+        from: `Tamleeq <${DEFAULT_SYSTEM_EMAIL}>`,
         to: email,
-        subject: 'Welcome to the Saudi Real Estate Platform!',
+        subject: 'Welcome to Tamleeq!',
         html: `
           <h1>Welcome, ${name}!</h1>
           <p>We are excited to have you as a <strong>${role}</strong> on our platform.</p>
@@ -67,7 +67,7 @@ export class EmailService {
     try {
       const resend = await getResendClient();
       await resend.emails.send({
-        from: `Saudi Real Estate Support <${DEFAULT_SYSTEM_EMAIL}>`,
+        from: `Tamleeq Support <${DEFAULT_SYSTEM_EMAIL}>`,
         to: email,
         subject: 'Account Approved - Start Listing Properties!',
         html: `
@@ -90,7 +90,7 @@ export class EmailService {
     try {
       const resend = await getResendClient();
       await resend.emails.send({
-        from: `Saudi Real Estate Support <${DEFAULT_SYSTEM_EMAIL}>`,
+        from: `Tamleeq Support <${DEFAULT_SYSTEM_EMAIL}>`,
         to: email,
         subject: 'Broker Application Status Update',
         html: `
@@ -115,12 +115,12 @@ export class EmailService {
       const resend = await getResendClient();
       const crmUrl = process.env.NEXT_PUBLIC_CRM_URL || 'http://localhost:3003';
       await resend.emails.send({
-        from: `Saudi Real Estate Support <${DEFAULT_SYSTEM_EMAIL}>`,
+        from: `Tamleeq Support <${DEFAULT_SYSTEM_EMAIL}>`,
         to: email,
         subject: 'CRM Access Approved - Start Managing Properties & Leads!',
         html: `
           <h1>Great news, ${name}!</h1>
-          <p>Your request has been manually reviewed and approved. You have been granted full access to the <strong>Saudi RE CRM Workspace</strong>.</p>
+          <p>Your request has been manually reviewed and approved. You have been granted full access to the <strong>Tamleeq CRM Workspace</strong>.</p>
           <p>You can now log in using your normal website credentials to manage your inventory, buy credit packages, feature listings, and track qualified leads.</p>
           <p style="margin: 20px 0;">
             <a href="${crmUrl}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
@@ -129,7 +129,7 @@ export class EmailService {
           </p>
           <p>If you have any questions, feel free to contact our support team.</p>
           <br/>
-          <p>Best Regards,<br/>Saudi RE Team</p>
+          <p>Best Regards,<br/>Tamleeq Team</p>
         `,
       });
     } catch (error) {

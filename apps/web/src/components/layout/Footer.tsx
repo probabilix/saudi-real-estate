@@ -30,12 +30,16 @@ export default function Footer() {
   const { user } = useAuth();
 
   const [settings, setSettings] = useState<any>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState(true);
   const [crmUrl, setCrmUrl] = useState('http://localhost:3003');
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     api.getSystemSettings().then(res => {
       if (res.success) setSettings(res.data);
+      setIsLoadingLogo(false);
+    }).catch(() => {
+      setIsLoadingLogo(false);
     });
     if (typeof window !== 'undefined') {
       const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -78,7 +82,9 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="lg:col-span-1">
             <Link href={`/${locale}`} className="flex items-center gap-2 mb-6">
-              {settings?.logo_url ? (
+              {isLoadingLogo ? (
+                <div className="w-10 h-10 rounded-xl bg-white/5 animate-pulse shrink-0" />
+              ) : settings?.logo_url ? (
                 <img src={settings.logo_url} alt="Tamleeq" className="h-9 w-auto object-contain" />
               ) : (
                 <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-md">

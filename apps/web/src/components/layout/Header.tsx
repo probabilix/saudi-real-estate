@@ -24,6 +24,7 @@ export default function Header({ locale }: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState(true);
   const [imgError, setImgError] = useState(false);
   const [contactPhone, setContactPhone] = useState(tCommon('supportPhone'));
 
@@ -37,7 +38,10 @@ export default function Header({ locale }: HeaderProps) {
         const logo = json?.data?.logo_url;
         if (logo) setLogoUrl(logo);
       })
-      .catch(() => { });
+      .catch(() => { })
+      .finally(() => {
+        setIsLoadingLogo(false);
+      });
   }, []);
 
   // Scroll visibility
@@ -121,7 +125,9 @@ export default function Header({ locale }: HeaderProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Logo */}
           <Link href={`/${locale}`} className="flex items-center gap-3 group">
-            {logoUrl ? (
+            {isLoadingLogo ? (
+              <div className="w-10 h-10 rounded-xl bg-gray-100 animate-pulse shrink-0" />
+            ) : logoUrl ? (
               <img src={logoUrl} alt="Tamleeq" className="h-9 w-auto object-contain animate-in fade-in duration-300" />
             ) : (
               <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-all">

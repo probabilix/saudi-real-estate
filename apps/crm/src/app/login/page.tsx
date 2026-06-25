@@ -12,6 +12,7 @@ export default function CrmLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState(true);
 
   useEffect(() => {
     async function fetchLogo() {
@@ -24,6 +25,8 @@ export default function CrmLoginPage() {
         }
       } catch (e) {
         console.error('Failed to fetch dynamic logo', e);
+      } finally {
+        setIsLoadingLogo(false);
       }
     }
     fetchLogo();
@@ -56,7 +59,9 @@ export default function CrmLoginPage() {
         {/* Logo */}
         <div className="relative">
           <div className="flex items-center gap-3 mb-2">
-            {logoUrl ? (
+            {isLoadingLogo ? (
+              <div className="w-10 h-10 bg-white/5 rounded-2xl animate-pulse" />
+            ) : logoUrl ? (
               <div className="h-10 w-auto shrink-0 flex items-center justify-start overflow-hidden bg-white rounded-lg p-1 animate-in fade-in duration-300">
                 <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
               </div>
@@ -114,7 +119,9 @@ export default function CrmLoginPage() {
         >
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
-            {logoUrl ? (
+            {isLoadingLogo ? (
+              <div className="w-9 h-9 bg-gray-100 rounded-xl animate-pulse" />
+            ) : logoUrl ? (
               <div className="h-9 w-auto shrink-0 flex items-center justify-start overflow-hidden bg-white rounded-lg p-1 animate-in fade-in duration-300">
                 <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
               </div>

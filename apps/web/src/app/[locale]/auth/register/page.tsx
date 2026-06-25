@@ -247,6 +247,7 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState(true);
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/system/settings`)
@@ -255,7 +256,10 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
         const logo = json?.data?.logo_url;
         if (logo) setLogoUrl(logo);
       })
-      .catch(() => { });
+      .catch(() => { })
+      .finally(() => {
+        setIsLoadingLogo(false);
+      });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -377,7 +381,9 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
           className="max-w-[480px] w-full mx-auto my-auto pt-16 sm:pt-8 lg:pt-0 pb-8"
         >
           <div className="mb-10 text-center lg:text-start">
-            {logoUrl ? (
+            {isLoadingLogo ? (
+              <div className="w-12 h-12 bg-gray-100 rounded-xl mb-6 mx-auto lg:mx-0 animate-pulse" />
+            ) : logoUrl ? (
               <div className="h-12 w-auto max-w-[140px] mb-6 mx-auto lg:mx-0 flex items-center justify-center lg:justify-start animate-in fade-in duration-300">
                 <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
               </div>

@@ -60,6 +60,7 @@ export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState(true);
 
   useEffect(() => {
     async function fetchLogo() {
@@ -71,6 +72,8 @@ export function AdminSidebar() {
         }
       } catch (e) {
         console.error('Failed to fetch logo setting', e);
+      } finally {
+        setIsLoadingLogo(false);
       }
     }
     fetchLogo();
@@ -112,7 +115,9 @@ export function AdminSidebar() {
       >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border relative">
-        {logoUrl ? (
+        {isLoadingLogo ? (
+          <div className="w-8 h-8 rounded-xl bg-sidebar-border/30 animate-pulse shrink-0" />
+        ) : logoUrl ? (
           collapsed ? (
             <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-white p-0.5 animate-in fade-in duration-300">
               <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />

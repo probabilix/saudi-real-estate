@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState(true);
 
   useEffect(() => {
     async function fetchLogo() {
@@ -23,6 +24,8 @@ export default function LoginPage() {
         }
       } catch (e) {
         console.error('Failed to fetch dynamic logo', e);
+      } finally {
+        setIsLoadingLogo(false);
       }
     }
     fetchLogo();
@@ -61,7 +64,9 @@ export default function LoginPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
-            {logoUrl ? (
+            {isLoadingLogo ? (
+              <div className="w-14 h-14 bg-white/5 rounded-2xl animate-pulse" />
+            ) : logoUrl ? (
               <div className="h-14 w-auto shrink-0 flex items-center justify-center bg-white rounded-2xl p-2.5 shadow-glow animate-in fade-in duration-300">
                 <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
               </div>

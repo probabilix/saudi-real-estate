@@ -113,9 +113,15 @@ export function AdminSidebar() {
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border relative">
         {logoUrl ? (
-          <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-white p-0.5 animate-in fade-in duration-300">
-            <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
-          </div>
+          collapsed ? (
+            <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-white p-0.5 animate-in fade-in duration-300">
+              <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+            </div>
+          ) : (
+            <div className="h-9 w-auto max-w-[120px] shrink-0 flex items-center justify-center bg-white rounded-lg px-2 py-0.5 overflow-hidden animate-in fade-in duration-300">
+              <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
+            </div>
+          )
         ) : (
           <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
             <Building2 className="w-4 h-4 text-white" />

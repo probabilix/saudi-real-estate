@@ -13,28 +13,36 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<{ success: boolean; data?: T; message?: string; error?: string }> {
-  const token = getToken();
-  const headers: Record<string, string> = {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(options.headers as Record<string, string> || {}),
-  };
+  try {
+    const token = getToken();
+    const headers: Record<string, string> = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers as Record<string, string> || {}),
+    };
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+    });
 
-  const json = await res.json();
+    const json = await res.json();
 
-  // If 401, clear token and redirect to login
-  if (res.status === 401 && typeof window !== 'undefined') {
-    localStorage.removeItem('adminToken');
-    window.location.href = '/login';
+    // If 401, clear token and redirect to login
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('adminToken');
+      window.location.href = '/login';
+    }
+
+    return json;
+  } catch (err: any) {
+    console.error(`Admin API Error requesting ${path}:`, err);
+    return {
+      success: false,
+      error: err?.message || 'Network error occurred',
+    };
   }
-
-  return json;
 }
 
 // ── Auth ──

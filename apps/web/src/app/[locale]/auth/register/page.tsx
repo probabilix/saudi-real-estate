@@ -246,6 +246,17 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
   const [error, setError] = useState<string | null>(null);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/system/settings`)
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        const logo = json?.data?.logo_url;
+        if (logo) setLogoUrl(logo);
+      })
+      .catch(() => { });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -366,6 +377,15 @@ export default function RegisterPage({ params: { locale } }: { params: { locale:
           className="max-w-[480px] w-full mx-auto my-auto pt-16 sm:pt-8 lg:pt-0 pb-8"
         >
           <div className="mb-10 text-center lg:text-start">
+            {logoUrl ? (
+              <div className="h-12 w-auto max-w-[140px] mb-6 mx-auto lg:mx-0 flex items-center justify-center lg:justify-start animate-in fade-in duration-300">
+                <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
+              </div>
+            ) : (
+              <div className="w-12 h-12 bg-primary-600 rounded-xl mb-6 mx-auto lg:mx-0 flex items-center justify-center shadow-lg shadow-primary-600/20">
+                <Building2 className="w-6 h-6 text-white" />
+              </div>
+            )}
             <h1 className="text-3xl md:text-4xl font-playfair font-bold text-gray-900 mb-2">{t('registerTitle')}</h1>
             <p className="text-gray-500 font-medium text-sm">{t('registerSubtitle')}</p>
           </div>

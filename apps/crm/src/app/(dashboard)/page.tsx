@@ -37,6 +37,21 @@ const SHORT_LABELS: Record<string, string> = {
   'AI Disqualified': 'AI Disqualified'
 };
 
+const CAMPAIGN_SHORT_LABELS: Record<string, string> = {
+  'New': 'New',
+  'AI Attempting': 'AI Att.',
+  'AI Qualified': 'AI Qual.',
+  'AI Disqualified': 'AI Disq.',
+  'AI Unreached': 'AI Unreach.',
+  'Attempted Contact': 'Attempted',
+  'Contacted': 'Contacted',
+  'Site Visit': 'Site Visit',
+  'Viewing': 'Viewing',
+  'Offer Submitted': 'Offer',
+  'Closed Won': 'Won',
+  'Closed Lost': 'Lost',
+};
+
 function StatCard({ label, value, icon: Icon, color, delta }: { label: string; value: number | string; icon: React.ElementType; color: string; delta?: string }) {
   return (
     <div className="stat-card">
@@ -85,7 +100,8 @@ export default function DashboardPage() {
 
   // Build funnel data from campaign statuses
   const funnelData = CRM_STAGES.map(s => ({
-    name: s.label,
+    name: CAMPAIGN_SHORT_LABELS[s.label] ?? s.label,
+    fullName: s.label,
     count: Number(data?.campaignByStatus.find(r => r.status === s.key)?.count ?? 0),
     color: s.dotColor,
   }));
@@ -187,6 +203,7 @@ export default function DashboardPage() {
                       <Tooltip
                         contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }}
                         cursor={{ fill: '#f8fafb' }}
+                        formatter={(value, name, props) => [value, props.payload.fullName]}
                       />
                       <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                         {funnelData.map((entry, i) => (

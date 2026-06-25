@@ -1,0 +1,856 @@
+{
+  "name": "Tamleeq VAPI Voice Qualification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vapi-meta-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3f6f9403-8be5-46a8-8ad8-6210cb61b0cf",
+      "name": "Lead Form Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        4176,
+        1936
+      ],
+      "webhookId": "vapi-meta-lead"
+    },
+    {
+      "parameters": {
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "478ca191-662d-4d76-bf76-bc2ed16df075",
+      "name": "VAPI Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4368,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\nconst adType     = (body.ad_type     || '').toLowerCase().trim();\nconst entityUuid = (body.entity_uuid || '').trim();\nconst leadName   = (body.lead_name   || 'Valued Customer').trim();\nconst phone      = (body.phone       || '').replace(/\\s+/g, '').trim();\nconst country    = (body.country     || 'SA').toUpperCase().trim();\nconst email      = (body.email       || '').trim();\n\nif (!['listing', 'project'].includes(adType))\n  throw new Error('ad_type must be listing or project. Got: ' + adType);\nif (!entityUuid)\n  throw new Error('entity_uuid is required');\nif (!phone)\n  throw new Error('phone is required');\n\n// Country → IANA timezone map for calling-hours check\nconst tzMap = {\n  SA: 'Asia/Riyadh',   AE: 'Asia/Dubai',    KW: 'Asia/Kuwait',\n  BH: 'Asia/Bahrain',  QA: 'Asia/Qatar',    OM: 'Asia/Muscat',\n  EG: 'Africa/Cairo',  JO: 'Asia/Amman',    LB: 'Asia/Beirut',\n  IQ: 'Asia/Baghdad',  YE: 'Asia/Aden',     PK: 'Asia/Karachi',\n  IN: 'Asia/Kolkata',  DEFAULT: 'Asia/Riyadh'\n};\nconst timezone = tzMap[country] || tzMap.DEFAULT;\n\nconst now = new Date();\nconst localHour = parseInt(\n  now.toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: timezone })\n);\nconst isCallableNow = localHour >= 9 && localHour < 21;\n\nreturn [{\n  json: {\n    adType, entityUuid, leadName, phone, country, email,\n    timezone, isCallableNow,\n    receivedAt: now.toISOString(),\n    retryCount: parseInt(body.retry_count || '0'),\n    crmLeadId:  body.crm_lead_id || null\n  }\n}];"
+      },
+      "id": "32d16534-2e18-4d1a-9565-12f0e85115eb",
+      "name": "Extract & Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4560,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isCallableNow }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "id": "f7eb073b-e053-4a9e-8f93-ba2a4ea97e12"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "81a23991-0cf4-4e40-b161-f20f9b4de728",
+      "name": "Callable Hours Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4800,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data  = $input.first().json;\nconst retry = data.retryCount || 0;\nconst next  = new Date();\nnext.setDate(next.getDate() + (retry === 0 ? 0 : retry));\n// Set to 9:00 AM next callable day (caller must re-trigger at this time via their scheduler)\nnext.setHours(9, 0, 0, 0);\nreturn [{\n  json: {\n    ...data,\n    action:       'SCHEDULED_LATER',\n    scheduledAt:  next.toISOString(),\n    reason:       'Outside calling hours (9am-9pm ' + data.timezone + ')'\n  }\n}];"
+      },
+      "id": "0a0a1b45-67fa-4816-a375-3e6d30f6aa3a",
+      "name": "Schedule Later Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        2128
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\": true, \"status\": \"scheduled\", \"message\": \"Outside calling hours. Call will be attempted at 9am local time.\", \"timezone\": \"={{ $json.timezone }}\", \"scheduledAt\": \"={{ $json.scheduledAt }}\"}",
+        "options": {}
+      },
+      "id": "56ecbdbf-83af-4092-8bae-c0aac707caad",
+      "name": "Respond — Scheduled",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        5280,
+        2128
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "output": "={{ $json.adType === 'listing' ? 0 : 1 }}"
+      },
+      "id": "e5c10254-1cdc-4008-b2a3-2f9f4ccb36de",
+      "name": "Ad Type Branch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        5040,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  l.id,\n  l.short_id,\n  l.en_title,\n  l.ar_title,\n  l.price,\n  l.area_sqm,\n  l.bedrooms,\n  l.bathrooms,\n  l.city,\n  l.district,\n  l.type,\n  l.completion_status,\n  l.description_en,\n  l.project_id,\n  p.name_en  AS project_name_en,\n  p.name_ar  AS project_name_ar\nFROM listings l\nLEFT JOIN projects p ON l.project_id = p.id\nWHERE l.id     = '{{ $('Extract & Validate Input').first().json.entityUuid }}'::uuid\n  AND l.status = 'ACTIVE'\nLIMIT 1;",
+        "options": {}
+      },
+      "id": "d14f0856-da97-40ae-83e3-ec3238bf9bfe",
+      "name": "Fetch Listing Details",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5280,
+        1808
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  p.id          AS project_id,\n  p.name_en,\n  p.name_ar,\n  p.description_en,\n  p.city,\n  p.district,\n  p.min_price,\n  p.max_price,\n  JSON_AGG(\n    JSON_BUILD_OBJECT(\n      'title',             l.en_title,\n      'price',             l.price,\n      'area_sqm',          l.area_sqm,\n      'bedrooms',          l.bedrooms,\n      'bathrooms',         l.bathrooms,\n      'completion_status', l.completion_status\n    ) ORDER BY l.price ASC\n  ) FILTER (WHERE l.id IS NOT NULL) AS layouts\nFROM projects p\nLEFT JOIN listings l ON l.project_id = p.id AND l.status = 'ACTIVE'\nWHERE p.id = '{{ $('Extract & Validate Input').first().json.entityUuid }}'::uuid\nGROUP BY p.id, p.name_en, p.name_ar, p.description_en,\n         p.city, p.district, p.min_price, p.max_price\nLIMIT 1;",
+        "options": {}
+      },
+      "id": "834c7c19-67e1-4259-a4b4-964883a962e8",
+      "name": "Fetch Project + Layouts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5280,
+        2000
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input   = $('Extract & Validate Input').first().json;\nconst adType  = input.adType;\n\nlet propertyContext = '';\nlet propertyName    = '';\nlet priceRange      = '';\nlet propertyCity    = '';\n\n// ── Build context block based on ad type ──\nif (adType === 'listing') {\n  const row = $('Fetch Listing Details').first().json;\n  if (!row || !row.id)\n    throw new Error('Listing not found or inactive: ' + input.entityUuid);\n\n  propertyName = row.en_title || row.ar_title || 'the property';\n  priceRange   = row.price\n    ? 'SAR ' + (row.price / 1_000_000).toFixed(2) + 'M'\n    : 'Price on request';\n  propertyCity = row.city || '';\n\n  propertyContext = [\n    '=== PROPERTY YOU ARE CALLING ABOUT ===',\n    'Type: Individual Listing',\n    'Name: ' + propertyName,\n    'Location: ' + [row.district, row.city].filter(Boolean).join(', '),\n    'Price: ' + priceRange,\n    'Area: ' + (row.area_sqm || 'N/A') + ' sqm',\n    'Bedrooms: ' + (row.bedrooms  || 'N/A'),\n    'Bathrooms: ' + (row.bathrooms || 'N/A'),\n    'Completion: ' + (row.completion_status || 'N/A'),\n    row.project_name_en ? 'Part of Project: ' + row.project_name_en : '',\n    row.description_en  ? 'Details: ' + row.description_en.substring(0, 400) : '',\n    '======================================',\n  ].filter(Boolean).join('\\n');\n\n} else {\n  const row = $('Fetch Project + Layouts').first().json;\n  if (!row || !row.project_id)\n    throw new Error('Project not found: ' + input.entityUuid);\n\n  propertyName = row.name_en || row.name_ar || 'the project';\n  propertyCity = row.city || '';\n\n  const minP = row.min_price ? 'SAR ' + (row.min_price / 1_000_000).toFixed(2) + 'M' : 'N/A';\n  const maxP = row.max_price ? 'SAR ' + (row.max_price / 1_000_000).toFixed(2) + 'M' : 'N/A';\n  priceRange = minP + ' – ' + maxP;\n\n  let layouts = [];\n  try {\n    layouts = Array.isArray(row.layouts)\n      ? row.layouts\n      : JSON.parse(row.layouts || '[]');\n  } catch(e) { layouts = []; }\n\n  const layoutLines = layouts.length > 0\n    ? layouts.slice(0, 8).map((l, i) => {\n        const p = l.price ? 'SAR ' + (l.price / 1_000_000).toFixed(2) + 'M' : 'TBD';\n        return `  ${i + 1}. ${l.title || 'Unit'}: ${l.bedrooms || 'N/A'} BR | ${l.area_sqm || 'N/A'} sqm | ${p} | ${l.completion_status || 'N/A'}`;\n      }).join('\\n')\n    : '  No layout data available';\n\n  propertyContext = [\n    '=== PROPERTY YOU ARE CALLING ABOUT ===',\n    'Type: Compound / Project',\n    'Name: ' + propertyName,\n    'Location: ' + [row.district, row.city].filter(Boolean).join(', '),\n    'Price Range: ' + priceRange,\n    row.description_en ? 'About: ' + row.description_en.substring(0, 400) : '',\n    'Available Unit Types:',\n    layoutLines,\n    '======================================',\n  ].filter(Boolean).join('\\n');\n}\n\n// ── Compose full system prompt ──\nconst systemPrompt = `You are Sara, a professional real estate consultant at Tamleeq.\nYou are making an outbound call to follow up on a property inquiry the lead submitted via an online advertisement.\n\n${propertyContext}\n\nSTRICT RULES:\n1. You are calling ONLY about \"${propertyName}\". Do not discuss or quote other properties.\n2. If the lead asks about a different property, say: \"I would be happy to have a specialist contact you about that separately. Today I am calling specifically about ${propertyName}.\"\n3. Do not fabricate any prices, areas, or details not listed above.\n4. Keep the call friendly, professional, and under 5 minutes.\n5. If the lead says it is a bad time, say: \"No problem, when is a good time for us to call back?\" and note the time.\n6. Speak naturally — this is a phone call, not a form. Do not read out lists.\n\nQUALIFICATION FLOW — cover these in natural conversation:\nStep 1 — Confirm interest: \"I am calling about ${propertyName}. Are you still interested in learning more?\"\nStep 2 — Budget: \"What is the budget range you have in mind for this purchase?\"\nStep 3 — Purpose: \"Is this for personal living or as an investment property?\"\nStep 4 — Timeline: \"When are you ideally looking to make a purchase?\"\nStep 5 — Decision: \"Are you the main decision maker, or will family members also be involved?\"\n\nQUALIFICATION CRITERIA:\n- QUALIFIED: Confirmed interest, budget is realistic relative to ${priceRange}, timeline within 12 months\n- NOT_INTERESTED: Lead explicitly says not interested or already purchased elsewhere\n- NO_BUDGET_MATCH: Lead's stated budget is significantly below the property price range\n- CALLBACK_NEEDED: Lead is interested but unavailable right now or needs to check with family\n- NO_ANSWER: Lead did not pick up (this is set by the system, not you)\n\nCLOSING THE CALL:\nAlways end with: \"Thank you for your time, ${input.leadName}. One of our property specialists will be in touch with you very soon with more information.\"\n\nIMPORTANT — LAST LINE OF YOUR RESPONSE:\nAfter the closing, output exactly one line in this format:\nOUTCOME: [QUALIFIED / NOT_INTERESTED / NO_BUDGET_MATCH / CALLBACK_NEEDED]\n\nExample final line: OUTCOME: QUALIFIED`;\n\nreturn [{\n  json: {\n    ...input,\n    systemPrompt,\n    propertyName,\n    priceRange,\n    propertyCity,\n    adType,\n    entityUuid: input.entityUuid\n  }\n}];"
+      },
+      "id": "8d7a083d-25ef-4b9a-8877-5f14af4cf56c",
+      "name": "Build VAPI System Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5520,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO crm_leads (\n  source, name, phone, email, status,\n  property_interest, city_preference,\n  campaign_details, is_duplicate,\n  created_at, updated_at\n)\nVALUES (\n  'META_ADS',\n  $$ {{ $json.leadName }} $$,\n  $$ {{ $json.phone }} $$,\n  NULLIF($$ {{ $json.email }} $$, ''),\n  'NEW',\n  $$ {{ $json.propertyName }} $$,\n  $$ {{ $json.propertyCity }} $$,\n  jsonb_build_object(\n    'ad_type',          $$ {{ $json.adType }} $$,\n    'entity_uuid',      $$ {{ $json.entityUuid }} $$,\n    'property_name',    $$ {{ $json.propertyName }} $$,\n    'price_range',      $$ {{ $json.priceRange }} $$,\n    'country',          $$ {{ $json.country }} $$,\n    'timezone',         $$ {{ $json.timezone }} $$,\n    'source',           'VAPI_VOICE_QUALIFICATION',\n    'call_initiated_at', NOW()::text\n  ),\n  EXISTS(SELECT 1 FROM crm_leads WHERE phone = $$ {{ $json.phone }} $$),\n  NOW(),\n  NOW()\n)\nON CONFLICT DO NOTHING\nRETURNING id;",
+        "options": {}
+      },
+      "id": "464221fd-11fd-4af5-9852-0482d09d1482",
+      "name": "Insert CRM Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5760,
+        1920
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vapi.ai/call/phone",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"assistantId\": \"={{ $('VAPI Config').first().json.assistantId }}\",\n  \"assistantOverrides\": {\n    \"firstMessage\": \"Hello, may I speak with {{ $('Build VAPI System Prompt').first().json.leadName }}? This is Sara calling from Tamleeq regarding a property you showed interest in recently. Is now a good time to speak?\",\n    \"model\": {\n      \"provider\": \"openai\",\n      \"model\": \"gpt-4o-mini\",\n      \"temperature\": 0.4,\n      \"messages\": [\n        {\n          \"role\": \"system\",\n          \"content\": \"={{ $('Build VAPI System Prompt').first().json.systemPrompt }}\"\n        }\n      ]\n    }\n  },\n  \"customer\": {\n    \"name\": \"={{ $('Build VAPI System Prompt').first().json.leadName }}\",\n    \"number\": \"={{ $('Build VAPI System Prompt').first().json.phone }}\"\n  },\n  \"phoneNumberId\": \"={{ $('VAPI Config').first().json.phoneNumberId }}\",\n  \"metadata\": {\n    \"crm_lead_id\":  \"={{ $('Insert CRM Lead').first().json.id }}\",\n    \"ad_type\":      \"={{ $('Build VAPI System Prompt').first().json.adType }}\",\n    \"entity_uuid\":  \"={{ $('Build VAPI System Prompt').first().json.entityUuid }}\",\n    \"retry_count\":  {{ $('Build VAPI System Prompt').first().json.retryCount }},\n    \"workflow\":     \"saudi-re-vapi-qualification\"\n  }\n}",
+        "options": {}
+      },
+      "id": "048e3eb4-d850-404f-a84c-ec47085b8ad0",
+      "name": "Initiate VAPI Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        6000,
+        1920
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "v542jXDg2A7p39kf",
+          "name": "Vapi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crm_leads SET\n  status = 'CONTACTED',\n  campaign_details = campaign_details || jsonb_build_object(\n    'vapi_call_id',     $$ {{ $json.id }} $$,\n    'vapi_call_status', 'initiated',\n    'call_started_at',  NOW()::text\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $('Insert CRM Lead').first().json.id }}'::uuid;",
+        "options": {}
+      },
+      "id": "b81b6bcd-ab15-47f3-9333-bbae2cac135a",
+      "name": "Update CRM with Call ID",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        6240,
+        1920
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": true,\n  \"message\": \"Call initiated\",\n  \"call_id\": \"={{ $('Initiate VAPI Call').first().json.id }}\",\n  \"crm_lead_id\": \"={{ $('Insert CRM Lead').first().json.id }}\"\n}",
+        "options": {}
+      },
+      "id": "03b99992-b516-47b1-82b0-6de0e0748e65",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        6480,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vapi-call-result",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "30f7555d-8dc5-45f4-863e-5b91b5b97cbc",
+      "name": "VAPI End-of-Call Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        4320,
+        2544
+      ],
+      "webhookId": "vapi-call-result"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\n// VAPI end-of-call-report structure\nconst call         = body.call || body;\nconst callId       = call.id              || '';\nconst callStatus   = call.status          || '';\nconst endedReason  = call.endedReason     || '';\nconst transcript   = body.transcript      || call.transcript  || '';\nconst summary      = body.summary         || body.analysis?.summary || '';\nconst recordingUrl = body.recordingUrl    || call.recordingUrl || '';\nconst duration     = (call.startedAt && call.endedAt)\n  ? Math.round((new Date(call.endedAt) - new Date(call.startedAt)) / 1000)\n  : 0;\n\n// Pull metadata we stored on call creation\nconst meta        = call.metadata        || body.metadata || {};\nconst crmLeadId   = meta.crm_lead_id     || '';\nconst adType      = meta.ad_type         || '';\nconst entityUuid  = meta.entity_uuid     || '';\nconst retryCount  = parseInt(meta.retry_count || '0');\n\n// ── Determine outcome ──\nlet outcome = 'UNKNOWN';\nconst haystack = (summary + ' ' + transcript + ' ' + endedReason).toUpperCase();\n\nconst noAnswerReasons = [\n  'customer-did-not-answer', 'no-answer', 'voicemail',\n  'machine-detected', 'machine_end_other'\n];\nif (noAnswerReasons.includes(endedReason.toLowerCase())) {\n  outcome = 'NO_ANSWER';\n} else if (haystack.includes('OUTCOME: QUALIFIED')) {\n  outcome = 'QUALIFIED';\n} else if (haystack.includes('OUTCOME: NOT_INTERESTED')) {\n  outcome = 'NOT_INTERESTED';\n} else if (haystack.includes('OUTCOME: NO_BUDGET_MATCH')) {\n  outcome = 'NO_BUDGET_MATCH';\n} else if (haystack.includes('OUTCOME: CALLBACK_NEEDED')) {\n  outcome = 'CALLBACK_NEEDED';\n} else if (callStatus === 'ended' || callStatus === 'completed') {\n  outcome = 'COMPLETED_UNKNOWN';\n}\n\n// ── Try to extract budget amount from transcript ──\nconst budgetMatch = transcript.match(/(SAR\\s*)?([\\d,\\.]+)\\s*(million|M|K|SAR)/i);\nconst mentionedBudget = budgetMatch ? budgetMatch[0].trim() : null;\n\n// ── Truncate transcript to avoid DB overflow ──\nconst transcriptShort = transcript.substring(0, 3000);\n\nreturn [{\n  json: {\n    callId, callStatus, endedReason, transcript: transcriptShort,\n    summary, recordingUrl, duration,\n    crmLeadId, adType, entityUuid, retryCount,\n    outcome, mentionedBudget\n  }\n}];"
+      },
+      "id": "59832c0e-4a9e-4a7f-a9bd-62bd6866d5bb",
+      "name": "Parse VAPI Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4560,
+        2544
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "output": "={{\n  $json.outcome === 'QUALIFIED'          ? 0 :\n  $json.outcome === 'NO_ANSWER'          ? 1 :\n  $json.outcome === 'NOT_INTERESTED'     ? 2 :\n  $json.outcome === 'NO_BUDGET_MATCH'    ? 3 :\n  $json.outcome === 'CALLBACK_NEEDED'    ? 4 : 5\n}}"
+      },
+      "id": "1b45b08a-1854-488c-a991-54f09653f45d",
+      "name": "Outcome Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        4800,
+        2544
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crm_leads SET\n  status     = 'QUALIFIED',\n  lead_score = 4,\n  campaign_details = campaign_details || jsonb_build_object(\n    'vapi_outcome',          'QUALIFIED',\n    'vapi_summary',          $$ {{ $json.summary }} $$,\n    'vapi_transcript',       $$ {{ $json.transcript }} $$,\n    'vapi_recording_url',    $$ {{ $json.recordingUrl }} $$,\n    'vapi_duration_seconds', {{ $json.duration }},\n    'vapi_budget_mentioned', $$ {{ $json.mentionedBudget || 'not mentioned' }} $$,\n    'call_completed_at',     NOW()::text\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.crmLeadId }}'::uuid;\n\nINSERT INTO crm_notes (lead_id, lead_type, agent_id, content, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  NULL,\n  $$ [VAPI CALL — QUALIFIED]\nDuration    : {{ $json.duration }}s\nBudget noted: {{ $json.mentionedBudget || 'not mentioned' }}\nSummary     : {{ $json.summary }}\nRecording   : {{ $json.recordingUrl }} $$,\n  NOW()\n);\n\nINSERT INTO crm_activities (lead_id, lead_type, activity_type, performed_by_id, metadata, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  'NOTE_ADDED',\n  NULL,\n  jsonb_build_object(\n    'source',        'VAPI_VOICE_CALL',\n    'outcome',       'QUALIFIED',\n    'call_id',       $$ {{ $json.callId }} $$,\n    'duration_secs', {{ $json.duration }}\n  ),\n  NOW()\n);",
+        "options": {}
+      },
+      "id": "6744919c-2c1a-458d-bce9-726d81393d9e",
+      "name": "CRM — Qualified",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        2320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data  = $input.first().json;\nconst retry = data.retryCount || 0;\n\nif (retry < 2) {\n  const delayHours = retry === 0 ? 2 : 24;\n  return [{\n    json: {\n      ...data,\n      action:         'RETRY',\n      nextRetryCount: retry + 1,\n      delayHours,\n      scheduledAt: new Date(Date.now() + delayHours * 3_600_000).toISOString()\n    }\n  }];\n}\nreturn [{\n  json: {\n    ...data,\n    action: 'COLD',\n    reason: 'No answer after 3 VAPI call attempts'\n  }\n}];"
+      },
+      "id": "d11bdc4a-0edb-4a4b-93be-fffd19c06b55",
+      "name": "No Answer — Retry Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        2464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "RETRY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5b3fea7b-34b7-4361-8e0c-f65cdffc0860",
+      "name": "Retry or Cold",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        5280,
+        2464
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crm_leads SET\n  status = 'NEW',\n  campaign_details = campaign_details || jsonb_build_object(\n    'vapi_outcome',   'NO_ANSWER_RETRY_' || {{ $json.nextRetryCount }}::text,\n    'next_retry_at',  $$ {{ $json.scheduledAt }} $$,\n    'retry_count',    {{ $json.nextRetryCount }}\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.crmLeadId }}'::uuid;\n\nINSERT INTO crm_followups (lead_id, lead_type, agent_id, scheduled_at, note, is_completed, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  NULL,\n  '{{ $json.scheduledAt }}'::timestamptz,\n  $$ [VAPI AUTO-RETRY] Attempt {{ $json.nextRetryCount + 1 }} of 3 — scheduled after {{ $json.delayHours }}h delay $$,\n  false,\n  NOW()\n);\n\nINSERT INTO crm_activities (lead_id, lead_type, activity_type, performed_by_id, metadata, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  'NOTE_ADDED',\n  NULL,\n  jsonb_build_object(\n    'source',       'VAPI_VOICE_CALL',\n    'outcome',      'NO_ANSWER',\n    'retry_number', {{ $json.nextRetryCount }},\n    'next_call_at', $$ {{ $json.scheduledAt }} $$\n  ),\n  NOW()\n);",
+        "options": {}
+      },
+      "id": "35329149-c00f-4921-8e37-405ae2f35c19",
+      "name": "CRM — Schedule Retry",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5520,
+        2400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crm_leads SET\n  status     = 'CLOSED_LOST',\n  lead_score = 1,\n  campaign_details = campaign_details || jsonb_build_object(\n    'vapi_outcome',    'NO_ANSWER_3_ATTEMPTS',\n    'closed_reason',   'No answer after 3 VAPI call attempts',\n    'closed_at',       NOW()::text\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.crmLeadId }}'::uuid;\n\nINSERT INTO crm_notes (lead_id, lead_type, agent_id, content, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  NULL,\n  '[VAPI COLD] 3 outbound call attempts — no answer each time. Lead marked cold. Recommend manual WhatsApp or SMS outreach.',\n  NOW()\n);\n\nINSERT INTO crm_activities (lead_id, lead_type, activity_type, performed_by_id, metadata, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  'NOTE_ADDED',\n  NULL,\n  '{\"source\": \"VAPI_VOICE_CALL\", \"outcome\": \"NO_ANSWER_3_ATTEMPTS\", \"action\": \"marked_cold\"}'::jsonb,\n  NOW()\n);",
+        "options": {}
+      },
+      "id": "cbead13c-5903-4c82-86e8-be238a086d04",
+      "name": "CRM — Cold Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5520,
+        2544
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crm_leads SET\n  status     = 'CLOSED_LOST',\n  lead_score = 1,\n  campaign_details = campaign_details || jsonb_build_object(\n    'vapi_outcome',          'NOT_INTERESTED',\n    'vapi_summary',          $$ {{ $json.summary }} $$,\n    'vapi_duration_seconds', {{ $json.duration }},\n    'closed_at',             NOW()::text\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.crmLeadId }}'::uuid;\n\nINSERT INTO crm_notes (lead_id, lead_type, agent_id, content, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  NULL,\n  $$ [VAPI NOT INTERESTED] Duration: {{ $json.duration }}s | Summary: {{ $json.summary }} $$,\n  NOW()\n);",
+        "options": {}
+      },
+      "id": "d72b6b79-1875-46f0-a2b8-a51c45442929",
+      "name": "CRM — Not Interested",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        2608
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crm_leads SET\n  status     = 'CLOSED_LOST',\n  lead_score = 2,\n  campaign_details = campaign_details || jsonb_build_object(\n    'vapi_outcome',          'NO_BUDGET_MATCH',\n    'vapi_summary',          $$ {{ $json.summary }} $$,\n    'vapi_budget_mentioned', $$ {{ $json.mentionedBudget || 'not stated' }} $$,\n    'vapi_duration_seconds', {{ $json.duration }}\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.crmLeadId }}'::uuid;\n\nINSERT INTO crm_notes (lead_id, lead_type, agent_id, content, created_at)\nVALUES (\n  '{{ $json.crmLeads }}'::uuid,\n  'CAMPAIGN',\n  NULL,\n  $$ [VAPI BUDGET MISMATCH] Budget mentioned: {{ $json.mentionedBudget || 'not stated' }} | Summary: {{ $json.summary }} $$,\n  NOW()\n);",
+        "options": {}
+      },
+      "id": "ffc47a80-323d-49af-9f1c-6eeddb211a78",
+      "name": "CRM — Budget Mismatch",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        2720
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crm_leads SET\n  status     = 'FOLLOW_UP',\n  lead_score = 3,\n  campaign_details = campaign_details || jsonb_build_object(\n    'vapi_outcome',          'CALLBACK_NEEDED',\n    'vapi_summary',          $$ {{ $json.summary }} $$,\n    'vapi_duration_seconds', {{ $json.duration }}\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.crmLeadId }}'::uuid;\n\nINSERT INTO crm_followups (lead_id, lead_type, agent_id, scheduled_at, note, is_completed, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  NULL,\n  NOW() + INTERVAL '4 hours',\n  $$ [VAPI CALLBACK] Lead interested but requested callback. Summary: {{ $json.summary }} $$,\n  false,\n  NOW()\n);\n\nINSERT INTO crm_activities (lead_id, lead_type, activity_type, performed_by_id, metadata, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  'FOLLOWUP_SCHEDULED',\n  NULL,\n  jsonb_build_object('source', 'VAPI_VOICE_CALL', 'outcome', 'CALLBACK_NEEDED'),\n  NOW()\n);",
+        "options": {}
+      },
+      "id": "96044ab5-c4a1-4f6b-b17f-4d287e79af59",
+      "name": "CRM — Callback Needed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        2848
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crm_leads SET\n  status     = 'FOLLOW_UP',\n  lead_score = 2,\n  campaign_details = campaign_details || jsonb_build_object(\n    'vapi_outcome',       'UNKNOWN',\n    'vapi_ended_reason',  $$ {{ $json.endedReason }} $$,\n    'vapi_summary',       $$ {{ $json.summary }} $$,\n    'vapi_recording_url', $$ {{ $json.recordingUrl }} $$,\n    'vapi_call_status',   $$ {{ $json.callStatus }} $$\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.crmLeadId }}'::uuid;\n\nINSERT INTO crm_notes (lead_id, lead_type, agent_id, content, created_at)\nVALUES (\n  '{{ $json.crmLeadId }}'::uuid,\n  'CAMPAIGN',\n  NULL,\n  $$ [VAPI UNKNOWN OUTCOME] Status: {{ $json.callStatus }} | Ended reason: {{ $json.endedReason }} | Summary: {{ $json.summary }} | Recording: {{ $json.recordingUrl }} $$,\n  NOW()\n);",
+        "options": {}
+      },
+      "id": "e986facb-f662-46dc-9a51-6752a33f8313",
+      "name": "CRM — Unknown Outcome",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        2960
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "MVUIn0LAmyaG0JjG",
+          "name": "Neon DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"received\": true}",
+        "options": {}
+      },
+      "id": "76195c8e-ab2b-451e-a04b-31e8bd4ac685",
+      "name": "Respond to VAPI",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        5760,
+        2640
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Lead Form Webhook": {
+      "main": [
+        [
+          {
+            "node": "VAPI Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract & Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Callable Hours Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Callable Hours Check": {
+      "main": [
+        [
+          {
+            "node": "Ad Type Branch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Schedule Later Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Later Call": {
+      "main": [
+        [
+          {
+            "node": "Respond — Scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ad Type Branch": {
+      "main": [
+        [
+          {
+            "node": "Fetch Listing Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Project + Layouts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Listing Details": {
+      "main": [
+        [
+          {
+            "node": "Build VAPI System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project + Layouts": {
+      "main": [
+        [
+          {
+            "node": "Build VAPI System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build VAPI System Prompt": {
+      "main": [
+        [
+          {
+            "node": "Insert CRM Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert CRM Lead": {
+      "main": [
+        [
+          {
+            "node": "Initiate VAPI Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initiate VAPI Call": {
+      "main": [
+        [
+          {
+            "node": "Update CRM with Call ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update CRM with Call ID": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VAPI End-of-Call Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse VAPI Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse VAPI Result": {
+      "main": [
+        [
+          {
+            "node": "Outcome Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outcome Router": {
+      "main": [
+        [
+          {
+            "node": "CRM — Qualified",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Answer — Retry Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CRM — Not Interested",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CRM — Budget Mismatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Answer — Retry Check": {
+      "main": [
+        [
+          {
+            "node": "Retry or Cold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry or Cold": {
+      "main": [
+        [
+          {
+            "node": "CRM — Schedule Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CRM — Cold Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM — Qualified": {
+      "main": [
+        [
+          {
+            "node": "Respond to VAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM — Schedule Retry": {
+      "main": [
+        [
+          {
+            "node": "Respond to VAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM — Cold Lead": {
+      "main": [
+        [
+          {
+            "node": "Respond to VAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM — Not Interested": {
+      "main": [
+        [
+          {
+            "node": "Respond to VAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM — Budget Mismatch": {
+      "main": [
+        [
+          {
+            "node": "Respond to VAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM — Callback Needed": {
+      "main": [
+        [
+          {
+            "node": "Respond to VAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM — Unknown Outcome": {
+      "main": [
+        [
+          {
+            "node": "Respond to VAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VAPI Config": {
+      "main": [
+        [
+          {
+            "node": "Extract & Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "91c3324a-b000-4750-8ca3-f0dbeb6fc0da",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "03d2424465fd56aa6a6f85128a043c8dc9eea61292ece12e24ba9455f321f427"
+  },
+  "id": "w1KgofdgShg5rkR0t7WBE",
+  "tags": [
+    {
+      "name": "VAPI",
+      "id": "SwzCECSJrxy0kIeF",
+      "updatedAt": "2026-06-22T05:53:21.583Z",
+      "createdAt": "2026-06-22T05:53:21.583Z"
+    },
+    {
+      "name": "Voice Qualification",
+      "id": "nmFo1amaDMxrp6uZ",
+      "updatedAt": "2026-06-22T05:53:21.605Z",
+      "createdAt": "2026-06-22T05:53:21.605Z"
+    },
+    {
+      "name": "Tamleeq",
+      "id": "wSgwDr4Seyb6uGfI",
+      "updatedAt": "2026-06-22T05:53:21.603Z",
+      "createdAt": "2026-06-22T05:53:21.603Z"
+    }
+  ]
+}

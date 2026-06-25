@@ -20,7 +20,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const interval = setInterval(fetchUnassigned, 300000); // Poll every 5 minutes
       return () => clearInterval(interval);
     }
-  }, [isAuthenticated, pathname]);
+  }, [isAuthenticated]);
 
   if (loading) {
     return (

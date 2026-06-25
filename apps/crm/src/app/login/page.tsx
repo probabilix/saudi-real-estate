@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
 import { Building2, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -11,6 +11,23 @@ export default function CrmLoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchLogo() {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+        const res = await fetch(`${apiBase}/system/settings`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          setLogoUrl(json.data.logo_url || null);
+        }
+      } catch (e) {
+        console.error('Failed to fetch dynamic logo', e);
+      }
+    }
+    fetchLogo();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,9 +56,15 @@ export default function CrmLoginPage() {
         {/* Logo */}
         <div className="relative">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-2xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/30">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
+            {logoUrl ? (
+              <div className="h-10 w-auto shrink-0 flex items-center justify-start overflow-hidden bg-white rounded-lg p-1 animate-in fade-in duration-300">
+                <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-2xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/30">
+                <Building2 className="w-5 h-5 text-white" />
+              </div>
+            )}
             <div>
               <div className="text-white font-bold text-lg">Tamleeq</div>
               <div className="text-primary-400 text-xs font-semibold tracking-widest uppercase">CRM Workspace</div>
@@ -91,9 +114,15 @@ export default function CrmLoginPage() {
         >
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center">
-              <Building2 className="w-4.5 h-4.5 text-white" />
-            </div>
+            {logoUrl ? (
+              <div className="h-9 w-auto shrink-0 flex items-center justify-start overflow-hidden bg-white rounded-lg p-1 animate-in fade-in duration-300">
+                <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
+              </div>
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center">
+                <Building2 className="w-4.5 h-4.5 text-white" />
+              </div>
+            )}
             <div>
               <div className="text-sm font-bold text-surface-800">Tamleeq CRM</div>
               <div className="text-[10px] text-surface-400 font-semibold tracking-widest uppercase">Workspace</div>

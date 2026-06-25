@@ -122,17 +122,15 @@ export default function Header({ locale }: HeaderProps) {
           {/* Logo */}
           <Link href={`/${locale}`} className="flex items-center gap-3 group">
             {logoUrl ? (
-              <img src={logoUrl} alt="Tamleeq" className="h-8 w-auto object-contain animate-in fade-in duration-300" />
+              <img src={logoUrl} alt="Tamleeq" className="h-9 w-auto object-contain animate-in fade-in duration-300" />
             ) : (
-              <>
-                <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-all">
-                  <Building2 className="w-6 h-6 text-white" />
-                </div>
-                <span className={`text-2xl font-bold tracking-tight text-gray-900 ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
-                  {tCommon('appName')}
-                </span>
-              </>
+              <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-all">
+                <Building2 className="w-6 h-6 text-white" />
+              </div>
             )}
+            <span className={`text-2xl font-bold tracking-tight text-gray-900 ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
+              {tCommon('appName')}
+            </span>
           </Link>
 
           {/* Desktop Nav */}

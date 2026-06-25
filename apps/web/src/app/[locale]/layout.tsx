@@ -67,16 +67,18 @@ export default async function LocaleLayout({
   const fontClass = locale === 'ar' ? ibmPlexArabic.variable : dmSans.variable;
 
   let faviconUrl = '/favicon.ico';
-  try {
-    const res = await fetch(`${API_BASE_URL}/system/settings`, { next: { revalidate: 60 } });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && json.data?.favicon_url) {
-        faviconUrl = json.data.favicon_url;
+  if (process.env.NEXT_PHASE !== 'phase-production-build') {
+    try {
+      const res = await fetch(`${API_BASE_URL}/system/settings`, { next: { revalidate: 60 } });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data?.favicon_url) {
+          faviconUrl = json.data.favicon_url;
+        }
       }
+    } catch (err) {
+      console.error('Failed to fetch favicon on server', err);
     }
-  } catch (err) {
-    console.error('Failed to fetch favicon on server', err);
   }
 
   return (

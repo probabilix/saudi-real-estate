@@ -1,6 +1,6 @@
 'use client';
 export const dynamic = 'force-dynamic';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminTopBar } from '@/components/AdminSidebar';
@@ -74,6 +74,8 @@ export default function EditProjectPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  // Only save a draft when the user has ACTUALLY changed something after the initial DB load
+  const hasUserEdited = useRef(false);
 
   // Project Data State
   const [projectData, setProjectData] = useState<ProjectFormState>({
@@ -116,7 +118,64 @@ export default function EditProjectPage() {
 
   const [layouts, setLayouts] = useState<LayoutRow[]>([]);
 
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftTime, setDraftTime] = useState('');
+
+  // Check for local draft on mount
+  useEffect(() => {
+    if (id) {
+      const saved = localStorage.getItem(`tamleeq_project_edit_draft_${id}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.updatedAt) {
+            setHasDraft(true);
+            setDraftTime(new Date(parsed.updatedAt).toLocaleString());
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  }, [id]);
+
+  // Auto-save draft — only triggers after user has actually edited something (prevents false banner on initial load)
+  useEffect(() => {
+    if (!loading && id && hasUserEdited.current) {
+      const draft = {
+        projectData,
+        layouts,
+        dynamicAmenities,
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem(`tamleeq_project_edit_draft_${id}`, JSON.stringify(draft));
+    }
+  }, [projectData, layouts, dynamicAmenities, loading, id]);
+
+  const restoreDraft = () => {
+    const saved = localStorage.getItem(`tamleeq_project_edit_draft_${id}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.projectData) setProjectData(parsed.projectData);
+        if (parsed.layouts) setLayouts(parsed.layouts);
+        if (parsed.dynamicAmenities) setDynamicAmenities(parsed.dynamicAmenities);
+        setHasDraft(false);
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
+  const discardDraft = () => {
+    if (id) {
+      localStorage.removeItem(`tamleeq_project_edit_draft_${id}`);
+    }
+    setHasDraft(false);
+  };
+
   const addLayout = () => {
+    hasUserEdited.current = true;
     setLayouts(prev => [...prev, {
       labelEn: `Type ${String.fromCharCode(65 + prev.length)}`,
       labelAr: `نموذج ${String.fromCharCode(65 + prev.length)}`,
@@ -126,10 +185,12 @@ export default function EditProjectPage() {
 
   const removeLayout = (i: number) => {
     if (layouts.length === 1) return;
+    hasUserEdited.current = true;
     setLayouts(prev => prev.filter((_, idx) => idx !== i));
   };
 
   const updateLayout = (i: number, key: keyof LayoutRow, val: any) => {
+    hasUserEdited.current = true;
     setLayouts(prev => prev.map((l, idx) => idx === i ? { ...l, [key]: val } : l));
   };
 
@@ -189,11 +250,24 @@ export default function EditProjectPage() {
 
         // Pre-fill layouts
         const dbLayouts = res.data.layouts || [];
+
+        // Escape all regex-special chars (e.g. parentheses in "Al Ezz Project (101)")
+        // so the project name is treated as a literal string, not a regex pattern.
+        // The `+` quantifier strips ALL consecutive repetitions in one pass, which also
+        // heals existing records where the prefix was stacked on every save.
+        const escapeRx = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const prefixPatternEn = p.nameEn ? `(?:${escapeRx(p.nameEn)}\\s*-\\s*)+` : null;
+        const prefixPatternAr = p.nameAr ? `(?:${escapeRx(p.nameAr)}\\s*-\\s*)+` : null;
+        const regexEn = prefixPatternEn ? new RegExp(`^${prefixPatternEn}`) : null;
+        const regexAr = prefixPatternAr ? new RegExp(`^${prefixPatternAr}`) : null;
+
         const mappedLayouts: LayoutRow[] = dbLayouts.map((l: any) => {
-          const regexEn = new RegExp(`^${p.nameEn || ''}\\s*-\\s*`);
-          const regexAr = new RegExp(`^${p.nameAr || ''}\\s*-\\s*`);
-          const labelEn = l.enTitle ? l.enTitle.replace(regexEn, '') : '';
-          const labelAr = l.arTitle ? l.arTitle.replace(regexAr, '') : '';
+          const labelEn = l.enTitle
+            ? (regexEn ? l.enTitle.replace(regexEn, '') : l.enTitle)
+            : '';
+          const labelAr = l.arTitle
+            ? (regexAr ? l.arTitle.replace(regexAr, '') : l.arTitle)
+            : '';
           return {
             id: l.id,
             labelEn,
@@ -221,6 +295,7 @@ export default function EditProjectPage() {
 
   // Handle inputs
   const handleProjectChange = (key: keyof ProjectFormState, value: any) => {
+    hasUserEdited.current = true;
     setProjectData(prev => ({
       ...prev,
       [key]: value
@@ -228,6 +303,7 @@ export default function EditProjectPage() {
   };
 
   const handleAmenityToggle = (key: string) => {
+    hasUserEdited.current = true;
     setProjectData(prev => ({
       ...prev,
       amenities: {
@@ -239,6 +315,7 @@ export default function EditProjectPage() {
 
   const addCustomAmenity = () => {
     if (!customAmenity.trim()) return;
+    hasUserEdited.current = true;
     const id = customAmenity.toLowerCase().trim().replace(/\s+/g, '_');
     setDynamicAmenities(prev => prev.includes(id) ? prev : [...prev, id]);
     setProjectData(prev => ({
@@ -252,6 +329,7 @@ export default function EditProjectPage() {
   };
 
   const removeCustomAmenity = (id: string) => {
+    hasUserEdited.current = true;
     setDynamicAmenities(prev => prev.filter(a => a !== id));
     setProjectData(prev => {
       const nextAmenities = { ...prev.amenities };
@@ -313,6 +391,7 @@ export default function EditProjectPage() {
       const result = await adminApi.updateProject(id, payload);
 
       if (result.success) {
+        localStorage.removeItem(`tamleeq_project_edit_draft_${id}`);
         setToast({ message: 'Project details updated successfully!', type: 'success' });
         setTimeout(() => {
           router.push('/projects');
@@ -332,7 +411,8 @@ export default function EditProjectPage() {
       <AdminTopBar title="Edit Project Details" />
 
       {/* Top Banner and Navigation */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-5xl mx-auto w-full pb-20">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 space-y-6 max-w-5xl mx-auto w-full">
         
         <div className="flex items-center gap-3">
           <Link href="/projects" className="btn-secondary py-1.5 px-3">
@@ -346,6 +426,22 @@ export default function EditProjectPage() {
           <div className="flex items-center gap-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
             <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
             <p className="font-semibold">{error}</p>
+          </div>
+        )}
+
+        {hasDraft && (
+          <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div>
+                <span className="font-bold text-amber-800 text-sm">Unsaved Draft Found!</span>
+                <p className="text-amber-700 text-xs mt-0.5">We found an unsaved draft from your last edit session ({draftTime}). Would you like to restore it?</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={restoreDraft} className="btn-primary text-xs py-1.5 px-3">Restore</button>
+              <button type="button" onClick={discardDraft} className="btn-secondary text-xs py-1.5 px-3">Discard</button>
+            </div>
           </div>
         )}
 
@@ -365,7 +461,7 @@ export default function EditProjectPage() {
             <p className="text-xs text-surface-500">Loading project records...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-8 animate-in fade-in duration-200">
+          <form id="edit-project-form" onSubmit={handleSubmit} className="space-y-8 animate-in fade-in duration-200">
             
             {/* SHARED PROJECT DETAILS */}
             <div className="admin-card p-6 space-y-6">
@@ -485,6 +581,16 @@ export default function EditProjectPage() {
                     <div className="flex-1 bg-surface-50 border border-surface-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-surface-600 truncate">
                       {projectData.brochureUrl || 'No brochure file uploaded'}
                     </div>
+                    {projectData.brochureUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleProjectChange('brochureUrl', '')}
+                        className="p-2.5 text-red-500 hover:text-red-700 bg-red-50 border border-red-200 rounded-xl transition-colors shrink-0"
+                        title="Remove Brochure"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                     <CldUploadWidget
                       uploadPreset="saudi_re_listing"
                       onSuccess={(result: any) => {
@@ -573,7 +679,10 @@ export default function EditProjectPage() {
                     uploadPreset="saudi_re_listing"
                     onSuccess={(result: any) => {
                       if (result.event === 'success' && result.info?.secure_url) {
-                        handleProjectChange('photos', [...projectData.photos, result.info.secure_url]);
+                        setProjectData(prev => ({
+                          ...prev,
+                          photos: [...prev.photos, result.info.secure_url]
+                        }));
                       }
                     }}
                   >
@@ -819,31 +928,33 @@ export default function EditProjectPage() {
               </div>
             </div>
 
-            {/* Submission Action */}
-            <div className="flex items-center justify-end gap-3 pt-4">
-              <Link href="/projects" className="btn-secondary">
-                Cancel
-              </Link>
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn-primary px-6"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Saving changes...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" /> Save Project Details
-                  </>
-                )}
-              </button>
-            </div>
-
           </form>
         )}
 
+        </div>
+      </div>
+
+      {/* ── Bottom Actions Bar — lives outside the scroll area, never overlaps content ── */}
+      <div className="bg-white border-t border-surface-200 py-3 px-6 flex items-center justify-between shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+        <div className="flex items-center gap-4">
+          <span className="text-xs font-bold text-surface-500">
+            Layouts: <span className="text-primary-600 font-extrabold">{layouts.length}</span>
+          </span>
+          <button type="button" onClick={addLayout} className="btn-secondary py-1.5 px-3 text-xs gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> Add Layout
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link href="/projects" className="btn-secondary py-1.5 px-3 text-xs">Cancel</Link>
+          <button type="submit" form="edit-project-form" disabled={saving} className="btn-primary py-1.5 px-4 text-xs gap-1.5 shadow-md">
+            {saving ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving changes...</>
+            ) : (
+              <><Save className="w-3.5 h-3.5" /> Save Project Details</>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

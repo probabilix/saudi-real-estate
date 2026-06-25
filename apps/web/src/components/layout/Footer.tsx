@@ -78,9 +78,13 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="lg:col-span-1">
             <Link href={`/${locale}`} className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-md">
-                <Building2 className="w-5 h-5 text-white" />
-              </div>
+              {settings?.logo_url ? (
+                <img src={settings.logo_url} alt="Tamleeq" className="h-9 w-auto object-contain" />
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-md">
+                  <Building2 className="w-5 h-5 text-white" />
+                </div>
+              )}
               <span className={`text-xl font-bold text-white ${locale === 'ar' ? 'font-arabic' : 'font-serif'}`}>
                 {tCommon('appName')}
               </span>

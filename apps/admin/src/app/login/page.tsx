@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { Building2, Mail, Lock, Eye, EyeOff, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -10,6 +10,23 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchLogo() {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+        const res = await fetch(`${apiBase}/system/settings`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          setLogoUrl(json.data.logo_url || null);
+        }
+      } catch (e) {
+        console.error('Failed to fetch dynamic logo', e);
+      }
+    }
+    fetchLogo();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,8 +60,16 @@ export default function LoginPage() {
       <div className="w-full max-w-sm relative z-10 animate-fade-in">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-600 shadow-glow mb-4">
-            <Building2 className="w-7 h-7 text-white" />
+          <div className="inline-flex items-center justify-center mb-4">
+            {logoUrl ? (
+              <div className="h-14 w-auto shrink-0 flex items-center justify-center bg-white rounded-2xl p-2.5 shadow-glow animate-in fade-in duration-300">
+                <img src={logoUrl} alt="Logo" className="max-h-full w-auto object-contain" />
+              </div>
+            ) : (
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-600 shadow-glow">
+                <Building2 className="w-7 h-7 text-white" />
+              </div>
+            )}
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Admin Panel</h1>
           <p className="text-surface-400 text-sm">Tamleeq Platform</p>

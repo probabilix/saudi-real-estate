@@ -71,6 +71,13 @@
       "when": 1781169104844,
       "tag": "0009_massive_jimmy_woo",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782896875120,
+      "tag": "0010_low_diamondback",
+      "breakpoints": true
     }
   ]
 }

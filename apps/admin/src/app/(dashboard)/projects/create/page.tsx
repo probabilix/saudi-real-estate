@@ -85,6 +85,8 @@ export default function CreateProjectPage() {
   const [dynamicAmenities, setDynamicAmenities] = useState<string[]>([]);
   const [isFeatured, setIsFeatured] = useState(false);
   const [featuredOrder, setFeaturedOrder] = useState('');
+  const [foreignerEligible, setForeignerEligible] = useState(false);
+  const [muslimOnly, setMuslimOnly] = useState(false);
 
   // Section B — Layouts
   const [layouts, setLayouts] = useState<LayoutRow[]>([
@@ -117,12 +119,13 @@ export default function CreateProjectPage() {
         nameEn, nameAr, city, district, descriptionEn, descriptionAr,
         brochureUrl, regaFalLicense, completionStatus, expectedDelivery,
         totalUnits, mapEmbedUrl, photos, amenities, isFeatured, featuredOrder,
+        foreignerEligible, muslimOnly,
         layouts,
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem('tamleeq_project_create_draft', JSON.stringify(draft));
     }
-  }, [nameEn, nameAr, city, district, descriptionEn, descriptionAr, brochureUrl, regaFalLicense, completionStatus, expectedDelivery, totalUnits, mapEmbedUrl, photos, amenities, isFeatured, featuredOrder, layouts]);
+  }, [nameEn, nameAr, city, district, descriptionEn, descriptionAr, brochureUrl, regaFalLicense, completionStatus, expectedDelivery, totalUnits, mapEmbedUrl, photos, amenities, isFeatured, featuredOrder, foreignerEligible, muslimOnly, layouts]);
 
   const restoreDraft = () => {
     const saved = localStorage.getItem('tamleeq_project_create_draft');
@@ -145,6 +148,8 @@ export default function CreateProjectPage() {
         setAmenities(parsed.amenities || initialAmenities);
         setIsFeatured(!!parsed.isFeatured);
         setFeaturedOrder(parsed.featuredOrder || '');
+        setForeignerEligible(!!parsed.foreignerEligible);
+        setMuslimOnly(!!parsed.muslimOnly);
         setLayouts(parsed.layouts || []);
         setHasDraft(false);
       } catch (e) {
@@ -221,6 +226,8 @@ export default function CreateProjectPage() {
           mapEmbedUrl, photos, amenities: cleanAmenities,
           isFeatured,
           featuredOrder: featuredOrder ? Number(featuredOrder) : 0,
+          foreignerEligible,
+          muslimOnly,
         },
         layouts: layouts.map(l => ({
           labelEn: l.labelEn,
@@ -434,6 +441,48 @@ export default function CreateProjectPage() {
                       onChange={(e) => setFeaturedOrder(e.target.value)}
                     />
                     <p className="text-[10px] text-surface-500 mt-1">Lower values rank higher (e.g., 1 is shown before 2).</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Foreigner Eligibility & Ownership Restrictions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-teal-500/5 border border-teal-500/20 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="foreignerEligible"
+                    checked={foreignerEligible}
+                    onChange={(e) => {
+                      setForeignerEligible(e.target.checked);
+                      if (!e.target.checked) setMuslimOnly(false); // Reset muslimOnly if not foreigner eligible
+                    }}
+                    className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-surface-300"
+                  />
+                  <div>
+                    <label htmlFor="foreignerEligible" className="text-xs font-bold text-surface-900 cursor-pointer flex items-center gap-1.5">
+                      <ShieldCheck className={clsx("w-4 h-4", foreignerEligible ? "text-teal-600" : "text-surface-400")} />
+                      Eligible for Foreign Buyers
+                    </label>
+                    <p className="text-[10px] text-surface-500 mt-0.5">Toggle if this project is located in a REGA designated zone permitting non-Saudi ownership.</p>
+                  </div>
+                </div>
+
+                {foreignerEligible && (
+                  <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-200">
+                    <input
+                      type="checkbox"
+                      id="muslimOnly"
+                      checked={muslimOnly}
+                      onChange={(e) => setMuslimOnly(e.target.checked)}
+                      className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-surface-300"
+                    />
+                    <div>
+                      <label htmlFor="muslimOnly" className="text-xs font-bold text-surface-900 cursor-pointer flex items-center gap-1.5">
+                        <Building2 className={clsx("w-4 h-4", muslimOnly ? "text-orange-600" : "text-surface-400")} />
+                        Muslims Only Restriction
+                      </label>
+                      <p className="text-[10px] text-surface-500 mt-0.5">Check if this project is in Makkah / Madinah areas where ownership is restricted to Muslims only.</p>
+                    </div>
                   </div>
                 )}
               </div>

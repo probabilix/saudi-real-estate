@@ -4,7 +4,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm, FormProvider, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createListingSchema, updateListingSchema, LISTING_TYPES } from '@saudi-re/shared';
+import { createListingSchema, updateListingSchema, LISTING_TYPES, extractLatLng, isShortGoogleMapsUrl } from '@saudi-re/shared';
+import { useJsApiLoader, GoogleMap, MarkerF, Autocomplete } from '@react-google-maps/api';
+const GOOGLE_MAPS_LIBRARIES: ("places")[] = ['places'];
 import { api } from '../../lib/api';
 import { useAuth } from '../../hooks/use-auth';
 import {
@@ -18,11 +20,11 @@ import {
   Zap, Flame, Tv, Coffee, Utensils, AlignLeft,
   Plus, Users, Briefcase, Glasses, Trash2, Home,
   Refrigerator, Shirt, Calendar, TrendingUp, X,
-  BookOpen, Map
+  BookOpen, Map as LucideMap
 } from 'lucide-react';
 
 const AgencyIcon = Building2;
-const MapIcon = Map;
+const MapIcon = LucideMap;
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MediaUpload } from './MediaUpload';
@@ -143,6 +145,93 @@ const InputField = ({ label, children, dir = 'ltr', error, icon: Icon, dark = fa
   </div>
 );
 
+// ── Commute Map Preview Subcomponent (renders only after googleMapsKey is loaded) ──
+interface CommuteMapPreviewProps {
+  googleMapsKey: string;
+  mapCoords: { lat: number; lng: number } | null;
+  handleMapClick: (e: google.maps.MapMouseEvent) => void;
+  handleMarkerDragEnd: (e: google.maps.MapMouseEvent) => void;
+  onAutocompleteLoad: (autoC: google.maps.places.Autocomplete) => void;
+  onPlaceChanged: () => void;
+}
+
+function CommuteMapPreview({
+  googleMapsKey,
+  mapCoords,
+  handleMapClick,
+  handleMarkerDragEnd,
+  onAutocompleteLoad,
+  onPlaceChanged
+}: CommuteMapPreviewProps) {
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: googleMapsKey,
+    libraries: GOOGLE_MAPS_LIBRARIES
+  });
+
+  if (!isLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 bg-white/5 border border-white/10 rounded-2xl gap-2 text-slate-400">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+        <span className="text-[10px] font-black uppercase tracking-wider">Loading Map Modules...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Places Autocomplete Input */}
+      <div className="relative">
+        <Autocomplete
+          onLoad={onAutocompleteLoad}
+          onPlaceChanged={onPlaceChanged}
+        >
+          <input
+            type="text"
+            placeholder="Search location, district, or compound name..."
+            className="w-full bg-white/5 border border-white/20 focus:border-emerald-500 rounded-xl px-4 py-3.5 text-xs font-bold text-white outline-none placeholder:text-white/25"
+            onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+          />
+        </Autocomplete>
+      </div>
+
+      <div className="relative h-64 rounded-[1.5rem] overflow-hidden border-2 border-white/20 bg-white/5">
+        <GoogleMap
+          id="commute-preview-map"
+          mapContainerStyle={{ width: '100%', height: '100%' }}
+          center={mapCoords ? { lat: mapCoords.lat, lng: mapCoords.lng } : { lat: 24.68773, lng: 46.72185 }}
+          zoom={mapCoords ? 15 : 6}
+          onClick={handleMapClick}
+          options={{
+            disableDefaultUI: true,
+            zoomControl: true,
+            styles: [
+              { elementType: 'geometry', stylers: [{ color: '#212121' }] },
+              { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+              { elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
+              { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
+              { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#757575' }] },
+              { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#2c2c2c' }] },
+              { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] }
+            ]
+          }}
+        >
+          {mapCoords && (
+            <MarkerF
+              position={{ lat: mapCoords.lat, lng: mapCoords.lng }}
+              draggable={true}
+              onDragEnd={handleMarkerDragEnd}
+            />
+          )}
+        </GoogleMap>
+        <div className="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider text-white z-10">
+          Drag marker or click anywhere on the map to adjust location pin
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, isStandalone = false }) => {
   const { user } = useAuth();
   const router = useRouter();
@@ -238,6 +327,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       residenceType: '',
       completionStatus: '',
       verified: false,
+      foreignerEligible: false,
+      muslimOnly: false,
       arTitle: '',
       enTitle: '',
       arDescription: '',
@@ -251,6 +342,141 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
   });
 
   const { watch, handleSubmit, control, setValue, reset, formState: { errors } } = methods;
+
+  const mapEmbedUrlValue = watch('mapEmbedUrl');
+  const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [parsingCoords, setParsingCoords] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+
+  const [googleMapsKey, setGoogleMapsKey] = useState<string>('');
+  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+      setGoogleMapsKey(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+      return;
+    }
+
+    const fetchConfig = async () => {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        const res = await fetch(`${apiBase}/listings/maps-config`);
+        const json = await res.json();
+        if (json.success && json.googleMapsKey) {
+          setGoogleMapsKey(json.googleMapsKey);
+        }
+      } catch (err) {
+        console.error('Failed to load Google Maps key dynamically', err);
+      }
+    };
+    fetchConfig();
+  }, []);// 
+
+  const onAutocompleteLoad = (autoC: google.maps.places.Autocomplete) => {
+    setAutocomplete(autoC);
+  };
+
+  const onPlaceChanged = () => {
+    if (autocomplete !== null) {
+      const place = autocomplete.getPlace();
+      const lat = place.geometry?.location?.lat();
+      const lng = place.geometry?.location?.lng();
+      if (lat && lng) {
+        setMapCoords({ lat, lng });
+        setValue('lat', lat);
+        setValue('lng', lng);
+        
+        let city = '';
+        let district = '';
+        place.address_components?.forEach(c => {
+          if (c.types.includes('locality')) {
+            city = c.long_name;
+          }
+          if (c.types.includes('sublocality') || c.types.includes('neighborhood')) {
+            district = c.long_name;
+          }
+        });
+        if (city) {
+          setValue('city', city);
+        }
+        if (district) {
+          setValue('district', district);
+        }
+        setValue('mapEmbedUrl', `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},17z`);
+      }
+    }
+  };
+
+  // Sync coords from database/initialData on mount or load
+  useEffect(() => {
+    if (initialData?.lat && initialData?.lng) {
+      setMapCoords({
+        lat: parseFloat(initialData.lat),
+        lng: parseFloat(initialData.lng)
+      });
+    }
+  }, [initialData]);
+
+  const handleMapUrlChange = async (url: string) => {
+    if (!url || url.trim() === '') {
+      setMapCoords(null);
+      setParseError(null);
+      setValue('lat', undefined);
+      setValue('lng', undefined);
+      return;
+    }
+
+    setParsingCoords(true);
+    setParseError(null);
+
+    try {
+      // 1. Expand short links first if detected
+      let finalUrl = url;
+      if (isShortGoogleMapsUrl(url)) {
+        const response = await fetch(`/api/v1/listings/expand-url?url=${encodeURIComponent(url)}`);
+        const json = await response.json();
+        if (json.success && json.url) {
+          finalUrl = json.url;
+        }
+      }
+
+      // 2. Parse coordinates from full URL
+      const parsed = extractLatLng(finalUrl);
+      if (parsed) {
+        setMapCoords(parsed);
+        setValue('lat', parsed.lat);
+        setValue('lng', parsed.lng);
+      } else {
+        setParseError('Failed to extract coordinates from URL automatically. Please drag or click the map below to set the pin location manually.');
+      }
+    } catch (err: any) {
+      setParseError('Error resolving Google Maps URL. Please drop a pin manually on the map below.');
+    } finally {
+      setParsingCoords(false);
+    }
+  };
+
+  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    const lat = e.latLng?.lat();
+    const lng = e.latLng?.lng();
+    if (lat && lng) {
+      setMapCoords({ lat, lng });
+      setValue('lat', lat);
+      setValue('lng', lng);
+      // Auto-update mapEmbedUrl with a standard formatted place link
+      setValue('mapEmbedUrl', `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},17z`);
+    }
+  };
+
+  const handleMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
+    const lat = e.latLng?.lat();
+    const lng = e.latLng?.lng();
+    if (lat && lng) {
+      setMapCoords({ lat, lng });
+      setValue('lat', lat);
+      setValue('lng', lng);
+    }
+  };
 
   // Single authoritative sync when data loads from DB
   useEffect(() => {
@@ -316,6 +542,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       completionStatus: initialData.completionStatus ?? undefined,
       residenceType: initialData.residenceType ?? undefined,
       verified: !!initialData.verified,
+      foreignerEligible: !!initialData.foreignerEligible,
+      muslimOnly: !!initialData.muslimOnly,
       lat: initialData.lat != null ? initialData.lat : undefined,
       lng: initialData.lng != null ? initialData.lng : undefined,
       regaAdvertisingLicense: initialData.regaAdvertisingLicense ?? undefined,
@@ -442,6 +670,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       residenceType: data.residenceType ?? undefined,
       completionStatus: data.completionStatus || undefined,
       verified: data.verified !== undefined ? Boolean(data.verified) : undefined,
+      foreignerEligible: data.foreignerEligible !== undefined ? Boolean(data.foreignerEligible) : undefined,
+      muslimOnly: data.muslimOnly !== undefined ? Boolean(data.muslimOnly) : undefined,
       regaAdvertisingLicense: data.regaAdvertisingLicense ?? undefined,
       regaFalLicense: data.regaFalLicense ?? undefined,
       youtubeUrl: data.youtubeUrl ?? undefined,
@@ -927,6 +1157,65 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                           </label>
                         </div>
                       )}
+
+                      {/* Foreigner Eligibility & Muslims Only Toggles */}
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center gap-2 ml-4">
+                          <Shield className="w-3.5 h-3.5 text-emerald-900" />
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Ownership & Eligibility</label>
+                        </div>
+                        
+                        <label className={`w-full flex items-center justify-between transition-all rounded-[1.5rem] border-2 shadow-sm p-4 md:p-6 cursor-pointer ${
+                          watch('foreignerEligible')
+                            ? 'bg-emerald-900/5 border-emerald-900/30'
+                            : 'bg-white border-slate-300 hover:border-emerald-950/30'
+                        }`}>
+                          <div>
+                            <p className="font-black text-sm uppercase text-slate-900">Eligible for Foreign Buyers</p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Non-Saudis are legally eligible to buy this property</p>
+                          </div>
+                          <div className="relative">
+                            <input 
+                              type="checkbox" 
+                              checked={!!watch('foreignerEligible')}
+                              onChange={(e) => {
+                                setValue('foreignerEligible', e.target.checked);
+                                if (!e.target.checked) setValue('muslimOnly', false);
+                              }}
+                              className="sr-only" 
+                            />
+                            <div className={`w-12 h-6 rounded-full transition-colors relative ${watch('foreignerEligible') ? 'bg-emerald-950' : 'bg-slate-200'}`}>
+                              <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${watch('foreignerEligible') ? 'translate-x-6' : ''}`} />
+                            </div>
+                          </div>
+                        </label>
+
+                        {watch('foreignerEligible') && (
+                          <div className="overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200">
+                            <label className={`w-full flex items-center justify-between transition-all rounded-[1.5rem] border-2 shadow-sm p-4 md:p-6 cursor-pointer ${
+                              watch('muslimOnly')
+                                ? 'bg-orange-50 border-orange-200'
+                                : 'bg-white border-slate-300 hover:border-orange-950/30'
+                            }`}>
+                              <div>
+                                <p className="font-black text-sm uppercase text-slate-900">Muslims Only Restriction</p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Check if ownership is restricted to Muslims (e.g. Makkah / Madinah zones)</p>
+                              </div>
+                              <div className="relative">
+                                <input 
+                                  type="checkbox" 
+                                  checked={!!watch('muslimOnly')}
+                                  onChange={(e) => setValue('muslimOnly', e.target.checked)}
+                                  className="sr-only" 
+                                />
+                                <div className={`w-12 h-6 rounded-full transition-colors relative ${watch('muslimOnly') ? 'bg-orange-600' : 'bg-slate-200'}`}>
+                                  <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${watch('muslimOnly') ? 'translate-x-6' : ''}`} />
+                                </div>
+                              </div>
+                            </label>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </section>
@@ -1382,12 +1671,64 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                         </div>
                       </div>
                     </div>
-                    <InputField label="Google Maps Embed HTML / Link" dark>
-                      <div className="flex items-center gap-4">
-                        <MapIcon className="w-6 h-6 text-blue-400" />
-                        <input {...methods.register('mapEmbedUrl')} placeholder="Paste Google Maps iframe code or link..." className="w-full bg-transparent py-2 text-white font-bold outline-none placeholder:text-white/10" />
-                      </div>
-                    </InputField>
+                    <div className="space-y-4">
+                      <InputField label="Google Maps Embed HTML / Link" dark>
+                        <div className="flex items-center gap-4">
+                          <MapIcon className="w-6 h-6 text-blue-400" />
+                          <input
+                            {...methods.register('mapEmbedUrl')}
+                            onChange={async (e) => {
+                              const val = e.target.value;
+                              methods.setValue('mapEmbedUrl', val);
+                              await handleMapUrlChange(val);
+                            }}
+                            placeholder="Paste Google Maps iframe code or link..."
+                            className="w-full bg-transparent py-2 text-white font-bold outline-none placeholder:text-white/10"
+                          />
+                        </div>
+                      </InputField>
+
+                      {/* Coordinates parsing feedback */}
+                      {parsingCoords && (
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-300 ml-4">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                          <span>Detecting coordinates...</span>
+                        </div>
+                      )}
+
+                      {parseError && (
+                        <p className="text-[10px] font-bold text-rose-400 ml-4 uppercase tracking-widest leading-relaxed">
+                          {parseError}
+                        </p>
+                      )}
+
+                      {mapCoords && !parseError && (
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 ml-4 uppercase tracking-wider">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span>Location detected successfully! (lat: {Number(mapCoords.lat).toFixed(5)}, lng: {Number(mapCoords.lng).toFixed(5)})</span>
+                        </div>
+                      )}
+
+                      {googleMapsKey ? (
+                        <CommuteMapPreview
+                          googleMapsKey={googleMapsKey}
+                          mapCoords={mapCoords}
+                          handleMapClick={handleMapClick}
+                          handleMarkerDragEnd={handleMarkerDragEnd}
+                          onAutocompleteLoad={onAutocompleteLoad}
+                          onPlaceChanged={onPlaceChanged}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-64 bg-white/5 border border-white/10 rounded-2xl gap-2 text-slate-400">
+                          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                          <span className="text-[10px] font-black uppercase tracking-wider">Loading Map Configuration...</span>
+                        </div>
+                      )}
+
+                      {/* Hidden form fields */}
+                      <input type="hidden" {...methods.register('lat')} />
+                      <input type="hidden" {...methods.register('lng')} />
+                    </div>
                   </div>
 
                   <div className="relative z-10">

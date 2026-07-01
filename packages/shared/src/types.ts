@@ -105,6 +105,7 @@ export interface Listing {
   photos: string[];
   amenities: Record<string, boolean>;
   foreignerEligible: boolean;
+  muslimOnly: boolean;
   isFreehold: boolean;
   isFeatured: boolean;
   featuredUntil: string | null;

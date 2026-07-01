@@ -9,7 +9,8 @@ import { CldUploadWidget } from 'next-cloudinary';
 import {
   Plus, Trash2, Save, X, ArrowLeft, Loader2,
   Upload, Image as ImageIcon, Check,
-  AlertCircle, Sparkles, Building, Layers, Star
+  AlertCircle, Sparkles, Building, Layers, Star,
+  ShieldCheck, Building2
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -63,6 +64,8 @@ interface ProjectFormState {
   mapEmbedUrl: string;
   isFeatured: boolean;
   featuredOrder: number;
+  foreignerEligible: boolean;
+  muslimOnly: boolean;
 }
 
 export default function EditProjectPage() {
@@ -95,6 +98,8 @@ export default function EditProjectPage() {
     mapEmbedUrl: '',
     isFeatured: false,
     featuredOrder: 0,
+    foreignerEligible: false,
+    muslimOnly: false,
   });
 
   // Custom dynamic amenities list
@@ -246,6 +251,8 @@ export default function EditProjectPage() {
           mapEmbedUrl: p.mapEmbedUrl || '',
           isFeatured: !!p.isFeatured,
           featuredOrder: p.featuredOrder || 0,
+          foreignerEligible: !!p.foreignerEligible,
+          muslimOnly: !!p.muslimOnly,
         });
 
         // Pre-fill layouts
@@ -654,6 +661,48 @@ export default function EditProjectPage() {
                       onChange={(e) => handleProjectChange('featuredOrder', e.target.value)}
                     />
                     <p className="text-[10px] text-surface-500 mt-1">Lower values rank higher (e.g., 1 is shown before 2).</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Foreigner Eligibility & Ownership Restrictions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-teal-500/5 border border-teal-500/20 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="foreignerEligible"
+                    checked={projectData.foreignerEligible}
+                    onChange={(e) => {
+                      handleProjectChange('foreignerEligible', e.target.checked);
+                      if (!e.target.checked) handleProjectChange('muslimOnly', false); // Reset muslimOnly if not foreigner eligible
+                    }}
+                    className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-surface-300"
+                  />
+                  <div>
+                    <label htmlFor="foreignerEligible" className="text-xs font-bold text-surface-900 cursor-pointer flex items-center gap-1.5">
+                      <ShieldCheck className={clsx("w-4 h-4", projectData.foreignerEligible ? "text-teal-600" : "text-surface-400")} />
+                      Eligible for Foreign Buyers
+                    </label>
+                    <p className="text-[10px] text-surface-500 mt-0.5">Toggle if this project is located in a REGA designated zone permitting non-Saudi ownership.</p>
+                  </div>
+                </div>
+
+                {projectData.foreignerEligible && (
+                  <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-200">
+                    <input
+                      type="checkbox"
+                      id="muslimOnly"
+                      checked={projectData.muslimOnly}
+                      onChange={(e) => handleProjectChange('muslimOnly', e.target.checked)}
+                      className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-surface-300"
+                    />
+                    <div>
+                      <label htmlFor="muslimOnly" className="text-xs font-bold text-surface-900 cursor-pointer flex items-center gap-1.5">
+                        <Building2 className={clsx("w-4 h-4", projectData.muslimOnly ? "text-orange-600" : "text-surface-400")} />
+                        Muslims Only Restriction
+                      </label>
+                      <p className="text-[10px] text-surface-500 mt-0.5">Check if this project is in Makkah / Madinah areas where ownership is restricted to Muslims only.</p>
+                    </div>
                   </div>
                 )}
               </div>

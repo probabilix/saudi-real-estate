@@ -606,8 +606,8 @@ export default function ListingsPage() {
                             )}
                           </div>
                           <div className="min-w-0 max-w-[240px]">
-                            <div className="text-sm font-bold text-surface-900 truncate" dir="rtl">
-                              {listing.arTitle}
+                            <div className="text-sm font-bold text-surface-900 truncate">
+                              {listing.enTitle || listing.arTitle}
                             </div>
                             <div className="text-[10px] text-surface-400 font-mono mt-0.5">
                               ID: {listing.shortId || listing.id.slice(0, 8)}
@@ -883,7 +883,7 @@ export default function ListingsPage() {
                   <span>Inventory Controller</span>
                 </h3>
                 <p className="text-xs text-surface-500 mt-1 font-medium truncate max-w-[400px]">
-                  {selectedListing.arTitle}
+                  {selectedListing.enTitle || selectedListing.arTitle}
                 </p>
               </div>
               <button

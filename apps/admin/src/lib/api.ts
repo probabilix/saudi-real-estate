@@ -410,6 +410,8 @@ export interface AdminListing {
   owner: { id: string; name: string | null; email: string; role: string } | null;
   aiQualificationActive?: boolean;
   projectId?: string | null;
+  foreignerEligible?: boolean;
+  muslimOnly?: boolean;
 }
 
 export interface SystemSetting {
@@ -528,6 +530,8 @@ export interface AdminProject {
   totalUnits?: number | null;
   isFeatured?: boolean;
   featuredOrder?: number;
+  foreignerEligible?: boolean;
+  muslimOnly?: boolean;
   createdAt: string;
   updatedAt: string;
 }

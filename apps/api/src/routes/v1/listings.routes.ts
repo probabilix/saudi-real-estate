@@ -1,11 +1,13 @@
 import { FastifyInstance } from 'fastify';
-import { listingSearchSchema, createListingSchema, updateListingSchema } from '@saudi-re/shared';
+import { listingSearchSchema, createListingSchema, updateListingSchema, extractLatLng } from '@saudi-re/shared';
 import { ListingService } from '../../services/listing.service';
+import { SystemService } from '../../services/system.service';
 import { CloudinaryService } from '../../services/cloudinary.service';
 import { authenticateJWT, optionalAuthenticateJWT } from '../../middleware/auth.middleware';
 import { db } from '../../db';
 import { leads, buyerProfiles, listings, projects, projectUnits, users, listingReports } from '../../db/schema';
-import { eq, and, sql, desc, asc, inArray, or } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, inArray, or, gte, lte, isNull } from 'drizzle-orm';
+
 
 /**
  * Listings Routes
@@ -122,10 +124,42 @@ export default async function listingsRoutes(app: FastifyInstance) {
   });
 
   /**
+   * GET /api/v1/listings/expand-url
+   * Expand short maps.app.goo.gl URLs by following redirects
+   */
+  app.get('/expand-url', async (request, reply) => {
+    const { url } = request.query as { url: string };
+    if (!url) {
+      return reply.code(400).send({ success: false, message: 'URL is required' });
+    }
+    try {
+      const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+      return reply.send({ success: true, url: response.url });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, message: 'Failed to expand URL', error: err.message });
+    }
+  });
+
+  /**
+   * GET /api/v1/listings/maps-config
+   * Fetch map configurations dynamically from database settings
+   */
+  app.get('/maps-config', async (request, reply) => {
+    try {
+      const mapboxToken = await SystemService.getSetting('mapbox_public_token', process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '');
+      const googleMapsKey = await SystemService.getSetting('google_maps_public_key', process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '');
+      return reply.send({ success: true, mapboxToken, googleMapsKey });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, message: 'Failed to fetch maps config', error: err.message });
+    }
+  });
+
+  /**
    * PUT /api/v1/listings/:id
    * Update listing (Authenticated, with Ownership check)
    */
   app.put('/:id', { preHandler: [authenticateJWT] }, async (request, reply) => {
+
     const { id } = request.params as { id: string };
     const userId = request.user?.userId;
     const userRole = request.user?.role;
@@ -329,15 +363,389 @@ export default async function listingsRoutes(app: FastifyInstance) {
   });
 
   /**
+   * GET /api/v1/listings/map
+   * ─────────────────────────────────────────────────────────────────────────
+   * Viewport-bound map data endpoint. Returns:
+   *   - projects (1 pin per project)
+   *   - standalone listings (project_id IS NULL — layouts excluded)
+   *
+   * Deduplication guarantee: layouts (listings with projectId) are NEVER
+   * returned here — they're represented by their parent project pin instead.
+   *
+   * Query params:
+   *   north, south, east, west  — bounding box (required for viewport mode)
+   *   price_min, price_max      — SAR price range
+   *   type                      — listing type enum
+   *   beds                      — min bedrooms
+   *   purpose                   — SALE | RENT | LEASE
+   */
+  app.get('/map', { preHandler: [optionalAuthenticateJWT] }, async (request, reply) => {
+    const q = request.query as any;
+
+    const north = q.north ? parseFloat(q.north) : null;
+    const south = q.south ? parseFloat(q.south) : null;
+    const east  = q.east  ? parseFloat(q.east)  : null;
+    const west  = q.west  ? parseFloat(q.west)  : null;
+    const priceMin = q.price_min ? parseInt(q.price_min) : null;
+    const priceMax = q.price_max ? parseInt(q.price_max) : null;
+    const type    = q.type    || null;
+    const beds    = q.beds    ? parseInt(q.beds)    : null;
+    const purpose = q.purpose || null;
+    const foreignerEligible = q.foreignerEligible === 'true' || q.foreigner_eligible === 'true';
+
+    try {
+      // ── Standalone Listings (project_id IS NULL) ──────────────────────────
+      const listingConditions: any[] = [
+        eq(listings.status, 'ACTIVE'),
+        isNull(listings.projectId),          // EXCLUDE layouts
+        isNull(listings.deletedAt),
+        sql`${listings.lat} IS NOT NULL AND ${listings.lng} IS NOT NULL`,
+      ];
+
+      if (north !== null && south !== null) {
+        listingConditions.push(sql`CAST(${listings.lat} AS DECIMAL) BETWEEN ${south} AND ${north}`);
+      }
+      if (east !== null && west !== null) {
+        listingConditions.push(sql`CAST(${listings.lng} AS DECIMAL) BETWEEN ${west} AND ${east}`);
+      }
+      if (priceMin !== null) listingConditions.push(gte(listings.price, priceMin));
+      if (priceMax !== null) listingConditions.push(lte(listings.price, priceMax));
+      if (type)    listingConditions.push(eq(listings.type, type));
+      if (beds)    listingConditions.push(sql`${listings.bedrooms} >= ${beds}`);
+      if (purpose) listingConditions.push(eq(listings.purpose, purpose));
+      if (foreignerEligible) listingConditions.push(eq(listings.foreignerEligible, true));
+
+      const standalonePins = await db.select({
+        id:        listings.id,
+        shortId:   listings.shortId,
+        lat:       listings.lat,
+        lng:       listings.lng,
+        price:     listings.price,
+        type:      listings.type,
+        purpose:   listings.purpose,
+        bedrooms:  listings.bedrooms,
+        city:      listings.city,
+        district:  listings.district,
+        enTitle:   listings.enTitle,
+        arTitle:   listings.arTitle,
+        thumb:     sql<string>`(${listings.photos})[1]`,
+        isFeatured: listings.isFeatured,
+        foreignerEligible: listings.foreignerEligible,
+        muslimOnly: listings.muslimOnly,
+      })
+      .from(listings)
+      .where(and(...listingConditions))
+      .limit(500);   // Safety cap — Supercluster handles this client-side
+
+      // ── Projects ──────────────────────────────────────────────────────────
+      const projectConditions: any[] = [
+        sql`${projects.lat} IS NOT NULL AND ${projects.lng} IS NOT NULL`,
+      ];
+
+      if (north !== null && south !== null) {
+        projectConditions.push(sql`CAST(${projects.lat} AS DECIMAL) BETWEEN ${south} AND ${north}`);
+      }
+      if (east !== null && west !== null) {
+        projectConditions.push(sql`CAST(${projects.lng} AS DECIMAL) BETWEEN ${west} AND ${east}`);
+      }
+      if (foreignerEligible) projectConditions.push(eq(projects.foreignerEligible, true));
+
+      const projectPins = await db.select({
+        id:          projects.id,
+        nameEn:      projects.nameEn,
+        nameAr:      projects.nameAr,
+        lat:         projects.lat,
+        lng:         projects.lng,
+        city:        projects.city,
+        district:    projects.district,
+        thumb:       sql<string>`(${projects.photos})[1]`,
+        isFeatured:  projects.isFeatured,
+        completionStatus: projects.completionStatus,
+        foreignerEligible: projects.foreignerEligible,
+        muslimOnly: projects.muslimOnly,
+      })
+      .from(projects)
+      .where(and(...projectConditions))
+      .limit(200);
+
+      return reply.send({
+        success: true,
+        data: {
+          listings: standalonePins.map(l => ({
+            ...l,
+            lat: l.lat ? parseFloat(l.lat as string) : null,
+            lng: l.lng ? parseFloat(l.lng as string) : null,
+            kind: 'listing' as const,
+          })),
+          projects: projectPins.map(p => ({
+            ...p,
+            lat: p.lat ? parseFloat(p.lat as string) : null,
+            lng: p.lng ? parseFloat(p.lng as string) : null,
+            kind: 'project' as const,
+          })),
+        }
+      });
+
+    } catch (err: any) {
+      console.error('Map data error:', err);
+      return reply.status(500).send({ success: false, message: 'Failed to fetch map data', error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/v1/listings/drive-time
+   * ─────────────────────────────────────────────────────────────────────────
+   * Search and filter properties by drive time isochrone from Point A (and Point B).
+   * Calculates polygon client/server-side using OpenRouteService.
+   */
+  app.post('/drive-time', { preHandler: [optionalAuthenticateJWT] }, async (request, reply) => {
+    const body = request.body as any;
+    const pointA = body.pointA as { lat: number; lng: number };
+    const pointB = body.pointB as { lat: number; lng: number } | undefined;
+    const minutes = body.minutes ? parseInt(body.minutes) : 30;
+    const mode = body.mode || 'balanced'; // 'balanced' | 'nearestA' | 'nearestB'
+    const filters = body.filters || {};
+
+    if (!pointA || pointA.lat == null || pointA.lng == null) {
+      return reply.code(400).send({ success: false, message: 'pointA {lat, lng} is required' });
+    }
+
+    const priceMin = filters.priceMin ? parseInt(filters.priceMin) : null;
+    const priceMax = filters.priceMax ? parseInt(filters.priceMax) : null;
+    const type = filters.type || null;
+    const beds = filters.beds ? parseInt(filters.beds) : null;
+    const purpose = filters.purpose || null;
+
+    try {
+      const googleMapsKey = await SystemService.getSetting('google_maps_public_key', process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '');
+      if (!googleMapsKey) {
+        return reply.code(400).send({ success: false, message: 'Google Maps API key is not configured in settings.' });
+      }
+
+      // ── 1. Calculate spatial bounding box pre-filter from database ──────────
+      // Standard radius of 35km covers normal commute ranges (up to ~60 mins driving)
+      const radiusKm = 35;
+      const dLat = radiusKm / 111;
+      const dLngA = radiusKm / (111 * Math.cos(pointA.lat * Math.PI / 180));
+
+      let minLat = pointA.lat - dLat;
+      let maxLat = pointA.lat + dLat;
+      let minLng = pointA.lng - dLngA;
+      let maxLng = pointA.lng + dLngA;
+
+      if (pointB && pointB.lat != null && pointB.lng != null) {
+        const dLngB = radiusKm / (111 * Math.cos(pointB.lat * Math.PI / 180));
+        minLat = Math.min(minLat, pointB.lat - dLat);
+        maxLat = Math.max(maxLat, pointB.lat + dLat);
+        minLng = Math.min(minLng, pointB.lng - dLngB);
+        maxLng = Math.max(maxLng, pointB.lng + dLngB);
+      }
+
+      const bbox = { minLat, maxLat, minLng, maxLng };
+
+      // ── 2. Query properties within bounds from database ──────────────────
+      const listingConditions: any[] = [
+        eq(listings.status, 'ACTIVE'),
+        isNull(listings.projectId), // Exclude layouts to prevent duplicate pins
+        isNull(listings.deletedAt),
+        sql`CAST(${listings.lat} AS DECIMAL) BETWEEN ${bbox.minLat} AND ${bbox.maxLat}`,
+        sql`CAST(${listings.lng} AS DECIMAL) BETWEEN ${bbox.minLng} AND ${bbox.maxLng}`,
+      ];
+
+      if (priceMin !== null) listingConditions.push(gte(listings.price, priceMin));
+      if (priceMax !== null) listingConditions.push(lte(listings.price, priceMax));
+      if (type) listingConditions.push(eq(listings.type, type));
+      if (beds) listingConditions.push(sql`${listings.bedrooms} >= ${beds}`);
+      if (purpose) listingConditions.push(eq(listings.purpose, purpose));
+
+      const candidateListings = await db.select({
+        id: listings.id,
+        shortId: listings.shortId,
+        lat: listings.lat,
+        lng: listings.lng,
+        price: listings.price,
+        type: listings.type,
+        purpose: listings.purpose,
+        bedrooms: listings.bedrooms,
+        city: listings.city,
+        district: listings.district,
+        enTitle: listings.enTitle,
+        arTitle: listings.arTitle,
+        thumb: sql<string>`(${listings.photos})[1]`,
+        isFeatured: listings.isFeatured,
+      })
+      .from(listings)
+      .where(and(...listingConditions));
+
+      const projectConditions: any[] = [
+        sql`CAST(${projects.lat} AS DECIMAL) BETWEEN ${bbox.minLat} AND ${bbox.maxLat}`,
+        sql`CAST(${projects.lng} AS DECIMAL) BETWEEN ${bbox.minLng} AND ${bbox.maxLng}`,
+      ];
+
+      const candidateProjects = await db.select({
+        id: projects.id,
+        nameEn: projects.nameEn,
+        nameAr: projects.nameAr,
+        lat: projects.lat,
+        lng: projects.lng,
+        city: projects.city,
+        district: projects.district,
+        thumb: sql<string>`(${projects.photos})[1]`,
+        isFeatured: projects.isFeatured,
+        completionStatus: projects.completionStatus,
+      })
+      .from(projects)
+      .where(and(...projectConditions));
+
+      // Merge and map
+      const mergedCandidates = [
+        ...candidateListings.map(l => ({ ...l, kind: 'listing' as const })),
+        ...candidateProjects.map(p => ({ ...p, kind: 'project' as const }))
+      ].filter(item => item.lat && item.lng);
+
+      // Helper: Haversine distance
+      const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371; // Earth's radius in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+
+      // ── 3. Sort candidates by straight-line distance to Point A ─────────
+      // We limit to top 75 closest candidates to keep API request overhead minimal and performance extremely fast
+      const closestCandidates = mergedCandidates
+        .map(item => {
+          const lat = parseFloat(item.lat as string);
+          const lng = parseFloat(item.lng as string);
+          return {
+            ...item,
+            lat,
+            lng,
+            straightDist: getDistance(lat, lng, pointA.lat, pointA.lng)
+          };
+        })
+        .sort((a, b) => a.straightDist - b.straightDist)
+        .slice(0, 75);
+
+      if (closestCandidates.length === 0) {
+        return reply.send({ success: true, data: [], polygons: { polyA: null, polyB: null } });
+      }
+
+      // ── 4. Query Google Distance Matrix in batches of 25 ─────────────────
+      const getGoogleTravelTimes = async (
+        origin: { lat: number; lng: number },
+        destList: { lat: number; lng: number }[]
+      ) => {
+        const results: { duration: number; distance: number }[] = [];
+        const batchSize = 25;
+        for (let i = 0; i < destList.length; i += batchSize) {
+          const batch = destList.slice(i, i + batchSize);
+          const destString = batch.map(d => `${d.lat},${d.lng}`).join('|');
+          const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${encodeURIComponent(destString)}&mode=driving&departure_time=now&key=${googleMapsKey}`;
+          
+          try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+            const data = await response.json();
+            if (data.status !== 'OK') throw new Error(`API status ${data.status}`);
+            
+            const elements = data.rows[0].elements;
+            elements.forEach((el: any) => {
+              if (el.status === 'OK') {
+                results.push({
+                  duration: Math.round(el.duration.value / 60), // minutes
+                  distance: el.distance.value / 1000 // km
+                });
+              } else {
+                results.push({ duration: 999, distance: 999 }); // unreachable fallback
+              }
+            });
+          } catch (err: any) {
+            console.error(`[GOOGLE-MATRIX-ERROR] Batch starting at ${i} failed:`, err.message);
+            // Haversine fallback duration: average city speed 40km/h with 30% traffic overhead
+            batch.forEach(d => {
+              const dist = getDistance(d.lat, d.lng, origin.lat, origin.lng);
+              const duration = Math.round((dist / 40) * 60 * 1.3);
+              results.push({ duration, distance: dist });
+            });
+          }
+        }
+        return results;
+      };
+
+      const travelTimesA = await getGoogleTravelTimes(pointA, closestCandidates);
+      let travelTimesB: { duration: number; distance: number }[] | null = null;
+      if (pointB && pointB.lat != null && pointB.lng != null) {
+        travelTimesB = await getGoogleTravelTimes(pointB, closestCandidates);
+      }
+
+      // ── 5. Filter items within drive limits and map to response array ────
+      const finalItems: any[] = [];
+      closestCandidates.forEach((item, index) => {
+        const timeA = travelTimesA[index]?.duration ?? 999;
+        const timeB = travelTimesB ? (travelTimesB[index]?.duration ?? 999) : null;
+
+        // Must be within Point A commute time, AND if Point B is provided, must be within Point B commute time too
+        const matchA = timeA <= minutes;
+        const matchB = pointB ? (timeB !== null && timeB <= minutes) : true;
+
+        if (matchA && matchB) {
+          finalItems.push({
+            ...item,
+            driveTimeA: timeA,
+            driveTimeB: timeB,
+          });
+        }
+      });
+
+      // ── 6. Sort final results based on commute mode ──────────────────────
+      if (mode === 'nearestA') {
+        finalItems.sort((a, b) => a.driveTimeA - b.driveTimeA);
+      } else if (mode === 'nearestB') {
+        finalItems.sort((a, b) => (a.driveTimeB || 999) - (b.driveTimeB || 999));
+      } else {
+        // Balanced (Minimize combined A + B time)
+        finalItems.sort((a, b) => {
+          const totalA = a.driveTimeA + (a.driveTimeB || a.driveTimeA);
+          const totalB = b.driveTimeA + (b.driveTimeB || b.driveTimeA);
+          return totalA - totalB;
+        });
+      }
+
+      return reply.send({
+        success: true,
+        data: finalItems,
+        polygons: {
+          polyA: null,
+          polyB: null,
+        }
+      });
+
+    } catch (err: any) {
+      console.error('Drive time search error:', err);
+      return reply.status(500).send({ success: false, message: 'Failed to process drive time search', error: err.message });
+    }
+  });
+
+
+  /**
    * POST /api/v1/listings/projects
    * Create a new project
    */
+
   app.post('/projects', { preHandler: [authenticateJWT] }, async (request, reply) => {
-    const { nameEn, nameAr, descriptionEn, descriptionAr, city, district, mapEmbedUrl, isFeatured, featuredOrder } = request.body as any;
+    const { nameEn, nameAr, descriptionEn, descriptionAr, city, district, mapEmbedUrl, isFeatured, featuredOrder, foreignerEligible, muslimOnly } = request.body as any;
     if (!nameEn || !nameAr || !city) {
       return reply.code(400).send({ success: false, message: 'nameEn, nameAr and city are required' });
     }
     try {
+      // Auto-parse lat/lng from mapEmbedUrl
+      const coords = mapEmbedUrl ? extractLatLng(mapEmbedUrl) : null;
+
       const [newProject] = await db.insert(projects).values({
         nameEn,
         nameAr,
@@ -346,8 +754,12 @@ export default async function listingsRoutes(app: FastifyInstance) {
         city,
         district,
         mapEmbedUrl,
+        lat: coords ? String(coords.lat) : null,
+        lng: coords ? String(coords.lng) : null,
         isFeatured: isFeatured !== undefined ? !!isFeatured : false,
         featuredOrder: featuredOrder !== undefined ? (featuredOrder === '' ? 0 : Number(featuredOrder)) : 0,
+        foreignerEligible: foreignerEligible !== undefined ? !!foreignerEligible : false,
+        muslimOnly: muslimOnly !== undefined ? !!muslimOnly : false,
       }).returning();
       return reply.code(201).send({ success: true, data: newProject });
     } catch (err: any) {
@@ -355,6 +767,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
       return reply.status(500).send({ success: false, message: 'Failed to create project', error: err.message });
     }
   });
+
 
   /**
    * POST /api/v1/listings/projects/bulk
@@ -379,6 +792,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         mapEmbedUrl?: string;
         isFeatured?: boolean;
         featuredOrder?: number;
+        foreignerEligible?: boolean;
+        muslimOnly?: boolean;
       };
       layouts: Array<{
         labelEn: string;
@@ -409,6 +824,9 @@ export default async function listingsRoutes(app: FastifyInstance) {
     }
 
     try {
+      // Auto-parse lat/lng from project mapEmbedUrl
+      const projectCoords = project.mapEmbedUrl ? extractLatLng(project.mapEmbedUrl) : null;
+
       // Create project record
       const [newProject] = await db.insert(projects).values({
         nameEn: project.nameEn,
@@ -418,6 +836,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         city: project.city,
         district: project.district,
         mapEmbedUrl: project.mapEmbedUrl,
+        lat: projectCoords ? String(projectCoords.lat) : null,
+        lng: projectCoords ? String(projectCoords.lng) : null,
         brochureUrl: project.brochureUrl,
         regaFalLicense: project.regaFalLicense,
         amenities: project.amenities || {},
@@ -427,9 +847,12 @@ export default async function listingsRoutes(app: FastifyInstance) {
         totalUnits: project.totalUnits,
         isFeatured: project.isFeatured !== undefined ? !!project.isFeatured : false,
         featuredOrder: project.featuredOrder !== undefined ? (project.featuredOrder === null ? 0 : Number(project.featuredOrder)) : 0,
+        foreignerEligible: project.foreignerEligible !== undefined ? !!project.foreignerEligible : false,
+        muslimOnly: project.muslimOnly !== undefined ? !!project.muslimOnly : false,
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
+
 
       // Helper to generate SRE short id
       const generateLocalShortId = () => {
@@ -466,6 +889,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
           regaFalLicense: project.regaFalLicense || null,
           regaAdvertisingLicense: project.regaFalLicense || null, // inherits project license
           amenities: project.amenities || {},
+          foreignerEligible: project.foreignerEligible !== undefined ? !!project.foreignerEligible : false,
+          muslimOnly: project.muslimOnly !== undefined ? !!project.muslimOnly : false,
           completionStatus: layout.completionStatus || project.completionStatus || null,
           aiQualificationActive: true,
           verified: true,
@@ -525,10 +950,6 @@ export default async function listingsRoutes(app: FastifyInstance) {
     }
   });
 
-  /**
-   * PUT /api/v1/listings/projects/:id
-   * Update project details (Authenticated)
-   */
   app.put('/projects/:id', { preHandler: [authenticateJWT] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const {
@@ -548,7 +969,9 @@ export default async function listingsRoutes(app: FastifyInstance) {
       totalUnits,
       isFeatured,
       featuredOrder,
-      layouts
+      layouts,
+      foreignerEligible,
+      muslimOnly
     } = request.body as any;
 
     if (!nameEn || !nameAr || !city) {
@@ -556,6 +979,17 @@ export default async function listingsRoutes(app: FastifyInstance) {
     }
 
     try {
+      // Auto-parse lat/lng if mapEmbedUrl provided and no explicit coords given
+      let latVal = null;
+      let lngVal = null;
+      if (mapEmbedUrl) {
+        const coords = extractLatLng(mapEmbedUrl);
+        if (coords) {
+          latVal = String(coords.lat);
+          lngVal = String(coords.lng);
+        }
+      }
+
       const [updatedProject] = await db.update(projects)
         .set({
           nameEn,
@@ -565,6 +999,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
           city,
           district: district || null,
           mapEmbedUrl: mapEmbedUrl || null,
+          lat: latVal,
+          lng: lngVal,
           brochureUrl: brochureUrl || null,
           regaFalLicense: regaFalLicense || null,
           amenities: amenities || {},
@@ -574,22 +1010,27 @@ export default async function listingsRoutes(app: FastifyInstance) {
           totalUnits: totalUnits ? Number(totalUnits) : null,
           isFeatured: isFeatured !== undefined ? !!isFeatured : undefined,
           featuredOrder: featuredOrder !== undefined ? (featuredOrder === '' ? 0 : Number(featuredOrder)) : undefined,
+          foreignerEligible: foreignerEligible !== undefined ? !!foreignerEligible : undefined,
+          muslimOnly: muslimOnly !== undefined ? !!muslimOnly : undefined,
           updatedAt: new Date(),
         })
         .where(eq(projects.id, id))
         .returning();
 
+
       if (!updatedProject) {
         return reply.code(404).send({ success: false, message: 'Project not found' });
       }
 
-      // Also propagate brochureUrl, regaFalLicense, city, district to all linked listings
+      // Also propagate brochureUrl, regaFalLicense, city, district, foreignerEligible, muslimOnly to all linked listings
       await db.update(listings)
         .set({
           brochureUrl: brochureUrl || null,
           regaFalLicense: regaFalLicense || null,
           city,
           district: district || null,
+          foreignerEligible: foreignerEligible !== undefined ? !!foreignerEligible : undefined,
+          muslimOnly: muslimOnly !== undefined ? !!muslimOnly : undefined,
           updatedAt: new Date(),
         })
         .where(eq(listings.projectId, id));
@@ -713,7 +1154,20 @@ export default async function listingsRoutes(app: FastifyInstance) {
       if (body.descriptionAr !== undefined) updateData.descriptionAr = body.descriptionAr;
       if (body.city !== undefined) updateData.city = body.city;
       if (body.district !== undefined) updateData.district = body.district;
-      if (body.mapEmbedUrl !== undefined) updateData.mapEmbedUrl = body.mapEmbedUrl;
+      if (body.mapEmbedUrl !== undefined) {
+        updateData.mapEmbedUrl = body.mapEmbedUrl;
+        // Auto-parse lat/lng when mapEmbedUrl changes (unless explicit coords provided)
+        if (body.lat == null && body.lng == null && body.mapEmbedUrl) {
+          const coords = extractLatLng(body.mapEmbedUrl);
+          if (coords) {
+            updateData.lat = String(coords.lat);
+            updateData.lng = String(coords.lng);
+          }
+        }
+      }
+      if (body.lat !== undefined) updateData.lat = body.lat;
+      if (body.lng !== undefined) updateData.lng = body.lng;
+
       if (body.brochureUrl !== undefined) updateData.brochureUrl = body.brochureUrl;
       if (body.regaFalLicense !== undefined) updateData.regaFalLicense = body.regaFalLicense;
       if (body.amenities !== undefined) updateData.amenities = body.amenities;

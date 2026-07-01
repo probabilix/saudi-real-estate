@@ -158,6 +158,16 @@ async function seedSettings() {
       set: { description: 'The uploaded image URL of the platform brand favicon.' }
     });
 
+    // 9. Google Maps API Configuration
+    await db.insert(systemSettings).values({
+      key: 'google_maps_public_key',
+      value: '',
+      description: 'Unified Google Maps JS API key for client-side maps and backend commute search.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { description: 'Unified Google Maps JS API key for client-side maps and backend commute search.' }
+    });
+
     console.log('✅ Successfully seeded system settings');
   } catch (error) {
     console.error('❌ Seeding failed:', error);

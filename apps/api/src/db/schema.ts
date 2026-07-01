@@ -129,6 +129,10 @@ export const projects = pgTable('projects', {
   district: varchar('district', { length: 100 }),
   mapEmbedUrl: text('map_embed_url'),
 
+  // ── Parsed coordinates (auto-extracted from mapEmbedUrl on save) ──
+  lat: decimal('lat', { precision: 10, scale: 7 }),
+  lng: decimal('lng', { precision: 10, scale: 7 }),
+
   // ── Project-level shared fields (uploaded once, inherited by all layouts) ──
   brochureUrl: text('brochure_url'),
   regaFalLicense: varchar('rega_fal_license', { length: 100 }),
@@ -142,7 +146,12 @@ export const projects = pgTable('projects', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   isFeatured: boolean('is_featured').default(false),
   featuredOrder: integer('featured_order').default(0),
-});
+  foreignerEligible: boolean('foreigner_eligible').default(false),
+  muslimOnly: boolean('muslim_only').default(false),
+}, (table) => ({
+  latLngIdx: index('projects_lat_lng_idx').on(table.lat, table.lng),
+}));
+
 
 // ── Listings Table ──
 export const listings = pgTable('listings', {
@@ -185,6 +194,7 @@ export const listings = pgTable('listings', {
   amenities: jsonb('amenities').default({}),
   history: jsonb('history').default([]),
   foreignerEligible: boolean('foreigner_eligible').default(false),
+  muslimOnly: boolean('muslim_only').default(false),
   isFreehold: boolean('is_freehold').default(true),
   
   // REGA Compliance & Legal (Saudi Specific)
@@ -222,6 +232,7 @@ export const listings = pgTable('listings', {
 }, (table) => ({
   searchVectorIdx: index('search_vector_idx').using('gin', table.searchVector),
   shortIdIdx: index('short_id_idx').on(table.shortId),
+  latLngIdx: index('listings_lat_lng_idx').on(table.lat, table.lng),
 }));
 
 // ── Project Units Table ──

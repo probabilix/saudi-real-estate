@@ -25,11 +25,40 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
   }
 
   const isDashboardPage = pathname.includes('/dashboard');
+  const isMapOrDriveTime = pathname.includes('/map') || pathname.includes('/drive-time');
+
+  if (isMapOrDriveTime) {
+    return (
+      <>
+        <Header locale={locale} />
+        {/* position:fixed anchors the map exactly below the fixed header,
+            guaranteeing full height regardless of body/flex chain height */}
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            paddingTop: 110,   /* desktop header height */
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            zIndex: 20,
+            background: 'white',
+          }}
+          className="pt-[70px] md:pt-[110px]"
+        >
+          {children}
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <Header locale={locale} />
-      <main className="flex-1 pt-[70px] md:pt-[110px]">
+      <main className={`flex-1 pt-[70px] md:pt-[110px]`}>
         {children}
       </main>
       {!isDashboardPage && <Footer />}

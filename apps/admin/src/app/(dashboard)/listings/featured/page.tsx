@@ -331,8 +331,8 @@ export default function FeaturedListingsPage() {
                             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent" />
                           </div>
                           <div className="min-w-0 max-w-[240px]">
-                            <div className="text-sm font-bold text-surface-900 truncate" dir="rtl">
-                              {listing.arTitle}
+                            <div className="text-sm font-bold text-surface-900 truncate">
+                              {listing.enTitle || listing.arTitle}
                             </div>
                             <div className="text-[10px] text-surface-400 font-mono mt-0.5">
                               {listing.shortId || listing.id.slice(0, 8)}

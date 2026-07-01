@@ -57,6 +57,7 @@ export const createListingSchema = z.object({
   photos: z.array(z.string().url()).min(3, 'Minimum 3 photos required'),
   amenities: z.record(z.boolean()).default({}),
   foreignerEligible: z.boolean().default(false),
+  muslimOnly: z.boolean().default(false),
   isFreehold: z.boolean().default(true),
   verified: z.boolean().default(false).optional(),
 
@@ -102,6 +103,7 @@ export const listingSearchSchema = z.object({
   maxPrice: z.preprocess((val) => (val ? parseInt(val as string, 10) : undefined), z.number().int().positive().optional()),
   bedrooms: z.preprocess((val) => (val ? parseInt(val as string, 10) : undefined), z.number().int().min(0).optional()),
   foreignerEligible: z.preprocess((val) => (val === undefined || val === null || val === '' ? undefined : val === 'true'), z.boolean().optional()),
+  muslimOnly: z.preprocess((val) => (val === undefined || val === null || val === '' ? undefined : val === 'true'), z.boolean().optional()),
   isFeatured: z.preprocess((val) => (val === undefined || val === null || val === '' ? undefined : val === 'true'), z.boolean().optional()),
   lang: z.enum(['ar', 'en']).default('en'),
   status: z.enum(LISTING_STATUSES).optional(),

@@ -1,9 +1,10 @@
 import { db } from '../db';
 import { listings, users, leads, favorites, buyerProfiles } from '../db/schema';
 import { eq, and, gte, lte, or, sql, desc, asc, inArray, InferSelectModel, SQL, isNull } from 'drizzle-orm';
-import { ListingSearchInput } from '@saudi-re/shared';
+import { ListingSearchInput, extractLatLng } from '@saudi-re/shared';
 import { SystemService } from './system.service';
 import { CloudinaryService } from './cloudinary.service';
+
 
 
 /**
@@ -39,7 +40,7 @@ export class ListingService {
   static async searchListings(filters: ListingSearchInput & { ownerId?: string; firmId?: string; status?: string; q?: string; userId?: string; requesterRole?: string; requesterId?: string; excludeProjects?: string }) {
     const {
       city, type, purpose, minPrice, maxPrice, bedrooms,
-      foreignerEligible, isFeatured, ownerId, firmId, status, q, limit = 20, cursor, userId,
+      foreignerEligible, muslimOnly, isFeatured, ownerId, firmId, status, q, limit = 20, cursor, userId,
       requesterRole, requesterId, excludeProjects
     } = filters;
 
@@ -53,6 +54,7 @@ export class ListingService {
     if (maxPrice) conditions.push(lte(listings.price, maxPrice));
     if (bedrooms) conditions.push(gte(listings.bedrooms, bedrooms));
     if (foreignerEligible !== undefined) conditions.push(eq(listings.foreignerEligible, foreignerEligible));
+    if (muslimOnly !== undefined) conditions.push(eq(listings.muslimOnly, muslimOnly));
     if (isFeatured !== undefined) conditions.push(eq(listings.isFeatured, isFeatured));
     if (excludeProjects !== 'false') conditions.push(isNull(listings.projectId));
 
@@ -437,9 +439,22 @@ export class ListingService {
         processedBrochureUrl = await this.processBrochureUrl(processedBrochureUrl);
       }
 
+      // ── Auto-parse lat/lng from mapEmbedUrl if not explicitly provided ──
+      let lat = data.lat != null ? data.lat : null;
+      let lng = data.lng != null ? data.lng : null;
+      if ((lat == null || lng == null) && data.mapEmbedUrl) {
+        const parsed = extractLatLng(data.mapEmbedUrl);
+        if (parsed) {
+          lat = String(parsed.lat);
+          lng = String(parsed.lng);
+        }
+      }
+
       const newListing = await db.insert(listings).values({
         ...data,
         brochureUrl: processedBrochureUrl,
+        lat,
+        lng,
         id: undefined,
         ownerId: finalOwnerId,
         shortId,
@@ -451,6 +466,7 @@ export class ListingService {
 
       return newListing[0];
     }
+
 
   /**
    * Update an existing listing with hierarchical permission checks
@@ -513,6 +529,19 @@ export class ListingService {
     // Process brochure URL if updated
     if (updateData.brochureUrl !== undefined && updateData.brochureUrl !== current.brochureUrl) {
       updateData.brochureUrl = await this.processBrochureUrl(updateData.brochureUrl);
+    }
+
+    // ── Auto-parse lat/lng from mapEmbedUrl if it changed and no explicit coords given ──
+    if (updateData.mapEmbedUrl !== undefined && updateData.mapEmbedUrl !== current.mapEmbedUrl) {
+      const explicitLat = updateData.lat != null;
+      const explicitLng = updateData.lng != null;
+      if (!explicitLat || !explicitLng) {
+        const parsed = extractLatLng(updateData.mapEmbedUrl);
+        if (parsed) {
+          if (!explicitLat) updateData.lat = String(parsed.lat);
+          if (!explicitLng) updateData.lng = String(parsed.lng);
+        }
+      }
     }
 
     // 4. Perform Update with timestamp

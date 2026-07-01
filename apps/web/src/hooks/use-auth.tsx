@@ -44,15 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function initAuth() {
-      if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
         const urlToken = urlParams.get('token');
         if (urlToken) {
           localStorage.setItem('accessToken', urlToken);
-          const newUrl = window.location.pathname;
+          urlParams.delete('token');
+          const remaining = urlParams.toString();
+          const newUrl = window.location.pathname + (remaining ? `?${remaining}` : '');
           window.history.replaceState({}, '', newUrl);
         }
-      }
 
       const token = localStorage.getItem('accessToken');
       if (token) {

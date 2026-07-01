@@ -5,7 +5,7 @@ import { useCrmAuth } from '@/hooks/use-crm-auth';
 import {
   LayoutDashboard, Globe, Megaphone, Settings,
   LogOut, ChevronRight, ChevronLeft, Building2,
-  X, Menu, AlertCircle, CreditCard
+  X, Menu, AlertCircle, CreditCard, MessageCircle
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -18,8 +18,9 @@ const NAV_ADMIN = [
   {
     label: 'Lead Modules',
     items: [
-      { href: '/website-leads',  label: 'Website Leads',  icon: Globe,      desc: 'AI-qualified' },
-      { href: '/campaign-leads', label: 'Campaign Leads', icon: Megaphone,  desc: 'Ads & Manual' },
+      { href: '/website-leads',    label: 'Website Leads',    icon: Globe,          desc: 'AI-qualified' },
+      { href: '/campaign-leads',   label: 'Campaign Leads',   icon: Megaphone,      desc: 'Ads & Manual' },
+      // { href: '/whatsapp-inbox',   label: 'WhatsApp Inbox',   icon: MessageCircle,  desc: 'AI chat agent', badge: 'NEW' },
     ],
   },
   {
@@ -42,8 +43,9 @@ const NAV_AGENT = [
   {
     label: 'My Leads',
     items: [
-      { href: '/website-leads',  label: 'Website Leads',  icon: Globe },
-      { href: '/campaign-leads', label: 'Campaign Leads', icon: Megaphone },
+      { href: '/website-leads',   label: 'Website Leads',   icon: Globe },
+      { href: '/campaign-leads',  label: 'Campaign Leads',  icon: Megaphone },
+      // { href: '/whatsapp-inbox',  label: 'WhatsApp Inbox',  icon: MessageCircle, badge: 'NEW' },
     ],
   },
   {
@@ -192,10 +194,15 @@ export function CrmSidebar({ unassigned = 0 }: CrmSidebarProps) {
                               <div className="truncate">{item.label}</div>
                               {'desc' in item && !isActive && (
                                 <div className="text-[10px] text-surface-600 group-hover:text-surface-400">
-                                  {item.desc}
+                                  {(item as any).desc}
                                 </div>
                               )}
                             </div>
+                            {'badge' in item && !isActive && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shrink-0">
+                                {(item as any).badge}
+                              </span>
+                            )}
                             {isActive && <ChevronRight className="w-3.5 h-3.5 opacity-60 shrink-0" />}
                           </>
                         )}

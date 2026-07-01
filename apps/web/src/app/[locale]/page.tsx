@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import HeroSection from '@/components/home/HeroSection';
 import FeaturedSection from '@/components/home/FeaturedSection';
 import HowItWorksSection from '@/components/home/HowItWorksSection';
+import MapCTACardsSection from '@/components/home/MapCTACardsSection';
 import CitySpotlightSection from '@/components/home/CitySpotlightSection';
 import CTASection from '@/components/home/CTASection';
 import TrustSection from '@/components/home/TrustSection';
@@ -128,6 +129,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
   return (
     <>
       <HeroSection contactPhone={contactPhone} />
+      <MapCTACardsSection />
       <FeaturedSection listings={featuredListings} projects={featuredProjects} />
       <HowItWorksSection />
       <TrustSection stats={homepageStats} />

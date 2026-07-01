@@ -132,6 +132,37 @@ export default function PostPropertyPage({ params: { locale } }: { params: { loc
   };
 
   if (isAllowedToPost) {
+    if (fromAdmin || fromCrm) {
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || (isLocal ? 'http://localhost:3002' : 'https://saudi-real-estate-admin.vercel.app');
+      const crmUrl = process.env.NEXT_PUBLIC_CRM_URL || (isLocal ? 'http://localhost:3003' : 'https://saudi-real-estate-crm.vercel.app');
+      const cancelUrl = fromAdmin ? `${adminUrl}/listings` : `${crmUrl}/my-listings`;
+
+      return (
+        <VerificationGuard>
+          <div className="container mx-auto px-4 py-12 max-w-5xl">
+            <div className="mb-8 flex items-center justify-between border-b border-slate-100 pb-5">
+              <div>
+                <h1 className="text-3xl font-black text-slate-900 mb-1 uppercase tracking-tight">
+                  Create New Listing
+                </h1>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                  Marketplace Inventory Integration ({fromAdmin ? 'Admin Panel' : 'CRM Portal'})
+                </p>
+              </div>
+              <a
+                href={cancelUrl}
+                className="inline-flex items-center gap-1.5 text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200 px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all"
+              >
+                Cancel
+              </a>
+            </div>
+            <ListingForm isStandalone={true} />
+          </div>
+        </VerificationGuard>
+      );
+    }
+
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const crmUrl = process.env.NEXT_PUBLIC_CRM_URL || (isLocal ? 'http://localhost:3003' : 'https://saudi-real-estate-crm.vercel.app');
 

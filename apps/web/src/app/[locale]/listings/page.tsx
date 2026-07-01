@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SlidersHorizontal, Map, Grid3X3, X, Loader2, Search, Building } from 'lucide-react';
+import { SlidersHorizontal, Map, Grid3X3, X, Loader2, Search, Building, Car, Navigation, Bell } from 'lucide-react';
 import ListingCard from '@/components/listings/ListingCard';
 import PriceDropdown from '@/components/search/PriceDropdown';
 import PropertyTypeDropdown from '@/components/search/PropertyTypeDropdown';
@@ -235,14 +235,87 @@ function ListingsContent() {
           </motion.div>
         ) : (
           <>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
-              {results.items.map((listing, i) => (
-                <ListingCard
-                  key={listing.id}
-                  listing={listing}
-                  index={i}
-                />
-              ))}
+            <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
+              {/* Listings Grid */}
+              <div className="flex-1">
+                <div className="grid sm:grid-cols-2 gap-6 lg:gap-8">
+                  {results.items.map((listing, i) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      index={i}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Sidebar */}
+              <div className="w-full lg:w-80 shrink-0 space-y-6">
+                {/* Mini Map View CTA */}
+                <Link
+                  href={`/${locale}/map`}
+                  className="group block relative h-44 rounded-[2rem] overflow-hidden border border-slate-200 shadow-sm transition-all hover:shadow-md"
+                >
+                  <div className="absolute inset-0 bg-[#e5e7eb] bg-[radial-gradient(#d1d5db_1.5px,transparent_1.5px)] [background-size:16px_16px] transition-transform duration-700 group-hover:scale-105" />
+                  
+                  {/* Decorative roads */}
+                  <div className="absolute inset-x-0 top-1/3 h-4 bg-white border-y border-slate-300 -rotate-6" />
+                  <div className="absolute inset-y-0 left-1/3 w-4 bg-white border-x border-slate-300 rotate-12" />
+
+                  {/* Decorative Pins */}
+                  <div className="absolute top-10 left-1/4 animate-bounce">
+                    <div className="px-2 py-1 bg-emerald-600 text-white text-[9px] font-black rounded-lg shadow border border-white">
+                      SAR 1.2M
+                    </div>
+                  </div>
+                  <div className="absolute bottom-12 right-1/4 animate-bounce delay-150">
+                    <div className="px-2 py-1 bg-emerald-600 text-white text-[9px] font-black rounded-lg shadow border border-white">
+                      SAR 850K
+                    </div>
+                  </div>
+
+                  {/* Floating Action Button */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/10 backdrop-blur-[0.5px]">
+                    <div className="flex items-center gap-2 bg-[#064e4b] text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl transition-all duration-300 group-hover:scale-105 active:scale-95">
+                      <Map className="w-4 h-4 text-emerald-400" />
+                      <span>Map View</span>
+                    </div>
+                  </div>
+                </Link>
+
+                {/* Commute search CTA card */}
+                <Link
+                  href={`/${locale}/drive-time`}
+                  className="group block p-5 rounded-[2rem] bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-slate-950 shadow-md relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  <div className="relative z-10 space-y-3">
+                    <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-emerald-400">
+                      <Car className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black tracking-wide leading-tight uppercase">Search by Commute</h4>
+                      <p className="text-[10px] text-slate-300 mt-1 font-semibold leading-relaxed">
+                        Find houses within 10-60 minutes driving distance from your workplace or school.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="absolute right-0 bottom-0 opacity-10 translate-x-4 translate-y-4">
+                    <Navigation className="w-20 h-20 rotate-45 text-white" />
+                  </div>
+                </Link>
+
+                {/* Subscribing / Alert card */}
+                <div className="p-5 rounded-[2rem] border border-slate-200 bg-slate-50 space-y-4">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Property Alerts</h4>
+                    <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">Be the first to hear about new properties in Saudi Arabia.</p>
+                  </div>
+                  <button className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-700 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 shadow-sm transition-all active:scale-95">
+                    <Bell className="w-3.5 h-3.5" />
+                    <span>Alert Me on New Properties</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Premium Pagination Footer */}

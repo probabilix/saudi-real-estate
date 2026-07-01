@@ -17,7 +17,8 @@ import { useLoadScript, GoogleMap, MarkerF, Polygon, InfoWindow, OverlayView } f
 import Link from 'next/link';
 import {
   MapPin, SlidersHorizontal, ChevronDown, Filter, Loader2,
-  Building2, Home, ArrowLeft, Car, ArrowRight, Settings, Info, Search, X
+  Building2, Home, ArrowLeft, Car, ArrowRight, Settings, Info, Search, X,
+  Building, Warehouse, Tent, Landmark
 } from 'lucide-react';
 
 const GOOGLE_MAPS_LIBRARIES: ("places")[] = ['places'];
@@ -46,6 +47,8 @@ interface CommutePin {
   nameEn?: string;
   nameAr?: string;
   completionStatus?: string;
+  foreignerEligible?: boolean;
+  muslimOnly?: boolean;
 }
 
 interface ClusterPoint {
@@ -146,23 +149,111 @@ function ClusterBadge({ item, onClick }: { item: ClusterPoint; onClick: () => vo
   );
 }
 
-// ── Clean dot pin (no label — click shows popup) ─────────────────────────────
-function DotPin({ pin, selected, onClick }: { pin: CommutePin; selected: boolean; onClick: (e: React.MouseEvent) => void }) {
-  const isProject = pin.kind === 'project';
+function getPinIcon(pin: CommutePin) {
+  if (pin.kind === 'project') {
+    return Building2;
+  }
+  switch (pin.type) {
+    case 'VILLA':
+    case 'TOWNHOUSE':
+    case 'DUPLEX':
+      return Home;
+    case 'APARTMENT':
+    case 'FLOOR':
+    case 'ROOM':
+      return Building2;
+    case 'RESIDENTIAL_BUILDING':
+    case 'OFFICE':
+      return Building;
+    case 'WAREHOUSE':
+      return Warehouse;
+    case 'CHALET':
+    case 'REST_HOUSE':
+      return Tent;
+    case 'RESIDENTIAL_LAND':
+      return Landmark;
+    default:
+      return Home;
+  }
+}
+
+// ── Redesigned speech bubble pin (large, easy to click, contextual icon & label) ────────
+function DotPin({ pin, selected, locale, faded, onClick }: { pin: CommutePin; selected: boolean; locale: string; faded?: boolean; onClick: (e: React.MouseEvent) => void }) {
+  const isP = pin.kind === 'project';
   const isFeatured = pin.isFeatured;
-  const bg = selected ? '#064e4b' : isProject ? '#1e40af' : (isFeatured ? '#f59e0b' : '#0d9488');
-  const ring = selected ? '0 0 0 3px rgba(6,78,75,0.35)' : 'none';
+  const isForeigner = pin.foreignerEligible;
+  const isMuslimOnly = pin.muslimOnly;
+
+  let bg = selected 
+    ? '#064e4b' 
+    : isForeigner
+      ? (isMuslimOnly ? '#ea580c' : '#7c3aed')
+      : isP 
+        ? '#1e40af' 
+        : (isFeatured ? '#f59e0b' : '#0d9488');
+
+  if (faded) {
+    bg = '#94a3b8';
+  }
+
+  const Icon = getPinIcon(pin);
 
   return (
-    <div onClick={onClick} style={{ transform: 'translate(-50%,-50%)', cursor: 'pointer', userSelect: 'none' }}>
-      <div style={{
-        width: 16, height: 16, borderRadius: '50%',
-        background: bg,
-        border: '3px solid white',
-        boxShadow: `0 2px 6px rgba(0,0,0,0.25), ${ring}`,
-        transition: 'all 0.15s',
-        transform: selected ? 'scale(1.5)' : 'scale(1)',
-      }} />
+    <div 
+      onClick={onClick} 
+      style={{ 
+        transform: 'translate(-50%, -100%)', // Anchor bottom center
+        cursor: 'pointer', 
+        userSelect: 'none',
+        filter: faded ? 'opacity(0.6) grayscale(20%)' : 'drop-shadow(0 3px 6px rgba(0,0,0,0.2))',
+      }}
+      className={`group transition-all duration-150 ${selected ? 'scale-110 z-50' : 'hover:scale-105'}`}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* Capsule */}
+        <div 
+          style={{
+            background: bg,
+            color: 'white',
+            borderRadius: '16px',
+            padding: '5px 9px',
+            border: '2px solid white',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Icon className="w-3.5 h-3.5 text-white shrink-0" />
+          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.2px' }}>
+            {isP ? (locale === 'ar' ? 'مشروع' : 'Project') : formatPrice(pin.price)}
+          </span>
+        </div>
+        
+        {/* Pointer (overlapping border) */}
+        <div 
+          style={{
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: `6px solid white`,
+            marginTop: '-1px',
+            zIndex: 1,
+          }}
+        />
+        <div 
+          style={{
+            width: 0,
+            height: 0,
+            borderLeft: '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderTop: `5px solid ${bg}`,
+            marginTop: '-6px',
+            zIndex: 2,
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -197,16 +288,66 @@ function GoogleMapWrapper({
   const mapRef = useRef<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(12);
   const [items, setItems] = useState<MapItem[]>([]);
+  const [viewportPins, setViewportPins] = useState<CommutePin[]>([]);
 
-  useEffect(() => {
-    setItems(clusterCommutePins(pins, zoom));
-  }, [pins, zoom]);
+  const fetchViewportPins = useCallback(async (m: google.maps.Map) => {
+    const b = m.getBounds(); if (!b) return;
+    const ne = b.getNorthEast(), sw = b.getSouthWest();
+    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+    const params = new URLSearchParams({
+      north: String(ne.lat()),
+      south: String(sw.lat()),
+      east: String(ne.lng()),
+      west: String(sw.lng()),
+    });
+    try {
+      const res = await fetch(`${base}/listings/map?${params}`);
+      const json = await res.json();
+      if (json.success) {
+        const parsed: CommutePin[] = [
+          ...json.data.listings.map((l: any) => ({ ...l, kind: 'listing' as const, driveTimeA: 999, driveTimeB: null })),
+          ...json.data.projects.map((p: any) => ({ ...p, kind: 'project' as const, driveTimeA: 999, driveTimeB: null }))
+        ];
+        setViewportPins(parsed);
+      }
+    } catch (e) {
+      console.error('[DriveTime] fetchViewportPins error:', e);
+    }
+  }, []);
 
   const handleIdle = useCallback(() => {
     if (mapRef.current) {
       setZoom(mapRef.current.getZoom() ?? 12);
+      fetchViewportPins(mapRef.current);
     }
-  }, []);
+  }, [fetchViewportPins]);
+
+  const mergedPins = useMemo(() => {
+    const commuteMap = new Map<string, CommutePin>();
+    pins.forEach(p => commuteMap.set(`${p.kind}-${p.id}`, p));
+
+    const hasCommute = !!pointA;
+    const merged = viewportPins.map(vp => {
+      const match = commuteMap.get(`${vp.kind}-${vp.id}`);
+      if (match) {
+        return { ...match, faded: false };
+      }
+      return { ...vp, faded: hasCommute };
+    });
+
+    const viewportKeys = new Set(viewportPins.map(vp => `${vp.kind}-${vp.id}`));
+    pins.forEach(p => {
+      if (!viewportKeys.has(`${p.kind}-${p.id}`)) {
+        merged.push({ ...p, faded: false });
+      }
+    });
+
+    return merged;
+  }, [pins, viewportPins, pointA]);
+
+  useEffect(() => {
+    setItems(clusterCommutePins(mergedPins, zoom));
+  }, [mergedPins, zoom]);
 
   const handleLocalLoad = useCallback((m: google.maps.Map) => {
     mapRef.current = m;
@@ -228,7 +369,10 @@ function GoogleMapWrapper({
       zoom={pointA ? 12 : 11}
       onLoad={handleLocalLoad}
       onIdle={handleIdle}
-      onClick={() => setSelectedPin(null)}
+      onClick={(e) => {
+        setSelectedPin(null);
+        handleMapClick(e);
+      }}
       options={{
         disableDefaultUI: false,
         zoomControl: true,
@@ -303,10 +447,10 @@ function GoogleMapWrapper({
 
       {/* Individual dot pins */}
       {items.filter(i => i.kind !== 'cluster').map(i => {
-        const pin = i as CommutePin;
+        const pin = i as CommutePin & { faded?: boolean };
         return (
           <OverlayView key={`${pin.kind}-${pin.id}`} position={{ lat: pin.lat, lng: pin.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET} getPixelPositionOffset={() => ({ x: 0, y: 0 })}>
-            <DotPin pin={pin} selected={selectedPin?.id === pin.id} onClick={e => { e.stopPropagation?.(); setSelectedPin(pin); }} />
+            <DotPin pin={pin} selected={selectedPin?.id === pin.id} locale={locale} faded={pin.faded} onClick={e => { e.stopPropagation?.(); setSelectedPin(pin); }} />
           </OverlayView>
         );
       })}
@@ -402,15 +546,6 @@ function PremiumCommuteCard({ pin, selected, onClick }: PremiumCardProps) {
               ★ Featured
             </span>
           )}
-          {isP ? (
-            <span className="bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-sm">
-              Project
-            </span>
-          ) : (
-            <span className="bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-sm">
-              {TYPE_LABELS[pin.type] || pin.type}
-            </span>
-          )}
         </div>
 
         {/* Purpose Badge (Buy/Rent) */}
@@ -427,6 +562,28 @@ function PremiumCommuteCard({ pin, selected, onClick }: PremiumCardProps) {
 
       {/* Info / Content Area */}
       <div className="p-4">
+        {/* Badges Row */}
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {isP ? (
+            <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
+              Project
+            </span>
+          ) : (
+            <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
+              {TYPE_LABELS[pin.type] || pin.type}
+            </span>
+          )}
+          {pin.foreignerEligible && (
+            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+              pin.muslimOnly 
+                ? 'bg-orange-50 text-orange-700 border-orange-100' 
+                : 'bg-purple-50 text-purple-700 border-purple-100'
+            }`}>
+              {pin.muslimOnly ? '🕌 Muslims Only' : '🌍 Foreigner Ok'}
+            </span>
+          )}
+        </div>
+
         {/* Price or completion status */}
         <div className="flex items-baseline justify-between gap-1 mb-1">
           {isP ? (
@@ -515,6 +672,15 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
     polyB: null
   });
   const [selectedPin, setSelectedPin] = useState<CommutePin | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pins]);
+
+  const pageSize = 20;
+  const totalPages = Math.ceil(pins.length / pageSize);
+  const pageListings = pins.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Init Google Places Autocomplete on the input fields once SDK is ready
   useEffect(() => {
@@ -708,7 +874,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-slate-50">
+    <div className="flex flex-col h-full overflow-hidden bg-slate-50">
       {/* Scope standard Pac Autocomplete styles for premium design */}
       <style jsx global>{`
         .pac-container {
@@ -748,172 +914,219 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
         }
       `}</style>
 
-      {/* ── Left Control & Results Sidebar ── */}
-      <div className="w-full lg:w-[680px] shrink-0 flex flex-col border-r border-slate-200 bg-white">
-        {/* Commute setup headers */}
-        <div className="p-5 border-b border-slate-100 space-y-4">
-          <div className="flex items-center gap-3">
-            <Link href={`/${locale}/map`} className="p-2 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100">
-              <ArrowLeft className="w-4 h-4 text-slate-600" />
+      {/* ── Top Full-width Commute Control Strip ── */}
+      <div style={{ flexShrink: 0 }} className="w-full bg-white border-b border-slate-200 py-3 px-6 z-30 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Title & Back Button */}
+          <div className="flex items-center gap-3 shrink-0">
+            <Link href={`/${locale}/map`} className="p-2 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100 shrink-0">
+              <ArrowLeft className="w-4 h-4 text-slate-700" />
             </Link>
-            <div>
-              <h1 className="font-black text-slate-900 text-sm uppercase tracking-wider">Search by Commute Time</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Saudi Commute MVP</p>
+            <div className="shrink-0">
+              <h1 className="font-black text-slate-900 text-sm uppercase tracking-wide leading-tight">Search by Commute</h1>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Saudi Commute Proximity</p>
             </div>
           </div>
 
-          {/* Commute controls */}
-          <div className="space-y-3">
-            {/* Point A search box */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">A</div>
-                First Point of Interest
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                <input
-                  ref={inputARef}
-                  type="text"
-                  placeholder="Search area, landmark, address..."
-                  defaultValue={pointALabel}
-                  onChange={e => setPointALabel(e.target.value)}
-                  onFocus={() => setSettingPoint('A')}
-                  className="w-full pl-9 pr-8 py-2.5 text-xs font-semibold border border-emerald-200 bg-emerald-50/50 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all placeholder:text-slate-400"
-                />
-                {pointA && (
-                  <button onClick={() => { setPointA(null); setPointALabel(''); if (inputARef.current) inputARef.current.value = ''; }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
-                    <X className="w-3 h-3 text-slate-400" />
-                  </button>
-                )}
-              </div>
+          {/* Controls Container */}
+          <div className="flex-1 flex flex-wrap items-center gap-4 min-w-[300px]">
+            {/* Point A */}
+            <div className="flex-1 min-w-[220px] relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 text-white text-[9px] font-black pointer-events-none">A</div>
+              <input
+                ref={inputARef}
+                type="text"
+                placeholder="Search first point (e.g. Work)..."
+                defaultValue={pointALabel}
+                onChange={e => setPointALabel(e.target.value)}
+                onFocus={() => setSettingPoint('A')}
+                className="w-full pl-10 pr-8 py-2 text-xs font-semibold border border-emerald-250 bg-emerald-50/20 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all placeholder:text-slate-400 text-slate-700"
+              />
               {pointA && (
-                <p className="text-[9px] text-emerald-600 font-bold pl-1">📍 {pointA.lat.toFixed(4)}, {pointA.lng.toFixed(4)}</p>
+                <button onClick={() => { setPointA(null); setPointALabel(''); if (inputARef.current) inputARef.current.value = ''; }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
+                  <X className="w-3 h-3 text-slate-400" />
+                </button>
               )}
             </div>
 
-            {/* Point B search box */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black">B</div>
-                Second Point (Optional)
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                <input
-                  ref={inputBRef}
-                  type="text"
-                  placeholder="Add a second commute point..."
-                  defaultValue={pointBLabel}
-                  onChange={e => setPointBLabel(e.target.value)}
-                  onFocus={() => setSettingPoint('B')}
-                  className="w-full pl-9 pr-8 py-2.5 text-xs font-semibold border border-blue-100 bg-blue-50/30 rounded-xl outline-none focus:border-blue-300 focus:bg-white transition-all placeholder:text-slate-400"
-                />
-                {pointB && (
-                  <button onClick={() => { setPointB(null); setPointBLabel(''); if (inputBRef.current) inputBRef.current.value = ''; setPolygons(p => ({ ...p, polyB: null })); }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
-                    <X className="w-3 h-3 text-slate-400" />
-                  </button>
-                )}
-              </div>
+            {/* Point B */}
+            <div className="flex-1 min-w-[220px] relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[9px] font-black pointer-events-none">B</div>
+              <input
+                ref={inputBRef}
+                type="text"
+                placeholder="Add second point (Optional)..."
+                defaultValue={pointBLabel}
+                onChange={e => setPointBLabel(e.target.value)}
+                onFocus={() => setSettingPoint('B')}
+                className="w-full pl-10 pr-8 py-2 text-xs font-semibold border border-blue-150 bg-blue-50/20 rounded-xl outline-none focus:border-blue-300 focus:bg-white transition-all placeholder:text-slate-400 text-slate-700"
+              />
               {pointB && (
-                <p className="text-[9px] text-blue-600 font-bold pl-1">📍 {pointB.lat.toFixed(4)}, {pointB.lng.toFixed(4)}</p>
+                <button onClick={() => { setPointB(null); setPointBLabel(''); if (inputBRef.current) inputBRef.current.value = ''; setPolygons(p => ({ ...p, polyB: null })); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
+                  <X className="w-3 h-3 text-slate-400" />
+                </button>
               )}
             </div>
 
             {/* Slider */}
-            <div className="space-y-1 pt-1">
-              <div className="flex justify-between text-xs font-bold text-slate-600">
-                <span>Maximum Drive Time</span>
-                <span className="text-[#064e4b] font-black">{minutes} minutes</span>
+            <div className="flex flex-col gap-0.5 min-w-[200px] flex-1">
+              <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                <span className="uppercase tracking-wider">Max Drive Time</span>
+                <span className="text-[#064e4b] font-black">{minutes} mins</span>
               </div>
               <input
                 type="range"
                 min="10"
-                max="60"
+                max="120"
                 step="5"
                 value={minutes}
                 onChange={e => setMinutes(Number(e.target.value))}
-                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-[#064e4b]"
+                style={{
+                  background: `linear-gradient(to right, #064e4b 0%, #064e4b ${((minutes - 10) / (120 - 10)) * 100}%, #e2e8f0 ${((minutes - 10) / (120 - 10)) * 100}%, #e2e8f0 100%)`
+                }}
+                className="w-full h-1 rounded-lg appearance-none cursor-pointer accent-[#064e4b]"
               />
             </div>
 
-            {/* Sort mode & filters trigger */}
-            <div className="flex items-center gap-2 pt-1">
+            {/* Mode Select */}
+            <div className="min-w-[150px]">
               <select
                 value={mode}
                 onChange={e => setMode(e.target.value as any)}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider outline-none text-slate-700 focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-black uppercase tracking-wider outline-none text-slate-700 focus:border-emerald-500"
               >
-                <option value="balanced">Balanced Proximity</option>
-                <option value="nearestA">Nearest to Point A</option>
-                {pointB && <option value="nearestB">Nearest to Point B</option>}
+                <option value="balanced">Balanced</option>
+                <option value="nearestA">Nearest A</option>
+                {pointB && <option value="nearestB">Nearest B</option>}
               </select>
             </div>
           </div>
         </div>
-
-        {/* Sync instructions */}
-        <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose">
-          <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span>Click on the map to place/adjust commute pins</span>
-        </div>
-
-        {/* Property cards listing - 2-column grid format */}
-        <div className="flex-1 overflow-y-auto">
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
-              <Loader2 className="w-8 h-8 animate-spin text-[#064e4b]" />
-              <span className="text-xs font-bold uppercase tracking-wider">Generating drive time contours...</span>
-            </div>
-          )}
-
-          {error && (
-            <div className="p-4 m-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-700 text-center uppercase tracking-wider leading-loose">
-              ⚠️ {error}
-            </div>
-          )}
-
-          {!loading && !error && pins.length === 0 && (
-            <div className="text-center py-16 text-slate-400 px-4">
-              <Car className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-              <p className="text-xs font-black uppercase tracking-wider">No properties reachable</p>
-              <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-relaxed">
-                Try expanding drive time range or moving Point A / B closer to residential zones.
-              </p>
-            </div>
-          )}
-
-          {!loading && !error && pins.length > 0 && (
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {pins.map(pin => (
-                <PremiumCommuteCard
-                  key={`${pin.kind}-${pin.id}`}
-                  pin={pin}
-                  selected={selectedPin?.id === pin.id}
-                  onClick={() => flyToPin(pin)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* ── Right Panel: Google Map ── */}
-      <div className="flex-1 relative">
-        <GoogleMapWrapper
-          pointA={pointA}
-          pointB={pointB}
-          polyAPath={polyAPath}
-          polyBPath={polyBPath}
-          pins={pins}
-          selectedPin={selectedPin}
-          setSelectedPin={setSelectedPin}
-          onLoad={onLoad}
-          handleMapClick={handleMapClick}
-          locale={locale}
-        />
+      {/* ── Bottom Split View ── */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* Left List Sidebar */}
+        <div className="w-full lg:w-[680px] shrink-0 flex flex-col border-r border-slate-250 bg-white h-full overflow-hidden">
+          {/* Sync instruction bar */}
+          <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose shrink-0">
+            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>Click map to place pin (Setting point: {settingPoint})</span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
+                <Loader2 className="w-8 h-8 animate-spin text-[#064e4b]" />
+                <span className="text-xs font-bold uppercase tracking-wider">Generating drive time contours...</span>
+              </div>
+            )}
+
+            {error && (
+              <div className="p-4 m-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-700 text-center uppercase tracking-wider leading-loose">
+                ⚠️ {error}
+              </div>
+            )}
+
+            {!loading && !error && pins.length === 0 && (
+              <div className="text-center py-16 text-slate-400 px-4">
+                <Car className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                <p className="text-xs font-black uppercase tracking-wider">No properties reachable</p>
+                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-relaxed">
+                  Try expanding drive time range or moving Point A / B closer to residential zones.
+                </p>
+              </div>
+            )}
+
+            {!loading && !error && pins.length > 0 && (
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
+                {pageListings.map(pin => (
+                  <PremiumCommuteCard
+                    key={`${pin.kind}-${pin.id}`}
+                    pin={pin}
+                    selected={selectedPin?.id === pin.id}
+                    onClick={() => flyToPin(pin)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Pagination controls at bottom */}
+          {!loading && !error && totalPages > 1 && (
+            <div style={{ flexShrink: 0 }} className="py-2.5 px-4 border-t border-slate-100 flex items-center justify-center gap-1.5 bg-slate-50">
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(1)}
+                className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+              >
+                «
+              </button>
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+              >
+                ‹ Prev
+              </button>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .map((p, idx, arr) => {
+                  const prevPage = arr[idx - 1];
+                  const showEllipsis = prevPage && p - prevPage > 1;
+                  return (
+                    <React.Fragment key={p}>
+                      {showEllipsis && <span className="text-slate-400 px-1">...</span>}
+                      <button
+                        onClick={() => setCurrentPage(p)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                          currentPage === p 
+                            ? 'bg-[#064e4b] text-white shadow-md' 
+                            : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    </React.Fragment>
+                  );
+                })}
+
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+              >
+                Next ›
+              </button>
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+              >
+                »
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Right Map */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <GoogleMapWrapper
+            pointA={pointA}
+            pointB={pointB}
+            polyAPath={polyAPath}
+            polyBPath={polyBPath}
+            pins={pins}
+            selectedPin={selectedPin}
+            setSelectedPin={setSelectedPin}
+            onLoad={onLoad}
+            handleMapClick={handleMapClick}
+            locale={locale}
+          />
+        </div>
       </div>
     </div>
   );

@@ -450,6 +450,20 @@ export default async function listingsRoutes(app: FastifyInstance) {
       }
       if (foreignerEligible) projectConditions.push(eq(projects.foreignerEligible, true));
 
+      if (priceMin !== null || priceMax !== null || type || beds || purpose) {
+        projectConditions.push(sql`EXISTS (
+          SELECT 1 FROM ${listings} 
+          WHERE ${listings.projectId} = ${projects.id}
+            AND ${listings.status} = 'ACTIVE'
+            AND ${listings.deletedAt} IS NULL
+            ${priceMin !== null ? sql`AND ${listings.price} >= ${priceMin}` : sql``}
+            ${priceMax !== null ? sql`AND ${listings.price} <= ${priceMax}` : sql``}
+            ${type ? sql`AND ${listings.type} = ${type}` : sql``}
+            ${beds ? sql`AND ${listings.bedrooms} >= ${beds}` : sql``}
+            ${purpose ? sql`AND ${listings.purpose} = ${purpose}` : sql``}
+        )`);
+      }
+
       const projectPins = await db.select({
         id:          projects.id,
         nameEn:      projects.nameEn,
@@ -523,8 +537,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
       }
 
       // ── 1. Calculate spatial bounding box pre-filter from database ──────────
-      // Standard radius of 35km covers normal commute ranges (up to ~60 mins driving)
-      const radiusKm = 35;
+      // Dynamic bounding box pre-filter radius based on minutes to accommodate longer commutes (up to 120 mins)
+      const radiusKm = Math.max(35, Math.ceil(minutes * 0.9));
       const dLat = radiusKm / 111;
       const dLngA = radiusKm / (111 * Math.cos(pointA.lat * Math.PI / 180));
 
@@ -573,6 +587,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         arTitle: listings.arTitle,
         thumb: sql<string>`(${listings.photos})[1]`,
         isFeatured: listings.isFeatured,
+        foreignerEligible: listings.foreignerEligible,
+        muslimOnly: listings.muslimOnly,
       })
       .from(listings)
       .where(and(...listingConditions));
@@ -593,6 +609,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         thumb: sql<string>`(${projects.photos})[1]`,
         isFeatured: projects.isFeatured,
         completionStatus: projects.completionStatus,
+        foreignerEligible: projects.foreignerEligible,
+        muslimOnly: projects.muslimOnly,
       })
       .from(projects)
       .where(and(...projectConditions));

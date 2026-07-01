@@ -510,7 +510,16 @@ export default function MapViewPage({ params }: { params: { locale: string } }) 
   const setF = (k: keyof Filters, v: string | boolean) => setFilters(f => ({ ...f, [k]: v }));
   const clearF = () => setFilters({ priceMin: '', priceMax: '', type: '', purpose: '', beds: '', foreignerEligible: false });
 
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [allPins, filters]);
+
   const sorted = [...allPins].sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
+  const pageSize = 20;
+  const totalPages = Math.ceil(sorted.length / pageSize);
+  const pageListings = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     /* Outer div fills 100% of the fixed container set by NavWrapper */
@@ -575,19 +584,78 @@ export default function MapViewPage({ params }: { params: { locale: string } }) 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
         {/* Left list - beautiful 2-column grid container */}
-        <div className="w-full lg:w-[680px] shrink-0 border-r border-slate-250 bg-white overflow-y-auto">
+        <div className="w-full lg:w-[680px] shrink-0 border-r border-slate-250 bg-white flex flex-col h-full overflow-hidden">
           {sorted.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full py-20 text-center px-4">
+            <div className="flex flex-col items-center justify-center h-full py-20 text-center px-4 overflow-y-auto">
               <MapPin className="w-10 h-10 text-slate-200 mb-3" />
               <p className="text-slate-400 text-sm font-semibold">No properties in this area</p>
               <p className="text-slate-300 text-xs mt-1">Pan or zoom out to explore</p>
             </div>
           ) : (
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {sorted.map(pin => (
-                <PremiumCard key={`${pin.kind}-${pin.id}`} pin={pin} selected={selectedPin?.id === pin.id} onClick={() => { setSelectedPin(pin); }} />
-              ))}
-            </div>
+            <>
+              <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
+                {pageListings.map(pin => (
+                  <PremiumCard key={`${pin.kind}-${pin.id}`} pin={pin} selected={selectedPin?.id === pin.id} onClick={() => { setSelectedPin(pin); }} />
+                ))}
+              </div>
+
+              {/* Pagination controls at bottom */}
+              {totalPages > 1 && (
+                <div style={{ flexShrink: 0 }} className="py-2.5 px-4 border-t border-slate-100 flex items-center justify-center gap-1.5 bg-slate-50">
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(1)}
+                    className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+                  >
+                    «
+                  </button>
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+                  >
+                    ‹ Prev
+                  </button>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                    .map((p, idx, arr) => {
+                      const prevPage = arr[idx - 1];
+                      const showEllipsis = prevPage && p - prevPage > 1;
+                      return (
+                        <React.Fragment key={p}>
+                          {showEllipsis && <span className="text-slate-400 px-1">...</span>}
+                          <button
+                            onClick={() => setCurrentPage(p)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                              currentPage === p 
+                                ? 'bg-[#064e4b] text-white shadow-md' 
+                                : 'text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+
+                  <button 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+                  >
+                    Next ›
+                  </button>
+                  <button 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(totalPages)}
+                    className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+                  >
+                    »
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 

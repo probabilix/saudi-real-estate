@@ -15,6 +15,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useLoadScript, GoogleMap, MarkerF, Polygon, InfoWindow, OverlayView } from '@react-google-maps/api';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   MapPin, SlidersHorizontal, ChevronDown, Filter, Loader2,
   Building2, Home, ArrowLeft, Car, ArrowRight, Settings, Info, Search, X,
@@ -263,32 +264,47 @@ function DotPin({ pin, selected, locale, faded, onClick }: { pin: CommutePin; se
 interface MapWrapperProps {
   pointA: { lat: number; lng: number } | null;
   pointB: { lat: number; lng: number } | null;
+  setPointA: (pt: { lat: number; lng: number } | null) => void;
+  setPointB: (pt: { lat: number; lng: number } | null) => void;
+  reverseGeocode: (lat: number, lng: number, target: 'A' | 'B') => void;
   polyAPath: { lat: number; lng: number }[] | null;
   polyBPath: { lat: number; lng: number }[] | null;
   pins: CommutePin[];
   selectedPin: CommutePin | null;
   setSelectedPin: (pin: CommutePin | null) => void;
   onLoad: (mapInstance: google.maps.Map) => void;
-  handleMapClick: (e: google.maps.MapMouseEvent) => void;
   locale: string;
 }
 
 function GoogleMapWrapper({
   pointA,
   pointB,
+  setPointA,
+  setPointB,
+  reverseGeocode,
   polyAPath,
   polyBPath,
   pins,
   selectedPin,
   setSelectedPin,
   onLoad,
-  handleMapClick,
   locale
 }: MapWrapperProps) {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(12);
   const [items, setItems] = useState<MapItem[]>([]);
   const [viewportPins, setViewportPins] = useState<CommutePin[]>([]);
+  const [contextMenu, setContextMenu] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Sync selection to pan map
+  useEffect(() => {
+    if (selectedPin && mapRef.current) {
+      mapRef.current.panTo({ lat: selectedPin.lat, lng: selectedPin.lng });
+      if ((mapRef.current.getZoom() ?? 0) < 13) {
+        mapRef.current.setZoom(13);
+      }
+    }
+  }, [selectedPin]);
 
   const fetchViewportPins = useCallback(async (m: google.maps.Map) => {
     const b = m.getBounds(); if (!b) return;
@@ -369,9 +385,16 @@ function GoogleMapWrapper({
       zoom={pointA ? 12 : 11}
       onLoad={handleLocalLoad}
       onIdle={handleIdle}
-      onClick={(e) => {
+      onClick={() => {
         setSelectedPin(null);
-        handleMapClick(e);
+        setContextMenu(null);
+      }}
+      onRightClick={(e) => {
+        const lat = e.latLng?.lat();
+        const lng = e.latLng?.lng();
+        if (lat && lng) {
+          setContextMenu({ lat, lng });
+        }
       }}
       options={{
         disableDefaultUI: false,
@@ -386,6 +409,37 @@ function GoogleMapWrapper({
         ]
       }}
     >
+      {/* Native right-click context menu to set Point A/B */}
+      {contextMenu && (
+        <InfoWindow
+          position={{ lat: contextMenu.lat, lng: contextMenu.lng }}
+          onCloseClick={() => setContextMenu(null)}
+        >
+          <div className="p-2 flex flex-col gap-1.5 font-sans min-w-[120px]">
+            <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest text-center border-b border-slate-100 pb-1 mb-1">Set Point</span>
+            <button
+              onClick={() => {
+                setPointA({ lat: contextMenu.lat, lng: contextMenu.lng });
+                reverseGeocode(contextMenu.lat, contextMenu.lng, 'A');
+                setContextMenu(null);
+              }}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-150 rounded-lg text-emerald-800 text-[10px] font-black uppercase tracking-wider transition-all"
+            >
+              Set as Point A
+            </button>
+            <button
+              onClick={() => {
+                setPointB({ lat: contextMenu.lat, lng: contextMenu.lng });
+                reverseGeocode(contextMenu.lat, contextMenu.lng, 'B');
+                setContextMenu(null);
+              }}
+              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100/70 border border-blue-150 rounded-lg text-blue-800 text-[10px] font-black uppercase tracking-wider transition-all"
+            >
+              Set as Point B
+            </button>
+          </div>
+        </InfoWindow>
+      )}
       {/* Point A Marker */}
       {pointA && (
         <MarkerF
@@ -508,51 +562,55 @@ function GoogleMapWrapper({
 interface PremiumCardProps {
   pin: CommutePin;
   selected: boolean;
-  onClick: () => void;
+  onClick?: () => void;
+  onMouseEnter?: () => void;
 }
 
-function PremiumCommuteCard({ pin, selected, onClick }: PremiumCardProps) {
+function PremiumCommuteCard({ pin, selected, onClick, onMouseEnter }: PremiumCardProps) {
   const isP = pin.kind === 'project';
   const title = isP ? (pin.nameEn || pin.nameAr) : (pin.enTitle || pin.arTitle);
+  const location = [pin.district, pin.city].filter(Boolean).join(', ');
 
   return (
     <div
       onClick={onClick}
-      className={`group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-300 transform hover:-translate-y-1 ${
+      onMouseEnter={onMouseEnter}
+      className={`group bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 ${
         selected
           ? 'border-[#064e4b] ring-4 ring-[#064e4b]/5 shadow-lg'
           : 'border-slate-100 hover:border-slate-200/80 hover:shadow-md'
-      }`}
+      } flex lg:flex-col h-[115px] lg:h-auto w-full relative`}
     >
       {/* Image Container */}
-      <div className="relative h-40 overflow-hidden bg-slate-50">
+      <div className="relative w-[115px] lg:w-full h-full lg:h-44 overflow-hidden bg-slate-50 shrink-0 pointer-events-none">
         {pin.thumb ? (
           <img
             src={pin.thumb}
             alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">
+          <div className="w-full h-full flex items-center justify-center text-slate-350 bg-slate-50">
             {isP ? <Building2 className="w-8 h-8" /> : <Home className="w-8 h-8" />}
           </div>
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-45" />
 
-        {/* Feature / Verified Badge */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1">
-          {pin.isFeatured && (
-            <span className="bg-amber-400 text-amber-900 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-sm">
+        {/* Overlay Badges on Image (Featured) */}
+        {pin.isFeatured && (
+          <div className="absolute top-2 left-2 z-10 pointer-events-none">
+            <span className="bg-amber-400 text-amber-955 text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shadow-sm">
               ★ Featured
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Purpose Badge (Buy/Rent) */}
+        {/* Purpose Badge overlay (Buy/Rent - Desktop only) */}
         {!isP && (
-          <div className="absolute top-3 right-3">
-            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg shadow-sm ${
-              pin.purpose === 'SALE' ? 'bg-[#064e4b] text-white' : 'bg-amber-500 text-white'
+          <div className="absolute top-2 right-2 z-10 lg:block hidden">
+            <span className={`text-[8.5px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm ${
+              pin.purpose === 'SALE' ? 'bg-[#064e4b] text-white' : 'bg-teal-500 text-white'
             }`}>
               {pin.purpose === 'SALE' ? 'Buy' : 'Rent'}
             </span>
@@ -561,69 +619,83 @@ function PremiumCommuteCard({ pin, selected, onClick }: PremiumCardProps) {
       </div>
 
       {/* Info / Content Area */}
-      <div className="p-4">
-        {/* Badges Row */}
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {isP ? (
-            <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-              Project
+      <div className="p-3 lg:p-4 flex-1 flex flex-col justify-between min-w-0 pointer-events-none">
+        <div>
+          {/* Price or completion status */}
+          <div className="flex items-baseline justify-between gap-1 mb-0.5">
+            {isP ? (
+              <span className="text-[10px] lg:text-xs font-black uppercase tracking-wider text-blue-655 truncate block max-w-full">
+                Project • {pin.completionStatus?.replace(/_/g, ' ') || 'Off Plan'}
+                {pin.foreignerEligible && ` • ${pin.muslimOnly ? '🕌 Muslims' : '🌍 Foreigner'}`}
+              </span>
+            ) : (
+              <span className="text-sm lg:text-base font-black text-slate-900 leading-tight">
+                SAR {formatPrice(pin.price)}
+                {pin.purpose === 'RENT' && <span className="text-xs text-slate-400 font-normal">/yr</span>}
+              </span>
+            )}
+
+            {/* Purpose Badge overlay (Buy/Rent - Mobile only) */}
+            {!isP && (
+              <span className={`lg:hidden text-[7.5px] font-black uppercase tracking-widest px-1 py-0.5 rounded ${
+                pin.purpose === 'SALE' ? 'bg-[#064e4b] text-white' : 'bg-teal-500 text-white'
+              }`}>
+                {pin.purpose === 'SALE' ? 'Buy' : 'Rent'}
+              </span>
+            )}
+          </div>
+
+          {/* Commute Badge Grid Row */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+            <span className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-md">
+              <Car className="w-3 h-3 text-emerald-650 shrink-0" />
+              <span>{pin.driveTimeA} min to A</span>
             </span>
-          ) : (
-            <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-              {TYPE_LABELS[pin.type] || pin.type}
-            </span>
-          )}
-          {pin.foreignerEligible && (
-            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
-              pin.muslimOnly 
-                ? 'bg-orange-50 text-orange-700 border-orange-100' 
-                : 'bg-purple-50 text-purple-700 border-purple-100'
-            }`}>
-              {pin.muslimOnly ? '🕌 Muslims Only' : '🌍 Foreigner Ok'}
-            </span>
-          )}
+            {pin.driveTimeB !== null && pin.driveTimeB !== undefined ? (
+              <span className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded-md">
+                <Car className="w-3 h-3 text-blue-655 shrink-0" />
+                <span>{pin.driveTimeB} min to B</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider bg-slate-55 text-slate-450 border border-slate-100 px-1.5 py-0.5 rounded-md">
+                <Car className="w-3 h-3 text-slate-300 shrink-0" />
+                <span>- min to B</span>
+              </span>
+            )}
+          </div>
+
+          {/* Title */}
+          <h3 className="text-[11.5px] lg:text-xs font-bold text-slate-800 truncate leading-snug group-hover:text-[#064e4b] transition-colors mb-0.5">
+            {title}
+          </h3>
+
+          {/* Location */}
+          <div className="flex items-center gap-1 text-slate-455">
+            <MapPin className="w-3.5 h-3.5 shrink-0 text-[#064e4b]/70" />
+            <span className="text-[10px] truncate">{location}</span>
+          </div>
         </div>
 
-        {/* Price or completion status */}
-        <div className="flex items-baseline justify-between gap-1 mb-1">
-          {isP ? (
-            <span className="text-xs font-black uppercase tracking-wider text-blue-600">
-              {pin.completionStatus?.replace(/_/g, ' ') || 'Off Plan'}
-            </span>
-          ) : (
-            <span className="text-sm font-black text-slate-900">
-              SAR {formatPrice(pin.price)}
-              {pin.purpose === 'RENT' && <span className="text-[10px] text-slate-400 font-normal">/yr</span>}
-            </span>
-          )}
-        </div>
-
-        {/* Title */}
-        <h3 className="text-xs font-extrabold text-slate-800 truncate leading-snug group-hover:text-[#064e4b] transition-colors">
-          {title}
-        </h3>
-
-        {/* Location */}
-        <div className="flex items-center gap-1 mt-1 text-slate-400">
-          <MapPin className="w-3.5 h-3.5 shrink-0 text-[#064e4b]/70" />
-          <span className="text-[10px] font-semibold truncate">
-            {pin.district ? `${pin.district}, ` : ''}{pin.city}
-          </span>
-        </div>
-
-        {/* Commute Badge Grid Footer */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-3 mt-3 border-t border-slate-100">
-          <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-emerald-100/50 text-emerald-800 px-2 py-0.5 rounded-lg">
-            <Car className="w-3 h-3 text-emerald-600" />
-            <span>{pin.driveTimeA}m to A</span>
-          </span>
-          {pin.driveTimeB && (
-            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-blue-100/50 text-blue-800 px-2 py-0.5 rounded-lg">
-              <Car className="w-3 h-3 text-blue-600" />
-              <span>{pin.driveTimeB}m to B</span>
-            </span>
-          )}
-        </div>
+        {/* Specs footer for listings */}
+        {!isP && (
+          <div className="flex items-center gap-1.5 pt-1.5 mt-1.5 border-t border-slate-100 text-slate-500 text-[10px] flex-wrap">
+            {pin.bedrooms && (
+              <span className="font-bold">{pin.bedrooms} Beds</span>
+            )}
+            {pin.bedrooms && <span className="w-1 h-1 rounded-full bg-slate-200" />}
+            <span className="font-semibold truncate">{TYPE_LABELS[pin.type] || pin.type}</span>
+            {pin.foreignerEligible && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-200" />
+                <span className={`font-bold text-[9px] uppercase tracking-wide shrink-0 ${
+                  pin.muslimOnly ? 'text-orange-600' : 'text-purple-655'
+                }`}>
+                  {pin.muslimOnly ? '🕌 Muslims' : '🌍 Foreigner Ok'}
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -637,6 +709,8 @@ interface DriveTimeInnerProps {
 }
 
 function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
+  const router = useRouter();
+
   // Load Maps SDK dynamically inside child component
   const { isLoaded: mapsLoaded, loadError } = useLoadScript({
     googleMapsApiKey: googleMapsKey,
@@ -645,6 +719,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const chooseMapRef = useRef<google.maps.Map | null>(null);
 
   const [pointA, setPointA] = useState<{ lat: number; lng: number } | null>({ lat: 24.7136, lng: 46.6753 });
   const [pointB, setPointB] = useState<{ lat: number; lng: number } | null>(null);
@@ -652,11 +727,16 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
   const [pointBLabel, setPointBLabel] = useState<string>('');
   const [settingPoint, setSettingPoint] = useState<'A' | 'B'>('A');
 
+  // Mobile multi-screen state
+  const [mobileScreen, setMobileScreen] = useState<'setup' | 'results' | 'choose-on-map'>('setup');
+  const [activeChoosePoint, setActiveChoosePoint] = useState<'A' | 'B'>('A');
+
+  // Properties / Projects kind filter state
+  const [kindFilter, setKindFilter] = useState<'listing' | 'project'>('listing');
+
   // Refs for autocomplete inputs
   const inputARef = useRef<HTMLInputElement>(null);
   const inputBRef = useRef<HTMLInputElement>(null);
-  const acARef    = useRef<google.maps.places.Autocomplete | null>(null);
-  const acBRef    = useRef<google.maps.places.Autocomplete | null>(null);
 
   const [minutes, setMinutes] = useState<number>(30);
   const [mode, setMode] = useState<'balanced' | 'nearestA' | 'nearestB'>('balanced');
@@ -673,14 +753,37 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
   });
   const [selectedPin, setSelectedPin] = useState<CommutePin | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(20);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [pins]);
+    setVisibleCount(20);
+  }, [pins, kindFilter]);
+
+  // Client-side kind filtering
+  const filteredPins = useMemo(() => {
+    return pins.filter(p => {
+      if (kindFilter === 'project') return p.kind === 'project';
+      return p.kind === 'listing';
+    });
+  }, [pins, kindFilter]);
+
+  const desktopListings = useMemo(() => {
+    return filteredPins.slice(0, visibleCount);
+  }, [filteredPins, visibleCount]);
+
+  const handleDesktopScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 120) {
+      if (visibleCount < filteredPins.length) {
+        setVisibleCount(prev => Math.min(prev + 20, filteredPins.length));
+      }
+    }
+  }, [visibleCount, filteredPins.length]);
 
   const pageSize = 20;
-  const totalPages = Math.ceil(pins.length / pageSize);
-  const pageListings = pins.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.ceil(filteredPins.length / pageSize);
+  const mobileListings = filteredPins.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Init Google Places Autocomplete on the input fields once SDK is ready
   useEffect(() => {
@@ -692,40 +795,36 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
       fields: ['geometry', 'formatted_address', 'name'],
     };
 
-    if (inputARef.current && !acARef.current) {
-      acARef.current = new google.maps.places.Autocomplete(inputARef.current, opts);
-      acARef.current.addListener('place_changed', () => {
-        const place = acARef.current!.getPlace();
+    const bindAutocomplete = (input: HTMLInputElement | null, target: 'A' | 'B') => {
+      if (!input) return null;
+      const ac = new google.maps.places.Autocomplete(input, opts);
+      ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
         if (place.geometry?.location) {
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
-          setPointA({ lat, lng });
-          setPointALabel(place.name || place.formatted_address || '');
-          if (map) {
-            map.panTo({ lat, lng });
-            map.setZoom(13);
+          if (target === 'A') {
+            setPointA({ lat, lng });
+            setPointALabel(place.name || place.formatted_address || '');
+            if (map) { map.panTo({ lat, lng }); map.setZoom(13); }
+          } else {
+            setPointB({ lat, lng });
+            setPointBLabel(place.name || place.formatted_address || '');
+            if (map) { map.panTo({ lat, lng }); map.setZoom(13); }
           }
         }
       });
-    }
+      return ac;
+    };
 
-    if (inputBRef.current && !acBRef.current) {
-      acBRef.current = new google.maps.places.Autocomplete(inputBRef.current, opts);
-      acBRef.current.addListener('place_changed', () => {
-        const place = acBRef.current!.getPlace();
-        if (place.geometry?.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          setPointB({ lat, lng });
-          setPointBLabel(place.name || place.formatted_address || '');
-          if (map) {
-            map.panTo({ lat, lng });
-            map.setZoom(13);
-          }
-        }
-      });
-    }
-  }, [mapsLoaded, map]);
+    let acA = bindAutocomplete(inputARef.current, 'A');
+    let acB = bindAutocomplete(inputBRef.current, 'B');
+
+    return () => {
+      if (acA) google.maps.event.clearInstanceListeners(acA);
+      if (acB) google.maps.event.clearInstanceListeners(acB);
+    };
+  }, [mapsLoaded, map, mobileScreen]);
 
   // ── Fetch drive time results ──
   const fetchCommuteData = useCallback(async () => {
@@ -757,7 +856,6 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
 
       const json = await res.json();
       if (json.success) {
-        // Sort featured first
         const sorted = (json.data || []).sort((a: CommutePin, b: CommutePin) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
         setPins(sorted);
         setPolygons({
@@ -780,7 +878,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
     fetchCommuteData();
   }, [pointA, pointB, minutes, mode, filters, fetchCommuteData]);
 
-  // Reverse geocoding helper to translate map click coordinates into human-readable locations
+  // Reverse geocoding helper to translate map click coordinates into locations
   const reverseGeocode = useCallback((lat: number, lng: number, target: 'A' | 'B') => {
     if (typeof google === 'undefined' || !google.maps?.Geocoder) return;
     const geocoder = new google.maps.Geocoder();
@@ -807,26 +905,11 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
     });
   }, []);
 
-  // Handle map click to drop pins
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    const lat = e.latLng?.lat();
-    const lng = e.latLng?.lng();
-    if (lat && lng) {
-      if (settingPoint === 'A') {
-        setPointA({ lat, lng });
-        reverseGeocode(lat, lng, 'A');
-      } else {
-        setPointB({ lat, lng });
-        reverseGeocode(lat, lng, 'B');
-      }
-    }
-  }, [settingPoint, reverseGeocode]);
-
   const onLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance);
   }, []);
 
-  // Convert GeoJSON polygon coordinates [lng, lat] to Google Maps `{ lat, lng }` path
+  // Convert GeoJSON coordinates to Google Maps path
   const polyAPath = useMemo(() => {
     if (!polygons.polyA || polygons.polyA.length === 0) return null;
     return polygons.polyA[0].map(coord => ({
@@ -874,7 +957,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-slate-50">
+    <div className="flex flex-col h-full overflow-hidden bg-slate-50 animate-fade-in">
       {/* Scope standard Pac Autocomplete styles for premium design */}
       <style jsx global>{`
         .pac-container {
@@ -914,219 +997,536 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
         }
       `}</style>
 
-      {/* ── Top Full-width Commute Control Strip ── */}
-      <div style={{ flexShrink: 0 }} className="w-full bg-white border-b border-slate-200 py-3 px-6 z-30 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Title & Back Button */}
-          <div className="flex items-center gap-3 shrink-0">
-            <Link href={`/${locale}/map`} className="p-2 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100 shrink-0">
-              <ArrowLeft className="w-4 h-4 text-slate-700" />
-            </Link>
-            <div className="shrink-0">
-              <h1 className="font-black text-slate-900 text-sm uppercase tracking-wide leading-tight">Search by Commute</h1>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Saudi Commute Proximity</p>
+      {/* ── DESKTOP VIEW ── */}
+      <div className="hidden lg:flex flex-col h-full overflow-hidden">
+        {/* Top Control Strip */}
+        <div style={{ flexShrink: 0 }} className="w-full bg-white border-b border-slate-200 py-3 px-6 z-30 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* Title & Back Button */}
+            <div className="flex items-center gap-3 shrink-0">
+              <Link href={`/${locale}/map`} className="p-2 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100 shrink-0">
+                <ArrowLeft className="w-4 h-4 text-slate-700" />
+              </Link>
+              <div className="shrink-0">
+                <h1 className="font-black text-slate-900 text-sm uppercase tracking-wide leading-tight">Search by Commute</h1>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Saudi Commute Proximity</p>
+              </div>
+            </div>
+
+            {/* Controls Container */}
+            <div className="flex-1 flex flex-wrap items-center gap-4 min-w-[300px]">
+              {/* Point A */}
+              <div className="flex-1 min-w-[220px] relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 text-white text-[9px] font-black pointer-events-none">A</div>
+                <input
+                  ref={inputARef}
+                  type="text"
+                  placeholder="Search first point (e.g. Work)..."
+                  defaultValue={pointALabel}
+                  onChange={e => setPointALabel(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 text-xs font-semibold border border-emerald-250 bg-emerald-50/20 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all placeholder:text-slate-400 text-slate-700"
+                />
+                {pointA && (
+                  <button onClick={() => { setPointA(null); setPointALabel(''); if (inputARef.current) inputARef.current.value = ''; }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
+                    <X className="w-3 h-3 text-slate-400" />
+                  </button>
+                )}
+              </div>
+
+              {/* Point B */}
+              <div className="flex-1 min-w-[220px] relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[9px] font-black pointer-events-none">B</div>
+                <input
+                  ref={inputBRef}
+                  type="text"
+                  placeholder="Add second point (Optional)..."
+                  defaultValue={pointBLabel}
+                  onChange={e => setPointBLabel(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 text-xs font-semibold border border-blue-150 bg-blue-50/20 rounded-xl outline-none focus:border-blue-300 focus:bg-white transition-all placeholder:text-slate-400 text-slate-700"
+                />
+                {pointB && (
+                  <button onClick={() => { setPointB(null); setPointBLabel(''); if (inputBRef.current) inputBRef.current.value = ''; setPolygons(p => ({ ...p, polyB: null })); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
+                    <X className="w-3 h-3 text-slate-400" />
+                  </button>
+                )}
+              </div>
+
+              {/* Slider */}
+              <div className="flex flex-col gap-0.5 min-w-[200px] flex-1">
+                <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                  <span className="uppercase tracking-wider">Max Drive Time</span>
+                  <span className="text-[#064e4b] font-black">{minutes} mins</span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="120"
+                  step="5"
+                  value={minutes}
+                  onChange={e => setMinutes(Number(e.target.value))}
+                  style={{
+                    background: `linear-gradient(to right, #064e4b 0%, #064e4b ${((minutes - 10) / (120 - 10)) * 100}%, #e2e8f0 ${((minutes - 10) / (120 - 10)) * 100}%, #e2e8f0 100%)`
+                  }}
+                  className="w-full h-1 rounded-lg appearance-none cursor-pointer accent-[#064e4b]"
+                />
+              </div>
+
+              {/* Mode Select */}
+              <div className="min-w-[150px]">
+                <select
+                  value={mode}
+                  onChange={e => setMode(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-black uppercase tracking-wider outline-none text-slate-700 focus:border-emerald-500"
+                >
+                  <option value="balanced">Balanced</option>
+                  <option value="nearestA">Nearest A</option>
+                  {pointB && <option value="nearestB">Nearest B</option>}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Split View */}
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          {/* Left List Sidebar */}
+          <div className="w-[680px] shrink-0 flex flex-col border-r border-slate-250 bg-white h-full overflow-hidden">
+            {/* Sync instruction bar */}
+            <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose shrink-0">
+              <div className="flex items-center gap-2">
+                <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Right click on the map to set location Point A or Point B</span>
+              </div>
+            </div>
+
+            {/* Properties / Projects Tab Switcher (Desktop) */}
+            <div className="px-5 py-2.5 bg-white border-b border-slate-150 flex gap-2 shrink-0">
+              {[['listing', 'Properties'], ['project', 'Projects']].map(([k, l]) => (
+                <button
+                  key={k}
+                  onClick={() => {
+                    setKindFilter(k as any);
+                  }}
+                  className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider rounded-xl transition-all border ${
+                    kindFilter === k
+                      ? 'bg-[#064e4b] text-white border-[#064e4b] shadow-sm'
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto" onScroll={handleDesktopScroll}>
+              {loading && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#064e4b]" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Generating drive time contours...</span>
+                </div>
+              )}
+
+              {error && (
+                <div className="p-4 m-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-700 text-center uppercase tracking-wider leading-loose">
+                  ⚠️ {error}
+                </div>
+              )}
+
+              {!loading && !error && filteredPins.length === 0 && (
+                <div className="text-center py-16 text-slate-400 px-4">
+                  <Car className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-xs font-black uppercase tracking-wider">No properties reachable</p>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-relaxed">
+                    Try expanding drive time range or moving Point A / B closer to residential zones.
+                  </p>
+                </div>
+              )}
+
+              {!loading && !error && filteredPins.length > 0 && (
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
+                  {desktopListings.map(pin => (
+                    <PremiumCommuteCard
+                      key={`${pin.kind}-${pin.id}`}
+                      pin={pin}
+                      selected={selectedPin?.id === pin.id}
+                      onClick={() => {
+                        const detailUrl = pin.kind === 'project'
+                          ? `/${locale}/projects/${pin.id}`
+                          : `/${locale}/listings/${pin.shortId || pin.id}`;
+                        router.push(detailUrl);
+                      }}
+                      onMouseEnter={() => flyToPin(pin)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Controls Container */}
-          <div className="flex-1 flex flex-wrap items-center gap-4 min-w-[300px]">
-            {/* Point A */}
-            <div className="flex-1 min-w-[220px] relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 text-white text-[9px] font-black pointer-events-none">A</div>
-              <input
-                ref={inputARef}
-                type="text"
-                placeholder="Search first point (e.g. Work)..."
-                defaultValue={pointALabel}
-                onChange={e => setPointALabel(e.target.value)}
-                onFocus={() => setSettingPoint('A')}
-                className="w-full pl-10 pr-8 py-2 text-xs font-semibold border border-emerald-250 bg-emerald-50/20 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all placeholder:text-slate-400 text-slate-700"
-              />
-              {pointA && (
-                <button onClick={() => { setPointA(null); setPointALabel(''); if (inputARef.current) inputARef.current.value = ''; }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
-                  <X className="w-3 h-3 text-slate-400" />
-                </button>
-              )}
-            </div>
-
-            {/* Point B */}
-            <div className="flex-1 min-w-[220px] relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[9px] font-black pointer-events-none">B</div>
-              <input
-                ref={inputBRef}
-                type="text"
-                placeholder="Add second point (Optional)..."
-                defaultValue={pointBLabel}
-                onChange={e => setPointBLabel(e.target.value)}
-                onFocus={() => setSettingPoint('B')}
-                className="w-full pl-10 pr-8 py-2 text-xs font-semibold border border-blue-150 bg-blue-50/20 rounded-xl outline-none focus:border-blue-300 focus:bg-white transition-all placeholder:text-slate-400 text-slate-700"
-              />
-              {pointB && (
-                <button onClick={() => { setPointB(null); setPointBLabel(''); if (inputBRef.current) inputBRef.current.value = ''; setPolygons(p => ({ ...p, polyB: null })); }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
-                  <X className="w-3 h-3 text-slate-400" />
-                </button>
-              )}
-            </div>
-
-            {/* Slider */}
-            <div className="flex flex-col gap-0.5 min-w-[200px] flex-1">
-              <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                <span className="uppercase tracking-wider">Max Drive Time</span>
-                <span className="text-[#064e4b] font-black">{minutes} mins</span>
-              </div>
-              <input
-                type="range"
-                min="10"
-                max="120"
-                step="5"
-                value={minutes}
-                onChange={e => setMinutes(Number(e.target.value))}
-                style={{
-                  background: `linear-gradient(to right, #064e4b 0%, #064e4b ${((minutes - 10) / (120 - 10)) * 100}%, #e2e8f0 ${((minutes - 10) / (120 - 10)) * 100}%, #e2e8f0 100%)`
-                }}
-                className="w-full h-1 rounded-lg appearance-none cursor-pointer accent-[#064e4b]"
-              />
-            </div>
-
-            {/* Mode Select */}
-            <div className="min-w-[150px]">
-              <select
-                value={mode}
-                onChange={e => setMode(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-black uppercase tracking-wider outline-none text-slate-700 focus:border-emerald-500"
-              >
-                <option value="balanced">Balanced</option>
-                <option value="nearestA">Nearest A</option>
-                {pointB && <option value="nearestB">Nearest B</option>}
-              </select>
-            </div>
+          {/* Right Map */}
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <GoogleMapWrapper
+              pointA={pointA}
+              pointB={pointB}
+              setPointA={setPointA}
+              setPointB={setPointB}
+              reverseGeocode={reverseGeocode}
+              polyAPath={polyAPath}
+              polyBPath={polyBPath}
+              pins={pins}
+              selectedPin={selectedPin}
+              setSelectedPin={setSelectedPin}
+              onLoad={onLoad}
+              locale={locale}
+            />
           </div>
         </div>
       </div>
 
-      {/* ── Bottom Split View ── */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Left List Sidebar */}
-        <div className="w-full lg:w-[680px] shrink-0 flex flex-col border-r border-slate-250 bg-white h-full overflow-hidden">
-          {/* Sync instruction bar */}
-          <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose shrink-0">
-            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>Click map to place pin (Setting point: {settingPoint})</span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {loading && (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
-                <Loader2 className="w-8 h-8 animate-spin text-[#064e4b]" />
-                <span className="text-xs font-bold uppercase tracking-wider">Generating drive time contours...</span>
+      {/* ── MOBILE VIEW ── */}
+      <div className="lg:hidden flex-1 flex flex-col overflow-hidden relative">
+        
+        {/* Screen 1: SETUP */}
+        {mobileScreen === 'setup' && (
+          <div className="flex-1 overflow-y-auto bg-white p-5 flex flex-col gap-6 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Car className="w-5 h-5 text-[#064e4b]" />
+                <h2 className="font-black text-slate-900 text-sm uppercase tracking-wide">Drive Time Proximity</h2>
               </div>
-            )}
+              <Link href={`/${locale}/map`} className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100">
+                <X className="w-4 h-4 text-slate-500" />
+              </Link>
+            </div>
 
-            {error && (
-              <div className="p-4 m-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-700 text-center uppercase tracking-wider leading-loose">
-                ⚠️ {error}
+            {/* Point A */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Origin Location (Point A)</label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 text-white text-[9px] font-black pointer-events-none">A</div>
+                <input
+                  ref={inputARef}
+                  type="text"
+                  placeholder="Search destination origin..."
+                  defaultValue={pointALabel}
+                  onChange={e => setPointALabel(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl outline-none focus:border-emerald-500 focus:bg-emerald-50/5 transition-all text-slate-700"
+                />
               </div>
-            )}
-
-            {!loading && !error && pins.length === 0 && (
-              <div className="text-center py-16 text-slate-400 px-4">
-                <Car className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                <p className="text-xs font-black uppercase tracking-wider">No properties reachable</p>
-                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-relaxed">
-                  Try expanding drive time range or moving Point A / B closer to residential zones.
-                </p>
-              </div>
-            )}
-
-            {!loading && !error && pins.length > 0 && (
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
-                {pageListings.map(pin => (
-                  <PremiumCommuteCard
-                    key={`${pin.kind}-${pin.id}`}
-                    pin={pin}
-                    selected={selectedPin?.id === pin.id}
-                    onClick={() => flyToPin(pin)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Pagination controls at bottom */}
-          {!loading && !error && totalPages > 1 && (
-            <div style={{ flexShrink: 0 }} className="py-2.5 px-4 border-t border-slate-100 flex items-center justify-center gap-1.5 bg-slate-50">
-              <button 
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(1)}
-                className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+              <button
+                onClick={() => {
+                  setActiveChoosePoint('A');
+                  setMobileScreen('choose-on-map');
+                }}
+                className="flex items-center gap-1.5 self-start text-[10px] font-black text-[#064e4b] bg-emerald-50/70 border border-emerald-100 px-3 py-1.5 rounded-xl transition-colors mt-0.5"
               >
-                «
-              </button>
-              <button 
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
-              >
-                ‹ Prev
-              </button>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .map((p, idx, arr) => {
-                  const prevPage = arr[idx - 1];
-                  const showEllipsis = prevPage && p - prevPage > 1;
-                  return (
-                    <React.Fragment key={p}>
-                      {showEllipsis && <span className="text-slate-400 px-1">...</span>}
-                      <button
-                        onClick={() => setCurrentPage(p)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                          currentPage === p 
-                            ? 'bg-[#064e4b] text-white shadow-md' 
-                            : 'text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    </React.Fragment>
-                  );
-                })}
-
-              <button 
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
-              >
-                Next ›
-              </button>
-              <button 
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(totalPages)}
-                className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
-              >
-                »
+                <MapPin className="w-3.5 h-3.5" />
+                Choose on Map
               </button>
             </div>
-          )}
-        </div>
 
-        {/* Right Map */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <GoogleMapWrapper
-            pointA={pointA}
-            pointB={pointB}
-            polyAPath={polyAPath}
-            polyBPath={polyBPath}
-            pins={pins}
-            selectedPin={selectedPin}
-            setSelectedPin={setSelectedPin}
-            onLoad={onLoad}
-            handleMapClick={handleMapClick}
-            locale={locale}
-          />
-        </div>
+            {/* Point B */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Second Destination (Point B - Optional)</label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[9px] font-black pointer-events-none">B</div>
+                <input
+                  ref={inputBRef}
+                  type="text"
+                  placeholder="Search second point..."
+                  defaultValue={pointBLabel}
+                  onChange={e => setPointBLabel(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-blue-50/5 transition-all text-slate-700"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setActiveChoosePoint('B');
+                  setMobileScreen('choose-on-map');
+                }}
+                className="flex items-center gap-1.5 self-start text-[10px] font-black text-[#064e4b] bg-blue-50/70 border border-blue-100 px-3 py-1.5 rounded-xl transition-colors mt-0.5"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                Choose on Map
+              </button>
+            </div>
+
+            {/* Drive Time slider or buttons */}
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                <span>Max Drive Time</span>
+                <span className="text-[#064e4b]">{minutes} mins</span>
+              </div>
+              <div className="flex gap-2">
+                {[15, 30, 45, 60].map(mins => (
+                  <button
+                    key={mins}
+                    onClick={() => setMinutes(mins)}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
+                      minutes === mins
+                        ? 'bg-[#064e4b] text-white border-[#064e4b]'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-350'
+                    }`}
+                  >
+                    {mins} min
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mode select */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Calculated Proximity Priority</label>
+              <select
+                value={mode}
+                onChange={e => setMode(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-black uppercase tracking-wider outline-none text-slate-700 focus:border-[#064e4b]"
+              >
+                <option value="balanced">Balanced Proximity</option>
+                <option value="nearestA">Nearest to A</option>
+                {pointB && <option value="nearestB">Nearest to B</option>}
+              </select>
+            </div>
+
+            {/* Find button */}
+            <button
+              onClick={() => {
+                if (!pointA) {
+                  setError('Origin location (Point A) is required.');
+                  return;
+                }
+                fetchCommuteData();
+                setMobileScreen('results');
+              }}
+              className="w-full bg-[#064e4b] hover:bg-[#043a37] text-white py-3 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg transition-all mt-auto"
+            >
+              Find Properties
+            </button>
+          </div>
+        )}
+
+        {/* Screen 2: CHOOSE ON MAP */}
+        {mobileScreen === 'choose-on-map' && (
+          <div className="flex-1 relative animate-fade-in w-full h-full">
+            <GoogleMap
+              mapContainerStyle={{ width: '100%', height: '100%' }}
+              center={pointA || SAUDI_CENTER}
+              zoom={13}
+              onLoad={m => { chooseMapRef.current = m; }}
+              options={{
+                disableDefaultUI: true,
+                zoomControl: true,
+                gestureHandling: 'greedy'
+              }}
+            />
+            
+            {/* Static central pointer pin overlay */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none">
+              <div className="flex flex-col items-center">
+                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-black shadow-lg border-2 border-white">
+                  {activeChoosePoint}
+                </div>
+                <div className="w-1.5 h-4 bg-emerald-600 shadow-md" style={{ marginTop: '-2px' }} />
+              </div>
+            </div>
+            
+            {/* Top instruction header card */}
+            <div className="absolute top-4 left-4 right-4 bg-white/95 backdrop-blur-sm p-3.5 rounded-2xl shadow-lg border border-slate-100 z-10">
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                Choose {activeChoosePoint === 'A' ? 'Point A (Origin)' : 'Point B (Destination)'}
+              </h3>
+              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Drag the map to change the location pin</p>
+            </div>
+
+            {/* Bottom confirm button */}
+            <div className="absolute bottom-6 left-4 right-4 z-10">
+              <button
+                onClick={() => {
+                  if (chooseMapRef.current) {
+                    const center = chooseMapRef.current.getCenter();
+                    if (center) {
+                      const lat = center.lat();
+                      const lng = center.lng();
+                      if (activeChoosePoint === 'A') {
+                        setPointA({ lat, lng });
+                        reverseGeocode(lat, lng, 'A');
+                      } else {
+                        setPointB({ lat, lng });
+                        reverseGeocode(lat, lng, 'B');
+                      }
+                      setMobileScreen('setup');
+                    }
+                  }
+                }}
+                className="w-full bg-[#064e4b] hover:bg-[#043a37] text-white py-3 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg transition-all"
+              >
+                Confirm Location
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Screen 3: RESULTS (with list and pagination - Aligned per user specifications) */}
+        {mobileScreen === 'results' && (
+          <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden animate-fade-in h-full">
+            
+            {/* Mobile top filter controls (Aligned per user specifications) */}
+            <div className="bg-white border-b border-slate-200 py-3.5 px-4 flex flex-col gap-3.5 shrink-0 shadow-sm z-30">
+              {/* Row 1: Return CTA on left, Filters CTA on right */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => router.push(`/${locale}/map`)}
+                  className="flex items-center gap-1.5 text-xs font-black text-[#064e4b] hover:underline"
+                >
+                  <ArrowLeft className="w-4 h-4 shrink-0" />
+                  <span>Regular Search</span>
+                </button>
+                <button
+                  onClick={() => setMobileScreen('setup')}
+                  className="flex items-center gap-1 bg-[#064e4b] hover:bg-[#043a37] text-white text-[10px] font-black uppercase tracking-wider px-3.5 py-2 rounded-xl shadow-sm transition-all"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Filters</span>
+                </button>
+              </div>
+
+              {/* Row 2: Distinct left-aligned page heading */}
+              <div>
+                <h2 className="text-lg font-black text-slate-900 tracking-tight leading-none">
+                  Results on Commute
+                </h2>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-none">
+                  Reachable within {minutes} mins
+                </p>
+              </div>
+
+              {/* Row 3: Horizontal tab switchers (Properties / Projects) */}
+              <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-150">
+                {[['listing', 'Properties'], ['project', 'Projects']].map(([k, label]) => {
+                  const isActive = kindFilter === k;
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => {
+                        setKindFilter(k as any);
+                      }}
+                      className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider rounded-lg transition-all ${
+                        isActive
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mobile commute results list */}
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+              {loading && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
+                  <Loader2 className="w-7 h-7 animate-spin text-[#064e4b]" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Generating drive time contours...</span>
+                </div>
+              )}
+
+              {error && (
+                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-700 text-center uppercase tracking-wider leading-loose">
+                  ⚠️ {error}
+                </div>
+              )}
+
+              {!loading && !error && filteredPins.length === 0 && (
+                <div className="text-center py-16 text-slate-400 px-4">
+                  <Car className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-xs font-black uppercase tracking-wider">No properties reachable</p>
+                  <p className="text-[10px] text-slate-455 font-bold mt-1 uppercase tracking-widest leading-relaxed">
+                    Try expanding drive time range or moving Point A / B closer to residential zones.
+                  </p>
+                </div>
+              )}
+
+              {!loading && !error && filteredPins.length > 0 && (
+                <>
+                  {mobileListings.map(pin => (
+                    <PremiumCommuteCard
+                      key={`mobile-${pin.kind}-${pin.id}`}
+                      pin={pin}
+                      selected={selectedPin?.id === pin.id}
+                      onClick={() => {
+                        const detailUrl = pin.kind === 'project'
+                          ? `/${locale}/projects/${pin.id}`
+                          : `/${locale}/listings/${pin.shortId || pin.id}`;
+                        router.push(detailUrl);
+                      }}
+                    />
+                  ))}
+
+                  {/* Mobile pagination controls */}
+                  {totalPages > 1 && (
+                    <div className="py-4 border-t border-slate-100 flex items-center justify-center gap-1.5 mt-2 bg-white rounded-2xl shadow-sm border border-slate-100">
+                      <button 
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(1)}
+                        className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+                      >
+                        «
+                      </button>
+                      <button 
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+                      >
+                        ‹
+                      </button>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                        .map((p, idx, arr) => {
+                          const prevPage = arr[idx - 1];
+                          const showEllipsis = prevPage && p - prevPage > 1;
+                          return (
+                            <React.Fragment key={p}>
+                              {showEllipsis && <span className="text-slate-400 px-1">...</span>}
+                              <button
+                                onClick={() => setCurrentPage(p)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                                  currentPage === p 
+                                    ? 'bg-[#064e4b] text-white shadow-md' 
+                                    : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            </React.Fragment>
+                          );
+                        })}
+
+                      <button 
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+                      >
+                        ›
+                      </button>
+                      <button 
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(totalPages)}
+                        className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
+                      >
+                        »
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

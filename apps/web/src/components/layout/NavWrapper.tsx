@@ -30,9 +30,10 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
   if (isMapOrDriveTime) {
     return (
       <>
-        <Header locale={locale} />
-        {/* position:fixed anchors the map exactly below the fixed header,
-            guaranteeing full height regardless of body/flex chain height */}
+        <div className="hidden lg:block">
+          <Header locale={locale} />
+        </div>
+        {/* position:fixed anchors the map exactly to the viewport boundary */}
         <div
           style={{
             position: 'fixed',
@@ -40,14 +41,13 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
             left: 0,
             right: 0,
             bottom: 0,
-            paddingTop: 110,   /* desktop header height */
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             zIndex: 20,
             background: 'white',
           }}
-          className="pt-[70px] md:pt-[110px]"
+          className="pt-0 lg:pt-[110px]"
         >
           {children}
         </div>

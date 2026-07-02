@@ -11,10 +11,11 @@
  * Switcher: Includes 'Search by Commute Time' button in the top filter strip.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useLoadScript, GoogleMap, OverlayView, InfoWindow } from '@react-google-maps/api';
 import Link from 'next/link';
-import { MapPin, X, Home, Loader2, Building2, ArrowLeft, AlertTriangle, Car, ShieldCheck, Building, Warehouse, Tent, Landmark } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { MapPin, X, Home, Loader2, Building2, ArrowLeft, AlertTriangle, Car, ShieldCheck, Building, Warehouse, Tent, Landmark, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const LIBRARIES: ('places')[] = ['places'];
@@ -36,7 +37,7 @@ interface ProjectPin  { id: string; nameEn?: string; nameAr: string; lat: number
 type MapPinType = ListingPin | ProjectPin;
 interface ClusterPoint { lat: number; lng: number; count: number; hasFeatured: boolean; pins: MapPinType[]; kind: 'cluster'; id: string; }
 type MapItem = MapPinType | ClusterPoint;
-interface Filters { priceMin: string; priceMax: string; type: string; purpose: string; beds: string; foreignerEligible: boolean; }
+interface Filters { priceMin: string; priceMax: string; type: string; purpose: string; beds: string; foreignerEligible: boolean; kind: 'listing' | 'project' | ''; }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function formatPrice(p: number) {
@@ -208,50 +209,63 @@ function DotPin({ pin, selected, locale, onClick }: { pin: MapPinType; selected:
 }
 
 // ── Premium Property Card (2-column layout compatible) ──────────────────────
-function PremiumCard({ pin, selected, onClick }: { pin: MapPinType; selected: boolean; onClick: () => void }) {
+function PremiumCard({
+  pin,
+  selected,
+  onClick,
+  onMouseEnter
+}: {
+  pin: MapPinType;
+  selected: boolean;
+  onClick?: () => void;
+  onMouseEnter?: () => void;
+}) {
   const isP = pin.kind === 'project';
   const p   = pin as ProjectPin;
   const l   = pin as ListingPin;
   const title = isP ? (p.nameEn || p.nameAr) : (l.enTitle || l.arTitle);
+  const location = [pin.district, pin.city].filter(Boolean).join(', ');
 
   return (
     <div
       onClick={onClick}
-      className={`group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-300 transform hover:-translate-y-1 ${
+      onMouseEnter={onMouseEnter}
+      className={`group bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 ${
         selected
-          ? 'border-[#064e4b] ring-4 ring-[#064e4b]/5 shadow-lg'
+          ? 'border-[#0D7377] ring-4 ring-[#0D7377]/5 shadow-lg'
           : 'border-slate-100 hover:border-slate-200/80 hover:shadow-md'
-      }`}
+      } flex lg:flex-col h-[115px] lg:h-auto w-full relative`}
     >
       {/* Image Container */}
-      <div className="relative h-40 overflow-hidden bg-slate-50">
+      <div className="relative w-[115px] lg:w-full h-full lg:h-40 overflow-hidden bg-slate-50 shrink-0 pointer-events-none">
         {pin.thumb ? (
           <img
             src={pin.thumb}
             alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">
-            {isP ? <Building2 className="w-8 h-8" /> : <Home className="w-8 h-8" />}
+          <div className="w-full h-full flex items-center justify-center text-slate-350 bg-slate-50">
+            {isP ? <Building2 className="w-6 h-6" /> : <Home className="w-6 h-6" />}
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-40" />
+
+        {/* Overlay Badges on Image (Featured) */}
+        {pin.isFeatured && (
+          <div className="absolute top-2 left-2 z-10 pointer-events-none">
+            <span className="bg-amber-400 text-amber-955 text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shadow-sm">
+              ★ Featured
+            </span>
           </div>
         )}
 
-        {/* Feature / Verified Badge */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
-          {pin.isFeatured && (
-            <span className="bg-amber-400 text-amber-900 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-sm">
-              ★ Featured
-            </span>
-          )}
-        </div>
-
-        {/* Purpose Badge (Buy/Rent) */}
+        {/* Purpose Badge overlay (Buy/Rent - Desktop only) */}
         {!isP && (
-          <div className="absolute top-3 right-3">
-            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg shadow-sm ${
-              l.purpose === 'SALE' ? 'bg-[#064e4b] text-white' : 'bg-amber-500 text-white'
+          <div className="absolute top-2 right-2 z-10 lg:block hidden">
+            <span className={`text-[8.5px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm ${
+              l.purpose === 'SALE' ? 'bg-[#0D7377] text-white' : 'bg-teal-500 text-white'
             }`}>
               {l.purpose === 'SALE' ? 'Buy' : 'Rent'}
             </span>
@@ -260,64 +274,62 @@ function PremiumCard({ pin, selected, onClick }: { pin: MapPinType; selected: bo
       </div>
 
       {/* Info / Content Area */}
-      <div className="p-4">
-        {/* Badges Row */}
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {isP ? (
-            <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-              Project
-            </span>
-          ) : (
-            <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-              {TYPE_LABELS[l.type] || l.type}
-            </span>
-          )}
-          {pin.foreignerEligible && (
-            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
-              pin.muslimOnly 
-                ? 'bg-orange-50 text-orange-700 border-orange-100' 
-                : 'bg-purple-50 text-purple-700 border-purple-100'
-            }`}>
-              {pin.muslimOnly ? '🕌 Muslims Only' : '🌍 Foreigner Ok'}
-            </span>
-          )}
-        </div>
+      <div className="p-3 lg:p-4 flex-1 flex flex-col justify-between min-w-0 pointer-events-none">
+        <div>
+          {/* Price or completion status */}
+          <div className="flex items-baseline justify-between gap-1 mb-0.5">
+            {isP ? (
+              <span className="text-[10px] lg:text-xs font-black uppercase tracking-wider text-blue-650 truncate block max-w-full">
+                Project • {p.completionStatus?.replace(/_/g, ' ') || 'Off Plan'}
+                {pin.foreignerEligible && ` • ${pin.muslimOnly ? '🕌 Muslims' : '🌍 Foreigner'}`}
+              </span>
+            ) : (
+              <span className="text-sm lg:text-base font-black text-slate-900 leading-tight">
+                SAR {formatPrice(l.price)}
+                {l.purpose === 'RENT' && <span className="text-[10px] text-slate-400 font-normal">/yr</span>}
+              </span>
+            )}
 
-        {/* Price or completion status */}
-        <div className="flex items-baseline justify-between gap-1 mb-1">
-          {isP ? (
-            <span className="text-xs font-black uppercase tracking-wider text-blue-600">
-              {p.completionStatus?.replace(/_/g, ' ') || 'Off Plan'}
-            </span>
-          ) : (
-            <span className="text-sm font-black text-slate-900">
-              SAR {formatPrice(l.price)}
-              {l.purpose === 'RENT' && <span className="text-[10px] text-slate-400 font-normal">/yr</span>}
-            </span>
-          )}
-        </div>
+            {/* Purpose Badge overlay (Buy/Rent - Mobile only) */}
+            {!isP && (
+              <span className={`lg:hidden text-[7.5px] font-black uppercase tracking-widest px-1 py-0.5 rounded ${
+                l.purpose === 'SALE' ? 'bg-[#0D7377] text-white' : 'bg-teal-500 text-white'
+              }`}>
+                {l.purpose === 'SALE' ? 'Buy' : 'Rent'}
+              </span>
+            )}
+          </div>
 
-        {/* Title */}
-        <h3 className="text-xs font-extrabold text-slate-800 truncate leading-snug group-hover:text-[#064e4b] transition-colors">
-          {title}
-        </h3>
+          {/* Title */}
+          <h3 className="text-[11.5px] lg:text-xs font-bold text-slate-800 truncate leading-snug group-hover:text-[#0D7377] transition-colors">
+            {title}
+          </h3>
 
-        {/* Location */}
-        <div className="flex items-center gap-1 mt-1 text-slate-400">
-          <MapPin className="w-3.5 h-3.5 shrink-0 text-[#064e4b]/70" />
-          <span className="text-[10px] font-semibold truncate">
-            {pin.district ? `${pin.district}, ` : ''}{pin.city}
-          </span>
+          {/* Location */}
+          <div className="flex items-center gap-1 mt-0.5 text-slate-400">
+            <MapPin className="w-3.5 h-3.5 shrink-0 text-[#0D7377]" />
+            <span className="text-[10px] truncate">{location}</span>
+          </div>
         </div>
 
         {/* Specs footer for listings */}
-        {!isP && (l.bedrooms || l.type) && (
-          <div className="flex items-center gap-2 pt-2.5 mt-2.5 border-t border-slate-100 text-slate-500 text-[10px]">
+        {!isP && (
+          <div className="flex items-center gap-1.5 pt-1.5 mt-1.5 border-t border-slate-100 text-slate-500 text-[10px] flex-wrap">
             {l.bedrooms && (
               <span className="font-bold">{l.bedrooms} Beds</span>
             )}
-            <span className="w-1 h-1 rounded-full bg-slate-200" />
-            <span className="font-medium truncate">{TYPE_LABELS[l.type] || l.type}</span>
+            {l.bedrooms && <span className="w-1 h-1 rounded-full bg-slate-200" />}
+            <span className="font-semibold truncate">{TYPE_LABELS[l.type] || l.type}</span>
+            {pin.foreignerEligible && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-200" />
+                <span className={`font-bold text-[9px] uppercase tracking-wide shrink-0 ${
+                  pin.muslimOnly ? 'text-orange-600' : 'text-purple-650'
+                }`}>
+                  {pin.muslimOnly ? '🕌 Muslims' : '🌍 Foreigner Ok'}
+                </span>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -342,9 +354,32 @@ function GoogleMapInner({ apiKey, locale, onPinsUpdate, selectedPin, onPinSelect
   const [items, setItems]     = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(false);
   const filtersRef = useRef(externalFilters);
+  const boundsFittedRef = useRef(false);
 
   useEffect(() => { filtersRef.current = externalFilters; }, [externalFilters]);
   useEffect(() => { setItems(clusterPins(rawPins, zoom)); }, [rawPins, zoom]);
+
+  useEffect(() => {
+    if (isLoaded && mapRef.current && rawPins.length > 0 && !boundsFittedRef.current) {
+      boundsFittedRef.current = true;
+      const bounds = new google.maps.LatLngBounds();
+      rawPins.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+      mapRef.current.fitBounds(bounds);
+      
+      const listener = google.maps.event.addListener(mapRef.current, 'bounds_changed', () => {
+        if (mapRef.current && mapRef.current.getZoom()! > 14) {
+          mapRef.current.setZoom(12);
+        }
+        google.maps.event.removeListener(listener);
+      });
+    }
+  }, [isLoaded, rawPins]);
+
+  useEffect(() => {
+    if (selectedPin && mapRef.current) {
+      mapRef.current.panTo({ lat: selectedPin.lat, lng: selectedPin.lng });
+    }
+  }, [selectedPin]);
 
   const fetchPins = useCallback(async (map: google.maps.Map, f: Filters) => {
     const b  = map.getBounds(); if (!b) return;
@@ -372,8 +407,15 @@ function GoogleMapInner({ apiKey, locale, onPinsUpdate, selectedPin, onPinSelect
           ...j.data.listings.filter((l: any) => typeof l.lat === 'number' && typeof l.lng === 'number'),
         ];
         combined.sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
-        setRawPins(combined);
-        onPinsUpdate(combined);
+        
+        let filtered = combined;
+        if (f.kind === 'listing') {
+          filtered = combined.filter(p => p.kind === 'listing');
+        } else if (f.kind === 'project') {
+          filtered = combined.filter(p => p.kind === 'project');
+        }
+        setRawPins(filtered);
+        onPinsUpdate(filtered);
       }
     } catch (e) { console.error('[Map] fetch:', e); }
     finally { setLoading(false); }
@@ -433,7 +475,7 @@ function GoogleMapInner({ apiKey, locale, onPinsUpdate, selectedPin, onPinSelect
 
         {/* InfoWindow popup on selected pin */}
         {selectedPin && (
-          <InfoWindow position={{ lat: selectedPin.lat, lng: selectedPin.lng }} onCloseClick={() => onPinSelect(null)}>
+          <InfoWindow position={{ lat: selectedPin.lat, lng: selectedPin.lng }} onCloseClick={() => onPinSelect(null)} options={typeof window !== 'undefined' && window.google ? { pixelOffset: new window.google.maps.Size(0, -32) } : undefined}>
             <div style={{ width: 200, fontFamily: 'system-ui, sans-serif', overflow: 'hidden' }}>
               {/* Thumbnail */}
               {selectedPin.thumb
@@ -504,29 +546,60 @@ export default function MapViewPage({ params }: { params: { locale: string } }) 
       .finally(() => setKeyLoading(false));
   }, []);
 
+  const router = useRouter();
   const [allPins, setAllPins]         = useState<MapPinType[]>([]);
   const [selectedPin, setSelectedPin] = useState<MapPinType | null>(null);
-  const [filters, setFilters]         = useState<Filters>({ priceMin: '', priceMax: '', type: '', purpose: '', beds: '', foreignerEligible: false });
+  const [filters, setFilters]         = useState<Filters>({ priceMin: '', priceMax: '', type: '', purpose: '', beds: '', foreignerEligible: false, kind: '' });
   const setF = (k: keyof Filters, v: string | boolean) => setFilters(f => ({ ...f, [k]: v }));
-  const clearF = () => setFilters({ priceMin: '', priceMax: '', type: '', purpose: '', beds: '', foreignerEligible: false });
+  const clearF = () => setFilters({ priceMin: '', priceMax: '', type: '', purpose: '', beds: '', foreignerEligible: false, kind: '' });
 
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [listExpanded, setListExpanded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
+    setVisibleCount(20);
     setCurrentPage(1);
   }, [allPins, filters]);
 
-  const sorted = [...allPins].sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
-  const pageSize = 20;
-  const totalPages = Math.ceil(sorted.length / pageSize);
-  const pageListings = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const sorted = useMemo(() => {
+    return [...allPins].sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
+  }, [allPins]);
+
+  const totalPages = useMemo(() => {
+    return Math.ceil(sorted.length / 10);
+  }, [sorted]);
+
+  const pageListings = useMemo(() => {
+    return sorted.slice(0, visibleCount);
+  }, [sorted, visibleCount]);
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 120) {
+      if (visibleCount < sorted.length) {
+        setVisibleCount(prev => Math.min(prev + 20, sorted.length));
+      }
+    }
+  }, [visibleCount, sorted.length]);
+
+  // Center active mobile card on change
+  useEffect(() => {
+    if (selectedPin) {
+      const el = document.getElementById(`mobile-card-${selectedPin.kind}-${selectedPin.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [selectedPin]);
 
   return (
-    /* Outer div fills 100% of the fixed container set by NavWrapper */
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }} className="relative">
+      {/* Outer div fills 100% of the fixed container set by NavWrapper */}
 
-      {/* ── Filter Strip ──────────────────────────────────────────────────── */}
-      <div style={{ flexShrink: 0 }} className="w-full bg-white border-b border-slate-200 py-3 px-4 flex flex-wrap items-center gap-2.5 z-30 shadow-sm">
+      {/* ── Desktop Filter Strip (Desktop only) ── */}
+      <div style={{ flexShrink: 0 }} className="hidden lg:flex w-full bg-white border-b border-slate-200 py-3 px-4 items-center gap-2.5 z-30 shadow-sm">
         <Link href={`/${locale}`} className="p-2 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100 shrink-0">
           <ArrowLeft className="w-4 h-4 text-slate-700" />
         </Link>
@@ -581,10 +654,10 @@ export default function MapViewPage({ params }: { params: { locale: string } }) 
       </div>
 
       {/* ── Split panel ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+      <div className="relative flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
 
-        {/* Left list - beautiful 2-column grid container */}
-        <div className="w-full lg:w-[680px] shrink-0 border-r border-slate-250 bg-white flex flex-col h-full overflow-hidden">
+        {/* Left list - beautiful 2-column grid container (desktop only) */}
+        <div className="hidden lg:flex w-[680px] shrink-0 border-r border-slate-250 bg-white flex-col h-full overflow-hidden">
           {sorted.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-20 text-center px-4 overflow-y-auto">
               <MapPin className="w-10 h-10 text-slate-200 mb-3" />
@@ -592,75 +665,29 @@ export default function MapViewPage({ params }: { params: { locale: string } }) 
               <p className="text-slate-300 text-xs mt-1">Pan or zoom out to explore</p>
             </div>
           ) : (
-            <>
-              <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
+            <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
                 {pageListings.map(pin => (
-                  <PremiumCard key={`${pin.kind}-${pin.id}`} pin={pin} selected={selectedPin?.id === pin.id} onClick={() => { setSelectedPin(pin); }} />
+                  <PremiumCard
+                    key={`${pin.kind}-${pin.id}`}
+                    pin={pin}
+                    selected={selectedPin?.id === pin.id}
+                    onClick={() => {
+                      const detailUrl = pin.kind === 'project'
+                        ? `/${locale}/projects/${pin.id}`
+                        : `/${locale}/listings/${(pin as ListingPin).shortId || pin.id}`;
+                      router.push(detailUrl);
+                    }}
+                    onMouseEnter={() => { setSelectedPin(pin); }}
+                  />
                 ))}
               </div>
-
-              {/* Pagination controls at bottom */}
-              {totalPages > 1 && (
-                <div style={{ flexShrink: 0 }} className="py-2.5 px-4 border-t border-slate-100 flex items-center justify-center gap-1.5 bg-slate-50">
-                  <button 
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(1)}
-                    className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
-                  >
-                    «
-                  </button>
-                  <button 
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
-                  >
-                    ‹ Prev
-                  </button>
-                  
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                    .map((p, idx, arr) => {
-                      const prevPage = arr[idx - 1];
-                      const showEllipsis = prevPage && p - prevPage > 1;
-                      return (
-                        <React.Fragment key={p}>
-                          {showEllipsis && <span className="text-slate-400 px-1">...</span>}
-                          <button
-                            onClick={() => setCurrentPage(p)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                              currentPage === p 
-                                ? 'bg-[#064e4b] text-white shadow-md' 
-                                : 'text-slate-600 hover:bg-slate-100'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        </React.Fragment>
-                      );
-                    })}
-
-                  <button 
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
-                  >
-                    Next ›
-                  </button>
-                  <button 
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(totalPages)}
-                    className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
-                  >
-                    »
-                  </button>
-                </div>
-              )}
-            </>
+            </div>
           )}
         </div>
 
-        {/* Right map */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {/* Right map (full screen on mobile, flex-1 on desktop) */}
+        <div className="relative flex-1 h-full w-full overflow-hidden">
           {keyLoading ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-50">
               <Loader2 className="w-8 h-8 animate-spin text-[#064e4b]" />
@@ -673,10 +700,342 @@ export default function MapViewPage({ params }: { params: { locale: string } }) 
               <p className="text-slate-400 text-sm max-w-xs">{keyError}</p>
             </div>
           ) : (
-            <GoogleMapInner apiKey={googleMapsKey} locale={locale} onPinsUpdate={setAllPins} selectedPin={selectedPin} onPinSelect={setSelectedPin} externalFilters={filters} />
+            <>
+              <GoogleMapInner apiKey={googleMapsKey} locale={locale} onPinsUpdate={setAllPins} selectedPin={selectedPin} onPinSelect={setSelectedPin} externalFilters={filters} />
+              
+              {/* Floating Mobile Top Search Bar */}
+              {!listExpanded && (
+                <div className="absolute top-4 left-4 right-4 z-30 lg:hidden flex items-center gap-2 pointer-events-auto bg-white rounded-2xl shadow-lg border border-slate-100 px-3 py-2.5 animate-fade-in">
+                  <Link href={`/${locale}`} className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors">
+                    <ArrowLeft className="w-4 h-4 text-slate-755" />
+                  </Link>
+                
+                {/* Compact Selector */}
+                <div className="flex bg-slate-100 p-0.5 rounded-lg shrink-0">
+                  {[['', 'All'], ['SALE', 'Buy'], ['RENT', 'Rent']].map(([k, l]) => (
+                    <button key={k} onClick={() => setF('purpose', k)}
+                      className={`px-2 py-1 rounded-md text-[10px] font-black transition-all ${filters.purpose === k ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="w-[1px] h-6 bg-slate-200 shrink-0 mx-1" />
+
+                {/* Search Text static display */}
+                <div className="flex-1 flex items-center gap-1.5 text-xs text-slate-700 min-w-0">
+                  <MapPin className="w-3.5 h-3.5 text-[#0D7377] shrink-0" />
+                  <span className="font-bold truncate">Saudi Arabia</span>
+                </div>
+              </div>
+            )}
+
+              {/* Floating Mobile Top Filters row */}
+              {!listExpanded && (
+                <div className="absolute top-[72px] left-4 right-4 z-30 lg:hidden flex items-center gap-2 pointer-events-auto overflow-visible">
+                  {/* Full filters modal trigger */}
+                  <button
+                    onClick={() => setShowFiltersModal(true)}
+                    className="p-2.5 bg-white border border-slate-150 rounded-2xl shadow-md text-slate-700 hover:bg-slate-50 shrink-0"
+                  >
+                    <SlidersHorizontal className="w-4 h-4" />
+                  </button>
+
+                  {/* Horizontal scroll strip */}
+                  <div className="flex-1 flex gap-2 overflow-x-auto no-scrollbar py-1">
+                    <select
+                      value={filters.type}
+                      onChange={e => setF('type', e.target.value)}
+                      className="border border-slate-150 bg-white hover:bg-slate-50 rounded-xl px-3 py-1.5 text-[11px] font-bold text-slate-700 outline-none shadow-sm shrink-0"
+                    >
+                      <option value="">Property Type</option>
+                      {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+
+                    <select
+                      value={filters.beds}
+                      onChange={e => setF('beds', e.target.value)}
+                      className="border border-slate-150 bg-white hover:bg-slate-50 rounded-xl px-3 py-1.5 text-[11px] font-bold text-slate-700 outline-none shadow-sm shrink-0"
+                    >
+                      <option value="">Bedrooms</option>
+                      {['1','2','3','4','5'].map(b => <option key={b} value={b}>{b}+ Beds</option>)}
+                    </select>
+
+                    <button
+                      onClick={() => setF('foreignerEligible', !filters.foreignerEligible)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border shadow-sm shrink-0 transition-all ${
+                        filters.foreignerEligible
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'bg-white text-slate-700 border-slate-150 hover:bg-slate-50'
+                      }`}
+                    >
+                      Foreigner OK
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Mobile Toggle kind Pill */}
+              {!listExpanded && (
+                <div className="absolute bottom-[190px] left-1/2 -translate-x-1/2 z-30 lg:hidden pointer-events-auto">
+                  <button
+                    onClick={() => setF('kind', filters.kind === 'project' ? 'listing' : 'project')}
+                    className="bg-[#0D7377] hover:bg-[#0b666a] text-white text-[11px] font-black uppercase tracking-wider px-5 py-2.5 rounded-full shadow-xl flex items-center gap-1.5 border border-[#0f888c] whitespace-nowrap animate-fade-in"
+                  >
+                    {filters.kind === 'project' ? (
+                      <>
+                        <Home className="w-3.5 h-3.5" />
+                        View Properties
+                      </>
+                    ) : (
+                      <>
+                        <Building2 className="w-3.5 h-3.5" />
+                        View Projects
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Expandable Bottom Drawer */}
+              <div
+                className={`transition-all duration-300 lg:hidden flex flex-col pointer-events-auto ${
+                  listExpanded 
+                    ? 'fixed inset-0 h-full w-full z-45 bg-white rounded-t-none' 
+                    : 'absolute bottom-0 left-0 right-0 h-[210px] rounded-t-3xl bg-white border-t border-slate-200 shadow-2xl z-35'
+                }`}
+              >
+                {/* Drawer Header */}
+                <div
+                  onClick={() => {
+                    if (!listExpanded) setListExpanded(true);
+                  }}
+                  className={`px-5 py-3.5 border-b border-slate-100 flex items-center gap-3 select-none bg-slate-50 rounded-t-3xl shrink-0 ${
+                    !listExpanded ? 'cursor-pointer' : ''
+                  }`}
+                >
+                  {listExpanded && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setListExpanded(false);
+                      }}
+                      className="p-1 hover:bg-slate-200 rounded-lg text-slate-655 shrink-0 pointer-events-auto"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                  )}
+                  <div className="flex-1">
+                    <h3 className="text-[11.5px] font-black text-slate-850 uppercase tracking-wider">
+                      {filters.kind === 'project' ? 'Projects' : 'Properties'} in Saudi Arabia
+                    </h3>
+                    <p className="text-[9.5px] text-slate-400 font-bold uppercase mt-0.5">
+                      {sorted.length} {sorted.length !== 1 ? 'results' : 'result'} found
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setListExpanded(!listExpanded);
+                    }}
+                    className="p-1.5 hover:bg-slate-200 rounded-xl transition-all text-slate-505 pointer-events-auto"
+                  >
+                    {listExpanded ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronUp className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Drawer Body */}
+                {listExpanded ? (
+                  // Expanded vertical view with pagination
+                  <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                    <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+                      {sorted.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
+                          <MapPin className="w-8 h-8 text-slate-250 mb-2" />
+                          <p className="text-xs font-bold">No properties found</p>
+                        </div>
+                      ) : (
+                        sorted.slice((currentPage - 1) * 10, currentPage * 10).map(pin => (
+                          <PremiumCard
+                            key={`expanded-${pin.kind}-${pin.id}`}
+                            pin={pin}
+                            selected={selectedPin?.id === pin.id}
+                            onClick={() => {
+                              const detailUrl = pin.kind === 'project'
+                                ? `/${locale}/projects/${pin.id}`
+                                : `/${locale}/listings/${(pin as ListingPin).shortId || pin.id}`;
+                              router.push(detailUrl);
+                            }}
+                          />
+                        ))
+                      )}
+                    </div>
+
+                    {/* Pagination Footer */}
+                    {totalPages > 1 && (
+                      <div className="border-t border-slate-150 p-4 bg-slate-50 flex items-center justify-center gap-1.5 shrink-0">
+                        <button
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          className="px-2.5 py-1.5 bg-white border border-slate-200 text-slate-655 text-xs font-black rounded-lg disabled:opacity-40"
+                        >
+                          Prev
+                        </button>
+                        {Array.from({ length: totalPages }).map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setCurrentPage(i + 1)}
+                            className={`w-8 h-8 text-xs font-black rounded-lg border transition-all ${
+                              currentPage === i + 1
+                                ? 'bg-[#0D7377] text-white border-[#0D7377] shadow-sm'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-350'
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        <button
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          className="px-2.5 py-1.5 bg-white border border-slate-200 text-slate-655 text-xs font-black rounded-lg disabled:opacity-40"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Collapsed horizontal swipeable carousel
+                  <div className="flex-1 bg-white p-3.5 overflow-hidden">
+                    {sorted.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 py-3">
+                        <MapPin className="w-5 h-5 text-[#0d9488] mb-1" />
+                        <p className="text-[10px] font-black uppercase">No properties in this area</p>
+                      </div>
+                    ) : (
+                      <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar pb-1">
+                        {sorted.map(pin => (
+                          <div
+                            id={`mobile-card-${pin.kind}-${pin.id}`}
+                            key={`mobile-${pin.kind}-${pin.id}`}
+                            className="w-[315px] shrink-0 snap-center"
+                          >
+                            <PremiumCard
+                              pin={pin}
+                              selected={selectedPin?.id === pin.id}
+                              onClick={() => {
+                                if (selectedPin?.id === pin.id) {
+                                  const detailUrl = pin.kind === 'project'
+                                    ? `/${locale}/projects/${pin.id}`
+                                    : `/${locale}/listings/${(pin as ListingPin).shortId || pin.id}`;
+                                  router.push(detailUrl);
+                                } else {
+                                  setSelectedPin(pin);
+                                }
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
+
+      {/* Full screen mobile filters overlay */}
+      {showFiltersModal && (
+        <div className="fixed inset-0 bg-white z-50 flex flex-col p-6 overflow-y-auto animate-fade-in pointer-events-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-150 pb-3 mb-5 shrink-0">
+            <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">Filters</h2>
+            <button onClick={() => setShowFiltersModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl border border-slate-100">
+              <X className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 flex flex-col gap-6">
+            {/* Purpose */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Purpose</label>
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                {[['', 'All'], ['SALE', 'Buy'], ['RENT', 'Rent']].map(([k, l]) => (
+                  <button key={k} onClick={() => setF('purpose', k)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filters.purpose === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Property Type */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Property Type</label>
+              <select value={filters.type} onChange={e => setF('type', e.target.value)} className="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 outline-none">
+                <option value="">All Property Types</option>
+                {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+
+            {/* Beds */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Bedrooms</label>
+              <select value={filters.beds} onChange={e => setF('beds', e.target.value)} className="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 outline-none">
+                <option value="">Bedrooms (Any)</option>
+                {['1','2','3','4','5'].map(b => <option key={b} value={b}>{b}+ Beds</option>)}
+              </select>
+            </div>
+
+            {/* Price range */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Price Range (SAR)</label>
+              <div className="flex items-center gap-2">
+                <input type="number" placeholder="Min Price" value={filters.priceMin} onChange={e => setF('priceMin', e.target.value)} className="flex-1 border border-slate-200 bg-slate-50 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-[#0D7377] text-slate-700" />
+                <span className="text-slate-300">|</span>
+                <input type="number" placeholder="Max Price" value={filters.priceMax} onChange={e => setF('priceMax', e.target.value)} className="flex-1 border border-slate-200 bg-slate-50 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-[#0D7377] text-slate-700" />
+              </div>
+            </div>
+
+            {/* Foreigner Eligible */}
+            <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-slate-800">Foreigner Eligible</span>
+                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">Properties eligible for non-Saudi buyers</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={filters.foreignerEligible}
+                onChange={() => setF('foreignerEligible', !filters.foreignerEligible)}
+                className="w-5 h-5 accent-[#0D7377] rounded"
+              />
+            </div>
+          </div>
+
+          {/* Bottom Buttons */}
+          <div className="border-t border-slate-150 pt-4 mt-8 flex gap-3 shrink-0">
+            <button
+              onClick={() => { clearF(); setShowFiltersModal(false); }}
+              className="flex-1 py-3 border border-slate-200 rounded-2xl text-xs font-bold text-slate-650 hover:bg-slate-50 transition-all animate-fade-in"
+            >
+              Reset All
+            </button>
+            <button
+              onClick={() => setShowFiltersModal(false)}
+              className="flex-1 bg-[#0D7377] hover:bg-[#0b666a] text-white py-3 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg transition-all animate-fade-in"
+            >
+              See Results
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

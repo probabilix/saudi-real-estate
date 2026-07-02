@@ -70,10 +70,17 @@ function StatCard({ label, value, icon: Icon, color, delta }: { label: string; v
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAdmin } = useCrmAuth();
+  const isSoloBroker = user?.role === 'SOLO_BROKER';
   const [data, setData] = useState<CrmDashboardData | null>(null);
   const [followups, setFollowups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'campaign' | 'website'>('campaign');
+
+  useEffect(() => {
+    if (isSoloBroker) {
+      setActiveTab('website');
+    }
+  }, [isSoloBroker]);
 
   useEffect(() => {
     async function load() {
@@ -141,38 +148,42 @@ export default function DashboardPage() {
         )}
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Campaign Leads" value={totalCampaign} icon={Megaphone} color="bg-indigo-500" />
+        <div className={clsx("grid grid-cols-2 gap-4", isSoloBroker ? "lg:grid-cols-3" : "lg:grid-cols-4")}>
+          {!isSoloBroker && (
+            <StatCard label="Campaign Leads" value={totalCampaign} icon={Megaphone} color="bg-indigo-500" />
+          )}
           <StatCard label="Website Leads" value={totalWebsite} icon={Globe} color="bg-primary-600" />
           <StatCard label="Deals Won" value={wonCampaign} icon={TrendingUp} color="bg-emerald-500" />
           <StatCard label="Due Today" value={data?.todayFollowupCount ?? 0} icon={Calendar} color="bg-amber-500" />
         </div>
 
         {/* Dashboard Tabs Selector */}
-        <div className="flex gap-2 p-1 bg-surface-100/50 rounded-xl max-w-md border border-surface-200/50">
-          <button
-            onClick={() => setActiveTab('campaign')}
-            className={clsx(
-              'flex-1 py-2 px-4 text-xs font-bold rounded-lg transition-all',
-              activeTab === 'campaign'
-                ? 'bg-white text-surface-800 shadow-sm'
-                : 'text-surface-500 hover:text-surface-700'
-            )}
-          >
-            Campaign Leads
-          </button>
-          <button
-            onClick={() => setActiveTab('website')}
-            className={clsx(
-              'flex-1 py-2 px-4 text-xs font-bold rounded-lg transition-all',
-              activeTab === 'website'
-                ? 'bg-white text-surface-800 shadow-sm'
-                : 'text-surface-500 hover:text-surface-700'
-            )}
-          >
-            Website & AI Concierge
-          </button>
-        </div>
+        {!isSoloBroker && (
+          <div className="flex gap-2 p-1 bg-surface-100/50 rounded-xl max-w-md border border-surface-200/50">
+            <button
+              onClick={() => setActiveTab('campaign')}
+              className={clsx(
+                'flex-1 py-2 px-4 text-xs font-bold rounded-lg transition-all',
+                activeTab === 'campaign'
+                  ? 'bg-white text-surface-800 shadow-sm'
+                  : 'text-surface-500 hover:text-surface-700'
+              )}
+            >
+              Campaign Leads
+            </button>
+            <button
+              onClick={() => setActiveTab('website')}
+              className={clsx(
+                'flex-1 py-2 px-4 text-xs font-bold rounded-lg transition-all',
+                activeTab === 'website'
+                  ? 'bg-white text-surface-800 shadow-sm'
+                  : 'text-surface-500 hover:text-surface-700'
+              )}
+            >
+              Website & AI Concierge
+            </button>
+          </div>
+        )}
 
         {activeTab === 'campaign' ? (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

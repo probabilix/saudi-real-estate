@@ -88,6 +88,16 @@ export function CrmSidebar({ unassigned = 0 }: CrmSidebarProps) {
   }, []);
 
   const nav = isAdmin ? NAV_ADMIN : NAV_AGENT;
+  const isSoloBroker = user?.role === 'SOLO_BROKER';
+  const filteredNav = nav.map(section => ({
+    ...section,
+    items: section.items.filter(item => {
+      if (isSoloBroker && item.href === '/campaign-leads') {
+        return false;
+      }
+      return true;
+    })
+  })).filter(section => section.items.length > 0);
 
   useEffect(() => {
     const handleToggle = () => setMobileOpen(p => !p);
@@ -164,7 +174,7 @@ export function CrmSidebar({ unassigned = 0 }: CrmSidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-5">
-          {nav.map(group => (
+          {filteredNav.map(group => (
             <div key={group.label}>
               {!collapsed && (
                 <div className="px-3 mb-2 text-[10px] font-black uppercase tracking-widest text-surface-600">

@@ -69,6 +69,7 @@ interface Filters {
   priceMax: string;
   type: string;
   purpose: string;
+  foreignerEligible: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -440,21 +441,60 @@ function GoogleMapWrapper({
           </div>
         </InfoWindow>
       )}
-      {/* Point A Marker */}
+      {/* Point A Premium HTML Marker (zIndex: 99999 overlay - Issue 3 / 4) */}
       {pointA && (
-        <MarkerF
+        <OverlayView
           position={{ lat: pointA.lat, lng: pointA.lng }}
-          label={{ text: 'A', color: 'white', fontWeight: 'black' }}
-        />
+          mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+          getPixelPositionOffset={() => ({ x: 0, y: 0 })}
+        >
+          <div 
+            className="absolute -translate-x-1/2 -translate-y-[calc(100%+14px)] pointer-events-none drop-shadow-md"
+            style={{ zIndex: 99999 }}
+          >
+            <div className="flex flex-col items-center">
+              <div className="relative flex items-center justify-center w-8 h-8 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-md bg-emerald-600">
+                <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center -rotate-45 shadow-sm">
+                  <span className="text-[10px] font-black text-emerald-700">A</span>
+                </div>
+              </div>
+              {/* Visual pointer extension */}
+              <div className="w-0.5 h-3 bg-emerald-600/80 mt-[-1px] shadow-sm" />
+              <div className="w-1 h-0.5 bg-black/40 rounded-full blur-[0.5px] mt-0.5" />
+            </div>
+          </div>
+        </OverlayView>
       )}
 
-      {/* Point B Marker */}
+      {/* Point B Premium HTML Marker (zIndex: 99999 overlay - Issue 3 / 4) */}
       {pointB && (
-        <MarkerF
+        <OverlayView
           position={{ lat: pointB.lat, lng: pointB.lng }}
-          label={{ text: 'B', color: 'white', fontWeight: 'black' }}
-        />
+          mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+          getPixelPositionOffset={() => ({ x: 0, y: 0 })}
+        >
+          <div 
+            className="absolute -translate-x-1/2 -translate-y-[calc(100%+14px)] pointer-events-none drop-shadow-md"
+            style={{ zIndex: 99999 }}
+          >
+            <div className="flex flex-col items-center">
+              <div className="relative flex items-center justify-center w-8 h-8 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-md bg-blue-600">
+                <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center -rotate-45 shadow-sm">
+                  <span className="text-[10px] font-black text-blue-700">B</span>
+                </div>
+              </div>
+              {/* Visual pointer extension */}
+              <div className="w-0.5 h-3 bg-blue-600/80 mt-[-1px] shadow-sm" />
+              <div className="w-1 h-0.5 bg-black/40 rounded-full blur-[0.5px] mt-0.5" />
+            </div>
+          </div>
+        </OverlayView>
       )}
+
+      {/* Floating map hint banner */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-slate-900/90 text-white text-[10px] font-black uppercase tracking-wider px-5 py-2.5 rounded-full shadow-lg border border-slate-800 pointer-events-none">
+        Use Right Click to place a pin on the map and select your location
+      </div>
 
       {/* Isochrone Polygon A */}
       {polyAPath && (
@@ -730,18 +770,22 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
   // Mobile multi-screen state
   const [mobileScreen, setMobileScreen] = useState<'setup' | 'results' | 'choose-on-map'>('setup');
   const [activeChoosePoint, setActiveChoosePoint] = useState<'A' | 'B'>('A');
+  const [showDesktopFilters, setShowDesktopFilters] = useState(false);
+  const [showMobileMoreFilters, setShowMobileMoreFilters] = useState(false);
 
   // Properties / Projects kind filter state
-  const [kindFilter, setKindFilter] = useState<'listing' | 'project'>('listing');
+  const [kindFilter, setKindFilter] = useState<'listing' | 'project'>('project');
 
-  // Refs for autocomplete inputs
-  const inputARef = useRef<HTMLInputElement>(null);
-  const inputBRef = useRef<HTMLInputElement>(null);
+  // Refs for autocomplete inputs (Split to prevent React ref-stealing between views)
+  const desktopInputARef = useRef<HTMLInputElement>(null);
+  const desktopInputBRef = useRef<HTMLInputElement>(null);
+  const mobileInputARef = useRef<HTMLInputElement>(null);
+  const mobileInputBRef = useRef<HTMLInputElement>(null);
 
   const [minutes, setMinutes] = useState<number>(30);
   const [mode, setMode] = useState<'balanced' | 'nearestA' | 'nearestB'>('balanced');
   const [filters, setFilters] = useState<Filters>({
-    priceMin: '', priceMax: '', type: '', purpose: ''
+    priceMin: '', priceMax: '', type: '', purpose: '', foreignerEligible: false
   });
 
   const [loading, setLoading] = useState(false);
@@ -760,13 +804,29 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
     setVisibleCount(20);
   }, [pins, kindFilter]);
 
-  // Client-side kind filtering
+  // Client-side kind & filter settings (Issue 1)
   const filteredPins = useMemo(() => {
     return pins.filter(p => {
-      if (kindFilter === 'project') return p.kind === 'project';
-      return p.kind === 'listing';
+      // 1. Kind filter
+      if (kindFilter === 'project' && p.kind !== 'project') return false;
+      if (kindFilter === 'listing' && p.kind !== 'listing') return false;
+
+      // 2. Purpose filter
+      if (filters.purpose && p.purpose !== filters.purpose) return false;
+
+      // 3. Property Type filter
+      if (filters.type && (p.kind !== 'listing' || p.type !== filters.type)) return false;
+
+      // 4. Price range
+      if (filters.priceMin && p.price < Number(filters.priceMin)) return false;
+      if (filters.priceMax && p.price > Number(filters.priceMax)) return false;
+
+      // 5. Foreigner Eligible
+      if (filters.foreignerEligible && !p.foreignerEligible) return false;
+
+      return true;
     });
-  }, [pins, kindFilter]);
+  }, [pins, kindFilter, filters]);
 
   const desktopListings = useMemo(() => {
     return filteredPins.slice(0, visibleCount);
@@ -817,12 +877,16 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
       return ac;
     };
 
-    let acA = bindAutocomplete(inputARef.current, 'A');
-    let acB = bindAutocomplete(inputBRef.current, 'B');
+    let acDesktopA = bindAutocomplete(desktopInputARef.current, 'A');
+    let acDesktopB = bindAutocomplete(desktopInputBRef.current, 'B');
+    let acMobileA = bindAutocomplete(mobileInputARef.current, 'A');
+    let acMobileB = bindAutocomplete(mobileInputBRef.current, 'B');
 
     return () => {
-      if (acA) google.maps.event.clearInstanceListeners(acA);
-      if (acB) google.maps.event.clearInstanceListeners(acB);
+      if (acDesktopA) google.maps.event.clearInstanceListeners(acDesktopA);
+      if (acDesktopB) google.maps.event.clearInstanceListeners(acDesktopB);
+      if (acMobileA) google.maps.event.clearInstanceListeners(acMobileA);
+      if (acMobileB) google.maps.event.clearInstanceListeners(acMobileB);
     };
   }, [mapsLoaded, map, mobileScreen]);
 
@@ -850,6 +914,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
             priceMax: filters.priceMax || undefined,
             type: filters.type || undefined,
             purpose: filters.purpose || undefined,
+            foreignerEligible: filters.foreignerEligible || undefined,
           }
         })
       });
@@ -887,19 +952,23 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
         const address = results[0].formatted_address || '';
         if (target === 'A') {
           setPointALabel(address);
-          if (inputARef.current) inputARef.current.value = address;
+          if (desktopInputARef.current) desktopInputARef.current.value = address;
+          if (mobileInputARef.current) mobileInputARef.current.value = address;
         } else {
           setPointBLabel(address);
-          if (inputBRef.current) inputBRef.current.value = address;
+          if (desktopInputBRef.current) desktopInputBRef.current.value = address;
+          if (mobileInputBRef.current) mobileInputBRef.current.value = address;
         }
       } else {
         const coordsStr = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         if (target === 'A') {
           setPointALabel(coordsStr);
-          if (inputARef.current) inputARef.current.value = coordsStr;
+          if (desktopInputARef.current) desktopInputARef.current.value = coordsStr;
+          if (mobileInputARef.current) mobileInputARef.current.value = coordsStr;
         } else {
           setPointBLabel(coordsStr);
-          if (inputBRef.current) inputBRef.current.value = coordsStr;
+          if (desktopInputBRef.current) desktopInputBRef.current.value = coordsStr;
+          if (mobileInputBRef.current) mobileInputBRef.current.value = coordsStr;
         }
       }
     });
@@ -1019,7 +1088,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
               <div className="flex-1 min-w-[220px] relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 text-white text-[9px] font-black pointer-events-none">A</div>
                 <input
-                  ref={inputARef}
+                  ref={desktopInputARef}
                   type="text"
                   placeholder="Search first point (e.g. Work)..."
                   defaultValue={pointALabel}
@@ -1027,7 +1096,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                   className="w-full pl-10 pr-8 py-2 text-xs font-semibold border border-emerald-250 bg-emerald-50/20 rounded-xl outline-none focus:border-emerald-400 focus:bg-white transition-all placeholder:text-slate-400 text-slate-700"
                 />
                 {pointA && (
-                  <button onClick={() => { setPointA(null); setPointALabel(''); if (inputARef.current) inputARef.current.value = ''; }}
+                  <button onClick={() => { setPointA(null); setPointALabel(''); if (desktopInputARef.current) desktopInputARef.current.value = ''; }}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
                     <X className="w-3 h-3 text-slate-400" />
                   </button>
@@ -1038,7 +1107,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
               <div className="flex-1 min-w-[220px] relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[9px] font-black pointer-events-none">B</div>
                 <input
-                  ref={inputBRef}
+                  ref={desktopInputBRef}
                   type="text"
                   placeholder="Add second point (Optional)..."
                   defaultValue={pointBLabel}
@@ -1046,18 +1115,28 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                   className="w-full pl-10 pr-8 py-2 text-xs font-semibold border border-blue-150 bg-blue-50/20 rounded-xl outline-none focus:border-blue-300 focus:bg-white transition-all placeholder:text-slate-400 text-slate-700"
                 />
                 {pointB && (
-                  <button onClick={() => { setPointB(null); setPointBLabel(''); if (inputBRef.current) inputBRef.current.value = ''; setPolygons(p => ({ ...p, polyB: null })); }}
+                  <button onClick={() => { setPointB(null); setPointBLabel(''); if (desktopInputBRef.current) desktopInputBRef.current.value = ''; setPolygons(p => ({ ...p, polyB: null })); }}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full">
                     <X className="w-3 h-3 text-slate-400" />
                   </button>
                 )}
               </div>
 
-              {/* Slider */}
-              <div className="flex flex-col gap-0.5 min-w-[200px] flex-1">
-                <div className="flex justify-between text-[10px] font-bold text-slate-500">
+              {/* Slider & Custom Minutes Input */}
+              <div className="flex flex-col gap-0.5 min-w-[220px] flex-1">
+                <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-0.5">
                   <span className="uppercase tracking-wider">Max Drive Time</span>
-                  <span className="text-[#064e4b] font-black">{minutes} mins</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="5"
+                      max="180"
+                      value={minutes}
+                      onChange={e => setMinutes(Number(e.target.value))}
+                      className="w-12 text-center py-0.5 border border-slate-250 rounded-md text-[10px] font-black text-[#064e4b] outline-none focus:border-[#064e4b]"
+                    />
+                    <span className="text-[#064e4b] font-black uppercase">mins</span>
+                  </div>
                 </div>
                 <input
                   type="range"
@@ -1074,7 +1153,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
               </div>
 
               {/* Mode Select */}
-              <div className="min-w-[150px]">
+              <div className="min-w-[130px]">
                 <select
                   value={mode}
                   onChange={e => setMode(e.target.value as any)}
@@ -1084,6 +1163,106 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                   <option value="nearestA">Nearest A</option>
                   {pointB && <option value="nearestB">Nearest B</option>}
                 </select>
+              </div>
+
+              {/* Desktop Filters Popover (Issue 1) */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowDesktopFilters(prev => !prev)}
+                  className={`px-3.5 py-1.5 rounded-xl border flex items-center justify-center gap-1.5 transition-all text-xs font-black ${
+                    showDesktopFilters || Object.values(filters).some(Boolean)
+                      ? 'bg-emerald-50 text-[#064e4b] border-emerald-300 shadow-sm'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-350'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-[#064e4b]" />
+                  <span>Filters</span>
+                  {Object.values(filters).some(Boolean) && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                  )}
+                </button>
+
+                {showDesktopFilters && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowDesktopFilters(false)} />
+                    <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-50 flex flex-col gap-3.5 animate-fade-in pointer-events-auto">
+                      <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Advanced Filters</span>
+                        <button
+                          onClick={() => {
+                            setFilters({ priceMin: '', priceMax: '', type: '', purpose: '', foreignerEligible: false });
+                            setShowDesktopFilters(false);
+                          }}
+                          className="text-[10px] font-black text-rose-500 hover:text-rose-600 uppercase tracking-widest"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+
+                      {/* Purpose Select */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Purpose</label>
+                        <select
+                          value={filters.purpose}
+                          onChange={e => setFilters(prev => ({ ...prev, purpose: e.target.value }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-black uppercase tracking-wider outline-none text-slate-700 focus:border-[#064e4b]"
+                        >
+                          <option value="">Buy / Rent (All)</option>
+                          <option value="SALE">For Sale</option>
+                          <option value="RENT">For Rent</option>
+                        </select>
+                      </div>
+
+                      {/* Property Type */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Property Type</label>
+                        <select
+                          value={filters.type}
+                          onChange={e => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-black uppercase tracking-wider outline-none text-slate-700 focus:border-[#064e4b]"
+                        >
+                          <option value="">All Types</option>
+                          {Object.entries(TYPE_LABELS).map(([v, l]) => (
+                            <option key={v} value={v}>{l}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Price Range */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Price Range (SAR)</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            placeholder="Min"
+                            value={filters.priceMin}
+                            onChange={e => setFilters(prev => ({ ...prev, priceMin: e.target.value }))}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none text-slate-700 focus:border-[#064e4b] placeholder:text-slate-350"
+                          />
+                          <span className="text-slate-300">to</span>
+                          <input
+                            type="number"
+                            placeholder="Max"
+                            value={filters.priceMax}
+                            onChange={e => setFilters(prev => ({ ...prev, priceMax: e.target.value }))}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none text-slate-700 focus:border-[#064e4b] placeholder:text-slate-350"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Foreigner Eligible checkbox */}
+                      <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={filters.foreignerEligible}
+                          onChange={e => setFilters(prev => ({ ...prev, foreignerEligible: e.target.checked }))}
+                          className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-[#064e4b]"
+                        />
+                        <span className="text-xs font-bold text-slate-700">Foreigner Eligible Only</span>
+                      </label>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1207,7 +1386,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 text-white text-[9px] font-black pointer-events-none">A</div>
                 <input
-                  ref={inputARef}
+                  ref={mobileInputARef}
                   type="text"
                   placeholder="Search destination origin..."
                   defaultValue={pointALabel}
@@ -1233,7 +1412,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[9px] font-black pointer-events-none">B</div>
                 <input
-                  ref={inputBRef}
+                  ref={mobileInputBRef}
                   type="text"
                   placeholder="Search second point..."
                   defaultValue={pointBLabel}
@@ -1255,9 +1434,19 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
 
             {/* Drive Time slider or buttons */}
             <div className="flex flex-col gap-2">
-              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-wider">
                 <span>Max Drive Time</span>
-                <span className="text-[#064e4b]">{minutes} mins</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="5"
+                    max="180"
+                    value={minutes}
+                    onChange={e => setMinutes(Number(e.target.value))}
+                    className="w-12 text-center py-0.5 border border-slate-250 rounded-md text-[10px] font-black text-[#064e4b] outline-none focus:border-[#064e4b]"
+                  />
+                  <span className="text-[#064e4b] font-black">mins</span>
+                </div>
               </div>
               <div className="flex gap-2">
                 {[15, 30, 45, 60].map(mins => (
@@ -1267,7 +1456,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                     className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
                       minutes === mins
                         ? 'bg-[#064e4b] text-white border-[#064e4b]'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-350'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-[#064e4b]'
                     }`}
                   >
                     {mins} min
@@ -1290,6 +1479,72 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
               </select>
             </div>
 
+            {/* Mobile More Filters (Scrollable on page - Issue 1) */}
+            <div className="flex flex-col gap-4 border-t border-slate-100 pt-4">
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Search Filters</h3>
+              
+              {/* Purpose */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Purpose</label>
+                <select
+                  value={filters.purpose}
+                  onChange={e => setFilters(prev => ({ ...prev, purpose: e.target.value }))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-750 outline-none focus:border-[#064e4b]"
+                >
+                  <option value="">Buy / Rent (All)</option>
+                  <option value="SALE">For Sale</option>
+                  <option value="RENT">For Rent</option>
+                </select>
+              </div>
+
+              {/* Property Type */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Property Type</label>
+                <select
+                  value={filters.type}
+                  onChange={e => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-750 outline-none focus:border-[#064e4b]"
+                >
+                  <option value="">All Types</option>
+                  {Object.entries(TYPE_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Price range */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Price Range (SAR)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min Price"
+                    value={filters.priceMin}
+                    onChange={e => setFilters(prev => ({ ...prev, priceMin: e.target.value }))}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-750 outline-none focus:border-[#064e4b] placeholder:text-slate-350"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max Price"
+                    value={filters.priceMax}
+                    onChange={e => setFilters(prev => ({ ...prev, priceMax: e.target.value }))}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-750 outline-none focus:border-[#064e4b] placeholder:text-slate-350"
+                  />
+                </div>
+              </div>
+
+              {/* Foreigner Eligible checkbox */}
+              <label className="flex items-center gap-2.5 py-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={filters.foreignerEligible}
+                  onChange={e => setFilters(prev => ({ ...prev, foreignerEligible: e.target.checked }))}
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-[#064e4b]"
+                />
+                <span className="text-xs font-bold text-slate-700">Foreigner Eligible Only</span>
+              </label>
+            </div>
+
             {/* Find button */}
             <button
               onClick={() => {
@@ -1307,41 +1562,75 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
           </div>
         )}
 
-        {/* Screen 2: CHOOSE ON MAP */}
+        {/* Screen 2: CHOOSE ON MAP (Bayut Style - Issue 2 / 3) */}
         {mobileScreen === 'choose-on-map' && (
-          <div className="flex-1 relative animate-fade-in w-full h-full">
-            <GoogleMap
-              mapContainerStyle={{ width: '100%', height: '100%' }}
-              center={pointA || SAUDI_CENTER}
-              zoom={13}
-              onLoad={m => { chooseMapRef.current = m; }}
-              options={{
-                disableDefaultUI: true,
-                zoomControl: true,
-                gestureHandling: 'greedy'
-              }}
-            />
-            
-            {/* Static central pointer pin overlay */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none">
-              <div className="flex flex-col items-center">
-                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-black shadow-lg border-2 border-white">
+          <div className="flex-1 relative animate-fade-in w-full h-full bg-slate-50 flex flex-col">
+            {/* Full-width High-Visibility Header Card (Issue 2) */}
+            <div className="bg-white border-b border-slate-200 z-20 flex flex-col shadow-sm shrink-0">
+              {/* Logo & Back button */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                <button
+                  onClick={() => setMobileScreen('setup')}
+                  className="p-1 hover:bg-slate-100 rounded-lg text-emerald-600 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 text-[#064e4b] stroke-[3]" />
+                </button>
+                <span className="font-black text-[#064e4b] text-sm tracking-wider uppercase">Tamleeq</span>
+                <div className="w-5" />
+              </div>
+              {/* Instructions row */}
+              <div className="px-5 py-4 flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0 ${
+                  activeChoosePoint === 'A' ? 'bg-emerald-600' : 'bg-blue-600'
+                }`}>
                   {activeChoosePoint}
                 </div>
-                <div className="w-1.5 h-4 bg-emerald-600 shadow-md" style={{ marginTop: '-2px' }} />
+                <div>
+                  <h3 className="text-[13px] font-black text-slate-900 leading-tight">
+                    Choose {activeChoosePoint === 'A' ? 'first' : 'second'} point of interest
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-bold mt-0.5">Drag the map to change location</p>
+                </div>
               </div>
             </div>
-            
-            {/* Top instruction header card */}
-            <div className="absolute top-4 left-4 right-4 bg-white/95 backdrop-blur-sm p-3.5 rounded-2xl shadow-lg border border-slate-100 z-10">
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">
-                Choose {activeChoosePoint === 'A' ? 'Point A (Origin)' : 'Point B (Destination)'}
-              </h3>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Drag the map to change the location pin</p>
+
+            <div className="flex-1 relative w-full">
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '100%' }}
+                center={pointA || SAUDI_CENTER}
+                zoom={13}
+                onLoad={m => { chooseMapRef.current = m; }}
+                options={{
+                  disableDefaultUI: true,
+                  zoomControl: true,
+                  gestureHandling: 'greedy'
+                }}
+              />
+              
+              {/* Premium downward teardrop pin pointer (Issue 3) */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(100%-2px)] z-10 pointer-events-none drop-shadow-lg">
+                <div className="flex flex-col items-center">
+                  {/* Teardrop pin body */}
+                  <div className={`relative flex items-center justify-center w-11 h-11 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-md ${
+                    activeChoosePoint === 'A' ? 'bg-emerald-600' : 'bg-blue-600'
+                  }`}>
+                    {/* Counter-rotate internal badge to keep text upright */}
+                    <div className="w-6.5 h-6.5 rounded-full bg-white flex items-center justify-center -rotate-45 shadow-sm">
+                      <span className={`text-xs font-black ${
+                        activeChoosePoint === 'A' ? 'text-emerald-700' : 'text-blue-700'
+                      }`}>
+                        {activeChoosePoint}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Shadow representation on map canvas */}
+                  <div className="w-1.5 h-1 bg-black/45 rounded-full blur-[0.5px] mt-1" />
+                </div>
+              </div>
             </div>
 
             {/* Bottom confirm button */}
-            <div className="absolute bottom-6 left-4 right-4 z-10">
+            <div className="absolute bottom-6 left-4 right-4 z-20">
               <button
                 onClick={() => {
                   if (chooseMapRef.current) {
@@ -1360,9 +1649,9 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                     }
                   }
                 }}
-                className="w-full bg-[#064e4b] hover:bg-[#043a37] text-white py-3 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg transition-all"
+                className="w-full bg-[#064e4b] hover:bg-[#043a37] text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all"
               >
-                Confirm Location
+                Confirm
               </button>
             </div>
           </div>

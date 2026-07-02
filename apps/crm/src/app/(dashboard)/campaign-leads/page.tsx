@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { crmApi, CrmLead, CrmLeadStatus, CRM_STAGES, CrmAgent } from '@/lib/api';
 import { CrmTopBar } from '@/components/CrmSidebar';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
@@ -21,7 +22,14 @@ interface GroupedLeads {
 }
 
 export default function CampaignLeadsPage() {
-  const { isAdmin } = useCrmAuth();
+  const { user, isAdmin } = useCrmAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user?.role === 'SOLO_BROKER') {
+      router.replace('/');
+    }
+  }, [user, router]);
   const [allLeads, setAllLeads] = useState<{ lead: CrmLead; agent: CrmAgent | null }[]>([]);
   const [unassigned, setUnassigned] = useState(0);
   const [total, setTotal] = useState(0);

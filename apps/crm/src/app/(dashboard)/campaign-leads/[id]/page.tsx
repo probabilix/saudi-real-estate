@@ -53,6 +53,12 @@ export default function CampaignLeadDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const { user, isAdmin } = useCrmAuth();
+
+  useEffect(() => {
+    if (user?.role === 'SOLO_BROKER') {
+      router.replace('/');
+    }
+  }, [user, router]);
   const [detail, setDetail] = useState<CampaignLeadDetail | null>(null);
   const [agents, setAgents] = useState<CrmAgent[]>([]);
   const [loading, setLoading] = useState(true);

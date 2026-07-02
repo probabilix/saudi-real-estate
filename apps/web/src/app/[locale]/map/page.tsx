@@ -775,27 +775,7 @@ export default function MapViewPage({ params }: { params: { locale: string } }) 
                 </div>
               )}
 
-              {/* Floating Mobile Toggle kind Pill */}
-              {!listExpanded && (
-                <div className="absolute bottom-[190px] left-1/2 -translate-x-1/2 z-30 lg:hidden pointer-events-auto">
-                  <button
-                    onClick={() => setF('kind', filters.kind === 'project' ? 'listing' : 'project')}
-                    className="bg-[#0D7377] hover:bg-[#0b666a] text-white text-[11px] font-black uppercase tracking-wider px-5 py-2.5 rounded-full shadow-xl flex items-center gap-1.5 border border-[#0f888c] whitespace-nowrap animate-fade-in"
-                  >
-                    {filters.kind === 'project' ? (
-                      <>
-                        <Home className="w-3.5 h-3.5" />
-                        View Properties
-                      </>
-                    ) : (
-                      <>
-                        <Building2 className="w-3.5 h-3.5" />
-                        View Projects
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
+
 
               {/* Expandable Bottom Drawer */}
               <div
@@ -827,7 +807,7 @@ export default function MapViewPage({ params }: { params: { locale: string } }) 
                   )}
                   <div className="flex-1">
                     <h3 className="text-[11.5px] font-black text-slate-850 uppercase tracking-wider">
-                      {filters.kind === 'project' ? 'Projects' : 'Properties'} in Saudi Arabia
+                      Properties & Projects in Saudi Arabia
                     </h3>
                     <p className="text-[9.5px] text-slate-400 font-bold uppercase mt-0.5">
                       {sorted.length} {sorted.length !== 1 ? 'results' : 'result'} found

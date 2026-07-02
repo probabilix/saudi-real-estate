@@ -139,7 +139,7 @@ export default function ProjectsPage() {
 
   const [layoutsLoading, setLayoutsLoading] = useState<Record<string, boolean>>({});
 
-  // â”€â”€ Inventory Drawer State â”€â”€
+  // ── Inventory Drawer State ──
   const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(false);
   const [selectedLayout, setSelectedLayout] = useState<LayoutItem | null>(null);
   const [selectedProjectForLayout, setSelectedProjectForLayout] = useState<ProjectListItem | null>(null);
@@ -147,7 +147,7 @@ export default function ProjectsPage() {
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [exportingProjectId, setExportingProjectId] = useState<string | null>(null);
 
-  // â”€â”€ Export Modal State â”€â”€
+  // ── Export Modal State ──
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportProjectId, setExportProjectId] = useState<string | null>(null);
   const [exportLanguage, setExportLanguage] = useState<'en' | 'ar'>('ar');
@@ -188,7 +188,6 @@ export default function ProjectsPage() {
     setInventoryDrawerOpen(true);
     setLoadingUnits(true);
 
-    // Default BHK form fallback
     let defaultBhk = '';
     if (layout.bedrooms) {
       defaultBhk = `${layout.bedrooms}BHK`;
@@ -322,6 +321,7 @@ export default function ProjectsPage() {
   const handleExportPDF = async (projectId: string, lang: 'en' | 'ar') => {
     setExportingProjectId(projectId);
     let iframe: HTMLIFrameElement | null = null;
+
     try {
       const project = projects.find(p => p.id === projectId);
       if (!project) return;
@@ -360,6 +360,20 @@ export default function ProjectsPage() {
         return;
       }
 
+      // ── Load html2canvas ──
+      if (!(window as any).html2canvas) {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        await new Promise<void>(resolve => { s.onload = () => resolve(); document.head.appendChild(s); });
+      }
+      // ── Load jsPDF ──
+      if (!(window as any).jspdf) {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        await new Promise<void>(resolve => { s.onload = () => resolve(); document.head.appendChild(s); });
+      }
+      await new Promise(r => setTimeout(r, 300));
+
       // ── Group by floor, sort descending ──
       const unitsByFloor: Record<number, any[]> = {};
       allUnits.forEach(u => {
@@ -374,15 +388,14 @@ export default function ProjectsPage() {
 
       const isAr = lang === 'ar';
 
-      // ── Helpers ──
       const floorLabel = (f: number): string => {
         if (f === 0) return isAr ? 'الدور الأرضي' : 'Ground Floor';
         if (f === -1) return isAr ? 'البدروم' : 'Basement';
         if (f < -1) return isAr ? `بدروم ${Math.abs(f)}` : `Basement ${Math.abs(f)}`;
         const ar = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس',
-                    'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
+          'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
         const en = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth',
-                    'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+          'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
         return isAr
           ? (f <= 10 ? `الدور ${ar[f]}` : `الدور ${f}`)
           : (f <= 10 ? `${en[f]} Floor` : `Floor ${f}`);
@@ -391,37 +404,107 @@ export default function ProjectsPage() {
       type SC = { bg: string; bd: string; tx: string; lbl: string };
       const statusMap: Record<string, SC> = {
         AVAILABLE: { bg: '#eff6ff', bd: '#93c5fd', tx: '#1e40af', lbl: isAr ? 'متاح' : 'Available' },
-        RESERVED:  { bg: '#fff7ed', bd: '#fed7aa', tx: '#c2410c', lbl: isAr ? 'محجوز' : 'Reserved' },
-        SOLD:      { bg: '#fef2f2', bd: '#fca5a5', tx: '#991b1b', lbl: isAr ? 'مباع' : 'Sold' },
+        RESERVED: { bg: '#fff7ed', bd: '#fed7aa', tx: '#c2410c', lbl: isAr ? 'محجوز' : 'Reserved' },
+        SOLD: { bg: '#fef2f2', bd: '#fca5a5', tx: '#991b1b', lbl: isAr ? 'مباع' : 'Sold' },
       };
 
+      // ── Page dimensions ──
+      // A4 landscape at 96dpi ≈ 1122 × 794px. We render at this width.
       const PAGE_W = 1122;
+      const PAGE_H = 794;          // A4 landscape px height
       const PAD = 18;
       const INNER_W = PAGE_W - PAD * 2;
       const FLOOR_COL_W = 124;
+      const HEADER_H = 130;        // approx px for header + legend
+      const THEAD_H = 50;         // approx px for table header row
+      const FOOTER_H = 30;         // approx px for footer
+      const USABLE_H = PAGE_H - PAD * 2 - HEADER_H - THEAD_H - FOOTER_H;
 
-      const buildPage = (chunk: any[], ci: number, total: number): string => {
+      // System font stacks — deliberately NOT using Google Fonts here.
+      // Fetching a webfont inside a hidden iframe right before an
+      // html2canvas capture is a race condition: if the font isn't fully
+      // parsed in time, html2canvas measures/rasterizes text with the
+      // fallback font's metrics, which is what caused the overlapping
+      // "eaten" characters (e.g. "Rehab Project" → "RehalProject").
+      // System fonts are already resident in the browser with zero load
+      // latency, so there's no race to lose — output is 100% deterministic.
+      const EN_FONT_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+      const AR_FONT_STACK = "'Segoe UI', Tahoma, 'Geeza Pro', 'Arial', sans-serif";
+
+      // ── Helper: estimate row height for a floor given a chunk ──
+      // Each badge is ~58px tall + 6px margin. We stack badges in a single column per cell.
+      const estimateRowH = (floor: number, chunk: any[]): number => {
+        let maxBadges = 0;
+        chunk.forEach(l => {
+          const count = (unitsByFloor[floor] || []).filter(u => u.layoutId === l.id).length;
+          if (count > maxBadges) maxBadges = count;
+        });
+        if (maxBadges === 0) return 44; // empty row (just dash)
+        return maxBadges * 64 + 16;    // badge height × count + cell padding
+      };
+
+      // ── Split floors across pages per chunk ──
+      // Returns array of page-groups: each page-group is an array of floor numbers.
+      const splitFloorsIntoPages = (chunk: any[]): number[][] => {
+        const pages: number[][] = [];
+        let currentPage: number[] = [];
+        let usedH = 0;
+
+        for (const floor of sortedFloors) {
+          const rowH = estimateRowH(floor, chunk);
+          if (currentPage.length > 0 && usedH + rowH > USABLE_H) {
+            // This row won't fit — start a new page
+            pages.push(currentPage);
+            currentPage = [floor];
+            usedH = rowH;
+          } else {
+            currentPage.push(floor);
+            usedH += rowH;
+          }
+        }
+        if (currentPage.length > 0) pages.push(currentPage);
+        return pages;
+      };
+
+      // ── Build the full HTML for one "sheet" (one chunk, one page-worth of floors) ──
+      const buildSheetHtml = (
+        chunk: any[],
+        floorsOnThisPage: number[],
+        chunkIdx: number,
+        totalChunks: number,
+        pageIdx: number,
+        totalPages: number
+      ): string => {
         const nCols = chunk.length;
         const dataColW = Math.floor((INNER_W - FLOOR_COL_W) / nCols);
 
+        // Counts only for units in this chunk
         const av = allUnits.filter(u => u.status === 'AVAILABLE' && chunk.some(l => l.id === u.layoutId)).length;
         const rv = allUnits.filter(u => u.status === 'RESERVED' && chunk.some(l => l.id === u.layoutId)).length;
-        const sd = allUnits.filter(u => u.status === 'SOLD'      && chunk.some(l => l.id === u.layoutId)).length;
+        const sd = allUnits.filter(u => u.status === 'SOLD' && chunk.some(l => l.id === u.layoutId)).length;
+
+        const groupLabel = totalChunks > 1
+          ? (isAr ? `مجموعة ${chunkIdx + 1} من ${totalChunks}` : `Group ${chunkIdx + 1} of ${totalChunks}`)
+          : '';
+        const pageLabel = totalPages > 1
+          ? (isAr ? ` — صفحة ${pageIdx + 1} من ${totalPages}` : ` — Page ${pageIdx + 1} of ${totalPages}`)
+          : '';
 
         const thFloor = `<th style="width:${FLOOR_COL_W}px;min-width:${FLOOR_COL_W}px;background:#0f2d24;color:#6ee7b7;font-size:10px;font-weight:800;text-align:center;padding:10px 6px;letter-spacing:0.04em;border-right:2px solid #1a3d30;">${isAr ? 'الدور' : 'FLOOR'}</th>`;
+
         const thCols = chunk.map(l => {
           const price = l.price ? (isAr ? `${Number(l.price).toLocaleString()} ريال` : `SAR ${Number(l.price).toLocaleString()}`) : '';
-          const area  = l.areaSqm ? `${Number(l.areaSqm).toFixed(0)} ${isAr ? 'م²' : 'sqm'}` : '';
+          const area = l.areaSqm ? `${Number(l.areaSqm).toFixed(0)} ${isAr ? 'م²' : 'sqm'}` : '';
           return `<th style="width:${dataColW}px;min-width:${dataColW}px;background:#0f2d24;color:#f0fdf4;font-size:11px;text-align:center;padding:10px 8px;border-right:1px solid #1a3d30;word-wrap:break-word;vertical-align:middle;">
             <div style="font-weight:800;color:#5eead4;font-size:11px;line-height:1.35;margin-bottom:3px;word-break:break-word;">${isAr ? l.arTitle : (l.enTitle || l.arTitle)}</div>
             ${price ? `<div style="font-size:9px;color:#a7f3d0;font-weight:700;margin-top:2px;">${price}</div>` : ''}
-            ${area  ? `<div style="font-size:8px;color:#6ee7b7;opacity:0.85;margin-top:1px;">${area}</div>`  : ''}
+            ${area ? `<div style="font-size:8px;color:#6ee7b7;opacity:0.85;margin-top:1px;">${area}</div>` : ''}
           </th>`;
         }).join('');
 
-        const bodyRows = sortedFloors.map((floor, fi) => {
+        const bodyRows = floorsOnThisPage.map((floor, fi) => {
           const isEven = fi % 2 === 0;
-          const rowBg  = isEven ? '#ffffff' : '#f8fafc';
+          const rowBg = isEven ? '#ffffff' : '#f8fafc';
           const tdFloor = `<td style="width:${FLOOR_COL_W}px;min-width:${FLOOR_COL_W}px;background:#f1f5f9;font-weight:800;font-size:10px;color:#0f2d24;text-align:center;padding:10px 6px;border-bottom:1px solid #e2e8f0;border-right:2px solid #0f2d24;vertical-align:middle;white-space:nowrap;">${floorLabel(floor)}</td>`;
 
           const tdCols = chunk.map(l => {
@@ -441,78 +524,149 @@ export default function ProjectsPage() {
                 ${u.type ? `<div style="font-size:7px;opacity:0.65;margin-top:1px;">${u.type}</div>` : ''}
               </div>`;
             }).join('');
+
             return `<td style="width:${dataColW}px;background:${rowBg};border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;padding:6px;vertical-align:middle;text-align:center;">${badges}</td>`;
           }).join('');
+
           return `<tr>${tdFloor}${tdCols}</tr>`;
         }).join('');
 
-        const pageBreakStyle = ci > 0 ? 'page-break-before:always;break-before:page;' : '';
-        return `
-<div style="${pageBreakStyle}width:${PAGE_W}px;box-sizing:border-box;padding:${PAD}px;font-family:${isAr ? "'Cairo','Arial'" : "'Outfit','Arial'"},sans-serif;background:#fff;direction:${isAr ? 'rtl' : 'ltr'};">
+        return `<!DOCTYPE html>
+<html lang="${lang}" dir="${isAr ? 'rtl' : 'ltr'}">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ${isAr ? AR_FONT_STACK : EN_FONT_STACK};
+      direction: ${isAr ? 'rtl' : 'ltr'};
+      background: #fff;
+      width: ${PAGE_W}px;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+  </style>
+</head>
+<body>
+<div style="width:${PAGE_W}px;box-sizing:border-box;padding:${PAD}px;background:#fff;direction:${isAr ? 'rtl' : 'ltr'};">
+  <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:10px;border-bottom:3px solid #0f2d24;">
     <div>
-      <div style="font-size:21px;font-weight:900;color:#0f2d24;line-height:1;letter-spacing:-0.5px;">تمليك <span style="font-size:14px;font-weight:700;color:#0d9488;letter-spacing:0.03em;">TAMLEEQ</span></div>
+      <div style="display:flex;align-items:baseline;gap:7px;direction:ltr;">
+        <span style="font-size:21px;font-weight:900;color:#0f2d24;line-height:1;letter-spacing:-0.5px;" dir="rtl">تمليك</span>
+        <span style="font-size:14px;font-weight:700;color:#0d9488;letter-spacing:0.03em;line-height:1;">TAMLEEQ</span>
+      </div>
       <div style="font-size:9px;color:#64748b;font-weight:600;margin-top:4px;">${isAr ? 'تقرير مخزون الوحدات — مخطط الطوابق' : 'Unit Inventory Report — Floor Plan Matrix'}</div>
     </div>
     <div style="text-align:${isAr ? 'left' : 'right'};">
       <div style="font-size:16px;font-weight:800;color:#0d9488;">${project.nameEn}</div>
       <div style="font-size:10px;color:#64748b;font-weight:600;margin-top:2px;">📍 ${project.city}${project.district ? ` • ${project.district}` : ''}</div>
-      ${total > 1 ? `<div style="font-size:8px;color:#94a3b8;margin-top:3px;font-weight:600;">${isAr ? `مجموعة ${ci + 1} من ${total}` : `Group ${ci + 1} of ${total}`}</div>` : ''}
+      ${(groupLabel || pageLabel) ? `<div style="font-size:8px;color:#94a3b8;margin-top:3px;font-weight:600;">${groupLabel}${pageLabel}</div>` : ''}
     </div>
   </div>
+  <!-- Legend -->
   <div style="display:flex;align-items:center;gap:14px;background:#f8fafc;border:1px solid #e8edf5;border-radius:8px;padding:7px 12px;margin-bottom:12px;">
-    <div style="display:flex;align-items:center;gap:5px;font-size:9px;font-weight:800;color:#1e40af;"><div style="width:11px;height:11px;background:#eff6ff;border:2px solid #93c5fd;border-radius:3px;flex-shrink:0;"></div>${isAr ? 'متاح' : 'Available'} (${av})</div>
-    <div style="display:flex;align-items:center;gap:5px;font-size:9px;font-weight:800;color:#c2410c;"><div style="width:11px;height:11px;background:#fff7ed;border:2px solid #fed7aa;border-radius:3px;flex-shrink:0;"></div>${isAr ? 'محجوز' : 'Reserved'} (${rv})</div>
-    <div style="display:flex;align-items:center;gap:5px;font-size:9px;font-weight:800;color:#991b1b;"><div style="width:11px;height:11px;background:#fef2f2;border:2px solid #fca5a5;border-radius:3px;flex-shrink:0;"></div>${isAr ? 'مباع' : 'Sold'} (${sd})</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:9px;line-height:11px;font-weight:800;color:#1e40af;"><div style="width:11px;height:11px;background:#eff6ff;border:2px solid #93c5fd;border-radius:3px;flex-shrink:0;"></div>${isAr ? 'متاح' : 'Available'} (${av})</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:9px;line-height:11px;font-weight:800;color:#c2410c;"><div style="width:11px;height:11px;background:#fff7ed;border:2px solid #fed7aa;border-radius:3px;flex-shrink:0;"></div>${isAr ? 'محجوز' : 'Reserved'} (${rv})</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:9px;line-height:11px;font-weight:800;color:#991b1b;"><div style="width:11px;height:11px;background:#fef2f2;border:2px solid #fca5a5;border-radius:3px;flex-shrink:0;"></div>${isAr ? 'مباع' : 'Sold'} (${sd})</div>
     <div style="margin-${isAr ? 'right' : 'left'}:auto;font-size:9px;color:#94a3b8;font-weight:700;">${isAr ? `الإجمالي: ${av + rv + sd} وحدة` : `Total: ${av + rv + sd} units`}</div>
   </div>
-  <table style="width:${INNER_W}px;table-layout:fixed;border-collapse:collapse;border:2px solid #0f2d24;font-size:11px;overflow:hidden;">
+  <!-- Table -->
+  <table style="width:${INNER_W}px;table-layout:fixed;border-collapse:collapse;border:2px solid #0f2d24;font-size:11px;">
     <thead><tr>${thFloor}${thCols}</tr></thead>
     <tbody>${bodyRows}</tbody>
   </table>
+  <!-- Footer -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:7px;border-top:1px solid #e2e8f0;font-size:7px;color:#94a3b8;font-weight:600;">
     <span>${isAr ? 'تم التصدير: ' : 'Exported: '}${new Date().toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
     <span>${isAr ? 'نظام تمليك الإداري © ' : 'Tamleeq Admin System © '}${new Date().getFullYear()}</span>
   </div>
-</div>`;
+</div>
+</body>
+</html>`;
       };
 
-      const pagesHtml = chunks.map((ch, i) => buildPage(ch, i, chunks.length)).join('\n');
-      const fontLink = 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;800;900&family=Cairo:wght@400;700;800;900&display=swap';
-      const fullHtml = `<!DOCTYPE html><html lang="${lang}" dir="${isAr ? 'rtl' : 'ltr'}"><head><meta charset="UTF-8"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="${fontLink}" rel="stylesheet"><style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;} body{font-family:${isAr ? "'Cairo','Arial'" : "'Outfit','Arial'"},sans-serif;direction:${isAr ? 'rtl' : 'ltr'};}</style></head><body>${pagesHtml}</body></html>`;
+      // ── A4 landscape in mm for jsPDF ──
+      const PDF_W_MM = 297;
+      const PDF_H_MM = 210;
 
-      iframe = document.createElement('iframe');
-      iframe.style.cssText = `position:fixed;left:-${PAGE_W + 100}px;top:0;width:${PAGE_W}px;height:794px;border:none;visibility:hidden;`;
-      document.body.appendChild(iframe);
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (doc) {
-        doc.open();
-        doc.write(fullHtml);
-        doc.close();
-      }
-
-      if (!(window as any).html2pdf) {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        await new Promise<void>(resolve => { s.onload = () => resolve(); document.head.appendChild(s); });
-      }
-
-      await new Promise(r => setTimeout(r, 2000));
-      const filename = `${project.nameEn.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_')}_inventory_${lang}.pdf`;
-      const opt = {
-        margin: 0,
-        filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-      };
       // @ts-ignore
-      await html2pdf().set(opt).from(iframe.contentDocument!.body).save();
+      const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+      const filename = `${project.nameEn.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_')}_inventory_${lang}.pdf`;
+
+      let isFirstPdfPage = true;
+
+      // ── For each layout-chunk, split floors into pages, render each sheet ──
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const chunk = chunks[ci];
+        const floorPages = splitFloorsIntoPages(chunk); // array of floor[] per page
+
+        for (let pi = 0; pi < floorPages.length; pi++) {
+          const floorsOnThisPage = floorPages[pi];
+          const sheetHtml = buildSheetHtml(chunk, floorsOnThisPage, ci, chunks.length, pi, floorPages.length);
+
+          // Create a hidden iframe for this single sheet
+          iframe = document.createElement('iframe');
+          iframe.style.cssText = `position:fixed;left:-${PAGE_W + 200}px;top:0;width:${PAGE_W}px;height:${PAGE_H + 200}px;border:none;visibility:hidden;`;
+          document.body.appendChild(iframe);
+
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            iframeDoc.open();
+            iframeDoc.write(sheetHtml);
+            iframeDoc.close();
+          }
+
+          // Wait for fonts to actually finish loading before capturing —
+          // a flat setTimeout is a race condition and is the root cause of
+          // the overlapping/garbled text (html2canvas measures with fallback
+          // font metrics if the webfont isn't ready yet).
+          const fontsReady = (iframeDoc as any)?.fonts?.ready;
+          if (fontsReady) {
+            await Promise.race([
+              fontsReady,
+              new Promise(r => setTimeout(r, 3000)), // safety timeout
+            ]);
+          }
+          // Small extra buffer for layout/reflow after fonts swap in
+          await new Promise(r => setTimeout(r, 300));
+
+          // Capture with html2canvas at exact PAGE_W × PAGE_H
+          // @ts-ignore
+          const canvas = await html2canvas(iframeDoc!.body, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            width: PAGE_W,
+            height: PAGE_H,
+            windowWidth: PAGE_W,
+            windowHeight: PAGE_H,
+            backgroundColor: '#ffffff',
+            letterRendering: true, // fixes html2canvas's inaccurate text
+            // measurement that causes overlapping /
+            // "eaten" characters and spaces on custom fonts
+          });
+
+          const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+          if (!isFirstPdfPage) doc.addPage();
+          isFirstPdfPage = false;
+
+          // Fill the entire A4 landscape page
+          doc.addImage(imgData, 'JPEG', 0, 0, PDF_W_MM, PDF_H_MM);
+
+          // Clean up iframe immediately
+          if (document.body.contains(iframe)) document.body.removeChild(iframe);
+          iframe = null;
+        }
+      }
+
+      doc.save(filename);
+
     } catch (err: any) {
       console.error('PDF Export Error:', err);
       setToast({ message: 'Error generating PDF. Please try again.', type: 'error' });
     } finally {
-      // ── Cleanup ──
       if (iframe && document.body.contains(iframe)) document.body.removeChild(iframe);
       setExportingProjectId(null);
     }
@@ -722,7 +876,7 @@ export default function ProjectsPage() {
                         {/* Actions */}
                         <td className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                             {project.brochureUrl && (
+                            {project.brochureUrl && (
                               <a
                                 href={project.brochureUrl}
                                 target="_blank"
@@ -874,17 +1028,14 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* â”€â”€ Inventory Side Drawer â”€â”€ */}
+      {/* ── Inventory Side Drawer ── */}
       {inventoryDrawerOpen && selectedLayout && selectedProjectForLayout && (
         <div className="fixed inset-0 z-40 overflow-hidden">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
             onClick={() => setInventoryDrawerOpen(false)}
           />
-
           <div className="fixed inset-y-0 right-0 max-w-xl w-full bg-white shadow-2xl flex flex-col z-50 transform transition-transform duration-300 animate-in slide-in-from-right">
-            {/* Drawer Header */}
             <div className="px-6 py-5 border-b border-surface-200 flex items-center justify-between bg-surface-50">
               <div>
                 <h3 className="text-base font-bold text-surface-900 flex items-center gap-2">
@@ -903,9 +1054,7 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            {/* Drawer Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Parent Project Details (Read-only) */}
               <div className="bg-surface-50 border border-surface-200 rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black uppercase tracking-wider text-surface-700 flex items-center gap-1.5">
@@ -924,21 +1073,18 @@ export default function ProjectsPage() {
                     <div className="text-[10px] text-surface-500 flex items-center gap-1 mt-1">
                       <MapPin className="w-3 h-3" />
                       {selectedProjectForLayout.city}
-                      {selectedProjectForLayout.district ? ` â€¢ ${selectedProjectForLayout.district}` : ''}
+                      {selectedProjectForLayout.district ? ` • ${selectedProjectForLayout.district}` : ''}
                     </div>
                   </div>
                   <span className="badge badge-green">Linked</span>
                 </div>
               </div>
 
-              {/* Units Inventory Section */}
               <div className="space-y-6">
-                {/* Add Units Form */}
                 <div className="bg-white border border-surface-200 rounded-2xl p-4 space-y-4 shadow-sm">
                   <h4 className="text-xs font-black uppercase tracking-wider text-surface-700">
                     Add Units to Inventory
                   </h4>
-
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="admin-label">Unit Number(s)</label>
@@ -967,7 +1113,6 @@ export default function ProjectsPage() {
                       </span>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="admin-label">BHK Type</label>
@@ -1002,7 +1147,6 @@ export default function ProjectsPage() {
                       />
                     </div>
                   </div>
-
                   <button
                     onClick={handleAddUnits}
                     disabled={loadingUnits}
@@ -1017,12 +1161,10 @@ export default function ProjectsPage() {
                   </button>
                 </div>
 
-                {/* Physical Unit Matrix */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-black uppercase tracking-wider text-surface-700">
                     Physical Unit Matrix
                   </h4>
-
                   {loadingUnits ? (
                     <div className="flex items-center gap-2 py-4 text-xs text-surface-500">
                       <Loader2 className="w-4 h-4 animate-spin text-primary-600" />
@@ -1059,7 +1201,6 @@ export default function ProjectsPage() {
                                   {unit.price && (
                                     <span className="opacity-75 font-medium">SAR {unit.price.toLocaleString()}</span>
                                   )}
-
                                   <div className="flex items-center gap-1 border-l border-current/25 pl-1.5 ml-1 select-none">
                                     <select
                                       value={unit.status}
@@ -1093,7 +1234,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* â”€â”€ PDF Export Selection Modal â”€â”€ */}
+      {/* ── PDF Export Selection Modal ── */}
       {exportModalOpen && exportProjectId && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl border border-surface-200 shadow-2xl max-w-md w-full overflow-hidden p-6 space-y-6 transform scale-95 animate-in zoom-in-95 duration-200">

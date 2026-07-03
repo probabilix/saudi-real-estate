@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
-import { Square, MapPin, Star, Shield, Heart } from 'lucide-react';
+import { Square, MapPin, Star, Shield, Heart, Bed, Bath, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatPriceCompact } from '@saudi-re/shared';
 import type { Listing } from '@saudi-re/shared';
@@ -31,6 +31,21 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
 
   const [favorited, setFavorited] = useState(!!listing.isFavorited);
   const [isToggling, setIsToggling] = useState(false);
+  const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+
+  const photos = listing.photos || [];
+
+  const handlePrevPhoto = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentPhotoIdx((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+  };
+
+  const handleNextPhoto = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentPhotoIdx((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+  };
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -95,7 +110,7 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
       transition={{ duration: 0.4, delay: index * 0.05 }}
       className="h-full relative group"
     >
-      <div className="bg-white border border-surface-200 rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 transform hover:-translate-y-1 relative h-full flex flex-col">
+      <div className="bg-white border border-surface-200 rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 relative h-full flex flex-col">
         {/* Link Overlay for the whole card area EXCEPT buttons */}
         <Link
           href={listing.projectId
@@ -107,16 +122,47 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
         />
 
         {/* Image Section */}
-        <div className="relative h-56 overflow-hidden shrink-0 pointer-events-none">
+        <div className="relative h-56 overflow-hidden shrink-0">
           <Image
-            src={photo}
+            key={currentPhotoIdx}
+            src={photos[currentPhotoIdx] || photo}
             alt={title}
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-700"
+            className="object-cover transition-transform duration-700 pointer-events-none"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            unoptimized={photo.includes('unsplash')}
+            unoptimized={(photos[currentPhotoIdx] || photo).includes('unsplash')}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60 pointer-events-none" />
+          
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={handlePrevPhoto}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full backdrop-blur-sm transition-all pointer-events-auto shadow-md"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleNextPhoto}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full backdrop-blur-sm transition-all pointer-events-auto shadow-md"
+                aria-label="Next image"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              {/* Bottom dots */}
+              <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 pointer-events-none">
+                {photos.map((_, dotIdx) => (
+                  <div
+                    key={dotIdx}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                      dotIdx === currentPhotoIdx ? 'bg-white scale-125' : 'bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Badges & Buttons (Above Link) */}
@@ -183,11 +229,25 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
             <span className={`line-clamp-1 ${locale === 'ar' ? 'font-arabic' : ''}`}>{location}</span>
           </div>
 
-          <div className="flex items-center gap-4 pt-4 border-t border-surface-100 mt-auto pointer-events-auto">
+          <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-surface-100 mt-auto pointer-events-auto">
             <div className="flex items-center gap-1.5 text-xs text-charcoal-muted pointer-events-none">
               <Square className="w-4 h-4 text-primary-500/70" />
               <span className="font-medium">{listing.areaSqm?.toLocaleString()} {tCommon('sqm')}</span>
             </div>
+
+            {listing.bedrooms !== undefined && listing.bedrooms !== null && (
+              <div className="flex items-center gap-1.5 text-xs text-charcoal-muted pointer-events-none">
+                <Bed className="w-4 h-4 text-primary-500/70" />
+                <span className="font-medium">{listing.bedrooms} {locale === 'ar' ? 'غرفة' : 'Beds'}</span>
+              </div>
+            )}
+
+            {listing.bathrooms !== undefined && listing.bathrooms !== null && (
+              <div className="flex items-center gap-1.5 text-xs text-charcoal-muted pointer-events-none">
+                <Bath className="w-4 h-4 text-primary-500/70" />
+                <span className="font-medium">{listing.bathrooms} {locale === 'ar' ? 'حمام' : 'Baths'}</span>
+              </div>
+            )}
 
             {isDashboard && (
               <div className="ms-auto flex items-center gap-2 relative z-20">

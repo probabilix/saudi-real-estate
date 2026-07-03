@@ -127,11 +127,24 @@ export class ListingService {
         },
         project: true
       },
-      orderBy: [
-        desc(listings.isFeatured),
-        asc(listings.featuredOrder),
-        desc(listings.createdAt)
-      ]
+      orderBy: (() => {
+        const order: any[] = [
+          desc(listings.isFeatured),
+          asc(listings.featuredOrder),
+        ];
+        if (filters.sortBy === 'price_asc') {
+          order.push(asc(listings.price));
+        } else if (filters.sortBy === 'price_desc') {
+          order.push(desc(listings.price));
+        } else if (filters.sortBy === 'beds_asc') {
+          order.push(asc(listings.bedrooms));
+        } else if (filters.sortBy === 'beds_desc') {
+          order.push(desc(listings.bedrooms));
+        } else {
+          order.push(desc(listings.createdAt));
+        }
+        return order;
+      })()
     });
 
     // Filter out listings whose featuredUntil has passed (expired promotions)

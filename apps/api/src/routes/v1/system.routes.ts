@@ -1009,12 +1009,17 @@ ${historyText}
       const page = Number(query.page || 1);
       const limit = Number(query.limit || 20);
 
+      const completionStatus = query.completionStatus as string;
+
       const conditions: any[] = [];
       if (city) {
         conditions.push(eq(projects.city, city));
       }
       if (isFeatured) {
         conditions.push(eq(projects.isFeatured, true));
+      }
+      if (completionStatus) {
+        conditions.push(eq(projects.completionStatus, completionStatus as any));
       }
       if (q) {
         const searchPattern = `%${q}%`;

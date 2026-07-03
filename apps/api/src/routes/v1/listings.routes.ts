@@ -955,11 +955,16 @@ export default async function listingsRoutes(app: FastifyInstance) {
         ))
         .orderBy(desc(listings.createdAt));
 
+      const units = await db.select()
+        .from(projectUnits)
+        .where(eq(projectUnits.projectId, id));
+
       return reply.send({
         success: true,
         data: {
           project,
-          layouts
+          layouts,
+          units
         }
       });
     } catch (err: any) {

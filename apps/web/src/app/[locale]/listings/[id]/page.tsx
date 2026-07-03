@@ -805,28 +805,6 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             {/* MOBILE ONLY: Links after Similar Properties */}
             <div className="lg:hidden space-y-4 pt-4">
               <div className="bg-white border border-surface-200 p-5 space-y-4 shadow-sm rounded-2xl">
-                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('popularAreas')}</h4>
-                <div className="grid gap-3">
-                  {[`Rentals in ${listing.district}`, `Villas for sale in ${listing.city}`, `New Projects in ${listing.city}`, `Commercial Spaces`].map((item, idx) => (
-                    <Link key={idx} href="#" className="flex items-center justify-between group">
-                      <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item}</span>
-                      <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-white border border-surface-200 p-5 space-y-4 shadow-sm rounded-2xl">
-                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('relatedCollections')}</h4>
-                <div className="grid gap-3">
-                  {['Luxury Penthouses', 'Family Sized Apartments', 'REGA Verified Projects', 'Near KAFD Financial District'].map((item, idx) => (
-                    <Link key={idx} href="#" className="flex items-center justify-between group">
-                      <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item}</span>
-                      <ChevronRight className="w-4 h-4 text-surface-300 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-white border border-surface-200 p-5 space-y-4 shadow-sm rounded-2xl">
                 <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('investmentInsights')}</h4>
                 <div className="grid gap-3">
                   {[

@@ -338,20 +338,20 @@ export default function ProjectsPage() {
         return;
       }
 
-      // ── Fetch all units in parallel ──
-      const unitsResults = await Promise.all(layouts.map(l => adminApi.getListingUnits(l.id)));
+      // ── Use preloaded units ──
+      const projectUnits = (detailsRes.data as any).units || [];
       const allUnits: any[] = [];
-      unitsResults.forEach((res, idx) => {
-        if (res.success && res.data) {
-          const layout = layouts[idx];
-          res.data.forEach((u: any) => allUnits.push({
+      projectUnits.forEach((u: any) => {
+        const layout = layouts.find(l => l.id === u.listingId);
+        if (layout) {
+          allUnits.push({
             ...u,
             layoutId: layout.id,
             layoutEn: layout.enTitle || layout.arTitle,
             layoutAr: layout.arTitle,
             layoutPrice: layout.price,
             layoutAreaSqm: layout.areaSqm,
-          }));
+          });
         }
       });
 

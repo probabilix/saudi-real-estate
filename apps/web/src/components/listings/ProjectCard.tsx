@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
-import { Square, MapPin, Layers, Sparkles, Shield, Construction, CheckCircle, Clock, Heart } from 'lucide-react';
+import { Square, MapPin, Layers, Sparkles, Shield, Construction, CheckCircle, Clock, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatPriceCompact } from '@saudi-re/shared';
 import { useAuth } from '@/hooks/use-auth';
@@ -53,6 +53,21 @@ export default function ProjectCard({
 
   const [favorited, setFavorited] = useState(!!isFavorited || !!project.isFavorited);
   const [isToggling, setIsToggling] = useState(false);
+  const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+
+  const photos = project.photos || [];
+
+  const handlePrevPhoto = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentPhotoIdx((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+  };
+
+  const handleNextPhoto = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentPhotoIdx((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+  };
 
   useEffect(() => {
     setFavorited(!!isFavorited || !!project.isFavorited);
@@ -132,7 +147,7 @@ export default function ProjectCard({
       transition={{ duration: 0.4, delay: index * 0.05 }}
       className="h-full relative group"
     >
-      <div className="bg-white border border-surface-200 rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 transform hover:-translate-y-1 relative h-full flex flex-col">
+      <div className="bg-white border border-surface-200 rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 relative h-full flex flex-col">
         {/* Link Overlay */}
         <Link
           href={`/${locale}/projects/${project.id}`}
@@ -141,15 +156,46 @@ export default function ProjectCard({
         />
 
         {/* Image Section */}
-        <div className="relative h-56 overflow-hidden shrink-0 pointer-events-none">
+        <div className="relative h-56 overflow-hidden shrink-0">
           <Image
-            src={photo}
+            key={currentPhotoIdx}
+            src={photos[currentPhotoIdx] || photo}
             alt={title}
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-700"
+            className="object-cover transition-transform duration-700 pointer-events-none"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent opacity-80" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent opacity-80 pointer-events-none" />
+
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={handlePrevPhoto}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full backdrop-blur-sm transition-all pointer-events-auto shadow-md"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleNextPhoto}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full backdrop-blur-sm transition-all pointer-events-auto shadow-md"
+                aria-label="Next image"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              {/* Bottom dots */}
+              <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 pointer-events-none">
+                {photos.map((_, dotIdx) => (
+                  <div
+                    key={dotIdx}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                      dotIdx === currentPhotoIdx ? 'bg-white scale-125' : 'bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
           
           {/* Starting Price Overlay (Premium) */}
           <div className="absolute bottom-4 start-4 flex flex-col pointer-events-none">

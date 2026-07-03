@@ -24,6 +24,7 @@ function ListingsContent() {
   const searchParams = useSearchParams();
 
   const [showFilters, setShowFilters] = useState(false);
+  const [showMobileFilterBar, setShowMobileFilterBar] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   const [isLoading, setIsLoading] = useState(true);
   const [results, setResults] = useState<{ items: Listing[]; total: number }>({ items: [], total: 0 });
@@ -38,6 +39,7 @@ function ListingsContent() {
   const bedrooms = searchParams.get('bedrooms') ? Number(searchParams.get('bedrooms')) : undefined;
   const q = searchParams.get('q') || '';
   const page = searchParams.get('page') ? Number(searchParams.get('page')) : 1;
+  const sortBy = searchParams.get('sortBy') || '';
 
   useEffect(() => {
     async function fetchListings() {
@@ -51,6 +53,7 @@ function ListingsContent() {
         if (maxPrice) queryParams.set('maxPrice', String(maxPrice));
         if (bedrooms) queryParams.set('bedrooms', String(bedrooms));
         if (q) queryParams.set('q', q);
+        if (sortBy) queryParams.set('sortBy', sortBy);
         queryParams.set('excludeProjects', 'true');
         queryParams.set('lang', locale);
         queryParams.set('limit', '21');
@@ -71,7 +74,7 @@ function ListingsContent() {
     }
 
     fetchListings();
-  }, [searchParams, locale, city, type, purpose, minPrice, maxPrice, bedrooms, q, page]);
+  }, [searchParams, locale, city, type, purpose, minPrice, maxPrice, bedrooms, q, page, sortBy]);
 
   function updateFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -92,7 +95,7 @@ function ListingsContent() {
     router.push(pathname);
   }
 
-  const hasActiveFilters = city || type || purpose || minPrice || maxPrice || bedrooms || q;
+  const hasActiveFilters = city || type || purpose || minPrice || maxPrice || bedrooms || q || sortBy;
 
   return (
     <div className="min-h-screen bg-white">
@@ -108,17 +111,133 @@ function ListingsContent() {
                 {t('title')}
               </h1>
             </div>
-            <Link
-              href={`/${locale}/projects`}
-              className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-charcoal text-white hover:bg-primary-600 font-bold text-sm shadow-md transition-all self-start md:self-auto hover:-translate-y-0.5 active:translate-y-0"
-            >
-              <Building className="w-4 h-4" />
-              {t('switchToProjects')}
-            </Link>
+            <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
+              <Link
+                href={`/${locale}/map`}
+                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 font-bold text-sm shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0"
+              >
+                <Map className="w-4 h-4 text-emerald-400" />
+                <span>{locale === 'ar' ? 'عرض الخريطة' : 'Map View'}</span>
+              </Link>
+              <Link
+                href={`/${locale}/projects`}
+                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-charcoal text-white hover:bg-primary-600 font-bold text-sm shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0"
+              >
+                <Building className="w-4 h-4" />
+                {t('switchToProjects')}
+              </Link>
+            </div>
           </div>
 
-          {/* Filter Bar */}
-          <div className="flex flex-wrap items-center gap-4">
+          {/* Mobile Search and Filters Button Row */}
+          <div className="flex items-center gap-3 md:hidden">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 group-focus-within:text-primary-600 transition-colors" />
+              <input
+                type="text"
+                placeholder={t('searchPlaceholder') || 'Search area, project or district...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && updateFilter('q', searchQuery)}
+                className="w-full pl-11 pr-4 py-3 rounded-xl border border-surface-200 bg-white text-sm font-medium focus:border-primary-600 outline-none transition-all shadow-sm"
+              />
+            </div>
+            <button
+              onClick={() => setShowMobileFilterBar(!showMobileFilterBar)}
+              className={`flex items-center justify-center p-3.5 rounded-xl border text-sm font-bold transition-all shadow-sm ${showMobileFilterBar || hasActiveFilters
+                ? 'border-primary-600 text-primary-700 bg-primary-50'
+                : 'border-surface-200 text-charcoal hover:border-primary-500 bg-white'
+              }`}
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Collapsible Mobile Filters */}
+          <AnimatePresence>
+            {showMobileFilterBar && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="md:hidden mt-4 bg-white border border-surface-200 rounded-2xl p-4 space-y-4 shadow-md overflow-hidden"
+              >
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-charcoal-muted">
+                    {locale === 'ar' ? 'خيارات التصفية' : 'Search Filters'}
+                  </h4>
+                  {/* City */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'المدينة' : 'City'}</label>
+                    <CityDropdown city={city} onChange={(val) => updateFilter('city', val)} />
+                  </div>
+                  {/* Type */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'نوع العقار' : 'Property Type'}</label>
+                    <PropertyTypeDropdown type={type} onChange={(val) => updateFilter('type', val)} />
+                  </div>
+                  {/* Purpose */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'الغرض' : 'Purpose'}</label>
+                    <PurposeDropdown purpose={purpose} onChange={(val) => updateFilter('purpose', val)} />
+                  </div>
+                  {/* Price */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'السعر' : 'Price Range'}</label>
+                    <PriceDropdown
+                      minPrice={minPrice}
+                      maxPrice={maxPrice}
+                      onChange={(min, max) => {
+                        updateFilter('minPrice', min ? String(min) : '');
+                        updateFilter('maxPrice', max ? String(max) : '');
+                      }}
+                    />
+                  </div>
+                  {/* Sort By */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'ترتيب حسب' : 'Sort By'}</label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => updateFilter('sortBy', e.target.value)}
+                      className="w-full px-5 py-3 rounded-xl border border-surface-200 bg-white text-sm font-bold text-charcoal outline-none transition-all shadow-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-600/5 cursor-pointer"
+                    >
+                      <option value="">{locale === 'ar' ? 'الافتراضي' : 'Default (Featured)'}</option>
+                      <option value="price_asc">{locale === 'ar' ? 'السعر: من الأقل للأعلى' : 'Price: Low to High'}</option>
+                      <option value="price_desc">{locale === 'ar' ? 'السعر: من الأعلى للأقل' : 'Price: High to Low'}</option>
+                      <option value="beds_asc">{locale === 'ar' ? 'الغرف: من الأقل للأكثر' : 'Bedrooms: Low to High'}</option>
+                      <option value="beds_desc">{locale === 'ar' ? 'الغرف: من الأكثر للأقل' : 'Bedrooms: High to Low'}</option>
+                    </select>
+                  </div>
+
+                  {/* Sort By / Clear Filters */}
+                  <div className="flex gap-2.5 pt-2">
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-xs font-bold transition-all shadow-sm ${showFilters
+                        ? 'border-primary-600 text-primary-700 bg-primary-50'
+                        : 'border-surface-200 text-charcoal hover:border-primary-500 bg-white'
+                      }`}
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      <span>{locale === 'ar' ? 'فلاتر إضافية' : 'More Filters'}</span>
+                    </button>
+                    {hasActiveFilters && (
+                      <button
+                        onClick={clearFilters}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition-all"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>{t('clearAll')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Desktop Filter Bar */}
+          <div className="hidden md:flex flex-wrap items-center gap-4">
             {/* Text Search */}
             <div className="relative flex-1 min-w-[240px] max-w-md group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 group-focus-within:text-primary-600 transition-colors" />
@@ -133,13 +252,13 @@ function ListingsContent() {
             </div>
 
             {/* City */}
-              <CityDropdown city={city} onChange={(val) => updateFilter('city', val)} />
+            <CityDropdown city={city} onChange={(val) => updateFilter('city', val)} />
 
             {/* Type */}
             <PropertyTypeDropdown type={type} onChange={(val) => updateFilter('type', val)} />
 
             {/* Purpose */}
-              <PurposeDropdown purpose={purpose} onChange={(val) => updateFilter('purpose', val)} />
+            <PurposeDropdown purpose={purpose} onChange={(val) => updateFilter('purpose', val)} />
 
             {/* Price Range */}
             <div className="z-20">
@@ -153,16 +272,29 @@ function ListingsContent() {
               />
             </div>
 
+            {/* Sort By Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => updateFilter('sortBy', e.target.value)}
+              className="px-5 py-3 rounded-xl border border-surface-200 bg-white text-sm font-bold text-charcoal outline-none transition-all shadow-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-600/5 cursor-pointer"
+            >
+              <option value="">{locale === 'ar' ? 'ترتيب حسب' : 'Sort By'}</option>
+              <option value="price_asc">{locale === 'ar' ? 'السعر: من الأقل للأعلى' : 'Price: Low to High'}</option>
+              <option value="price_desc">{locale === 'ar' ? 'السعر: من الأعلى للأقل' : 'Price: High to Low'}</option>
+              <option value="beds_asc">{locale === 'ar' ? 'الغرف: من الأقل للأكثر' : 'Bedrooms: Low to High'}</option>
+              <option value="beds_desc">{locale === 'ar' ? 'الغرف: من الأكثر للأقل' : 'Bedrooms: High to Low'}</option>
+            </select>
+
             {/* More Filters Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-sm font-bold transition-all shadow-sm ${showFilters || hasActiveFilters
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl border text-sm font-bold transition-all shadow-sm ${showFilters
                 ? 'border-primary-600 text-primary-700 bg-primary-50'
                 : 'border-surface-200 text-charcoal hover:border-primary-500 hover:bg-surface-50 hover:text-primary-600'
                 }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
-              {t('sortBy')}
+              <span>{locale === 'ar' ? 'فلاتر إضافية' : 'More Filters'}</span>
             </button>
 
             {/* Clear Filters */}
@@ -183,7 +315,6 @@ function ListingsContent() {
             <span className="text-sm text-charcoal-muted hidden lg:block">
               {t('showingResults', { count: results.total })}
             </span>
-
           </div>
 
           {/* Extended Filters Expansion */}
@@ -235,86 +366,16 @@ function ListingsContent() {
           </motion.div>
         ) : (
           <>
-            <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
+            <div className="w-full">
               {/* Listings Grid */}
-              <div className="flex-1">
-                <div className="grid sm:grid-cols-2 gap-6 lg:gap-8">
-                  {results.items.map((listing, i) => (
-                    <ListingCard
-                      key={listing.id}
-                      listing={listing}
-                      index={i}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Sidebar */}
-              <div className="w-full lg:w-80 shrink-0 space-y-6">
-                {/* Mini Map View CTA */}
-                <Link
-                  href={`/${locale}/map`}
-                  className="group block relative h-44 rounded-[2rem] overflow-hidden border border-slate-200 shadow-sm transition-all hover:shadow-md"
-                >
-                  <div className="absolute inset-0 bg-[#e5e7eb] bg-[radial-gradient(#d1d5db_1.5px,transparent_1.5px)] [background-size:16px_16px] transition-transform duration-700 group-hover:scale-105" />
-                  
-                  {/* Decorative roads */}
-                  <div className="absolute inset-x-0 top-1/3 h-4 bg-white border-y border-slate-300 -rotate-6" />
-                  <div className="absolute inset-y-0 left-1/3 w-4 bg-white border-x border-slate-300 rotate-12" />
-
-                  {/* Decorative Pins */}
-                  <div className="absolute top-10 left-1/4 animate-bounce">
-                    <div className="px-2 py-1 bg-emerald-600 text-white text-[9px] font-black rounded-lg shadow border border-white">
-                      SAR 1.2M
-                    </div>
-                  </div>
-                  <div className="absolute bottom-12 right-1/4 animate-bounce delay-150">
-                    <div className="px-2 py-1 bg-emerald-600 text-white text-[9px] font-black rounded-lg shadow border border-white">
-                      SAR 850K
-                    </div>
-                  </div>
-
-                  {/* Floating Action Button */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/10 backdrop-blur-[0.5px]">
-                    <div className="flex items-center gap-2 bg-[#064e4b] text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl transition-all duration-300 group-hover:scale-105 active:scale-95">
-                      <Map className="w-4 h-4 text-emerald-400" />
-                      <span>Map View</span>
-                    </div>
-                  </div>
-                </Link>
-
-                {/* Commute search CTA card */}
-                <Link
-                  href={`/${locale}/drive-time`}
-                  className="group block p-5 rounded-[2rem] bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-slate-950 shadow-md relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg"
-                >
-                  <div className="relative z-10 space-y-3">
-                    <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-emerald-400">
-                      <Car className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black tracking-wide leading-tight uppercase">Search by Commute</h4>
-                      <p className="text-[10px] text-slate-300 mt-1 font-semibold leading-relaxed">
-                        Find houses within 10-60 minutes driving distance from your workplace or school.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="absolute right-0 bottom-0 opacity-10 translate-x-4 translate-y-4">
-                    <Navigation className="w-20 h-20 rotate-45 text-white" />
-                  </div>
-                </Link>
-
-                {/* Subscribing / Alert card */}
-                <div className="p-5 rounded-[2rem] border border-slate-200 bg-slate-50 space-y-4">
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Property Alerts</h4>
-                    <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">Be the first to hear about new properties in Saudi Arabia.</p>
-                  </div>
-                  <button className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-700 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 shadow-sm transition-all active:scale-95">
-                    <Bell className="w-3.5 h-3.5" />
-                    <span>Alert Me on New Properties</span>
-                  </button>
-                </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                {results.items.map((listing, i) => (
+                  <ListingCard
+                    key={listing.id}
+                    listing={listing}
+                    index={i}
+                  />
+                ))}
               </div>
             </div>
 

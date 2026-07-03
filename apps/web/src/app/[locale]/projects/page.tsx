@@ -4,7 +4,8 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { Loader2, Search, X, Grid3X3 } from 'lucide-react';
+import { Loader2, Search, X, Grid3X3, SlidersHorizontal, Map, Building, MapPin } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ProjectCard from '@/components/listings/ProjectCard';
 import CityDropdown from '@/components/search/CityDropdown';
 import { api } from '@/lib/api';
@@ -38,6 +39,7 @@ function ProjectsContent() {
   const searchParams = useSearchParams();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [showMobileFilterBar, setShowMobileFilterBar] = useState(false);
   const [results, setResults] = useState<{ items: ProjectItem[]; total: number }>({ items: [], total: 0 });
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
 
@@ -45,6 +47,7 @@ function ProjectsContent() {
   const city = searchParams.get('city') || '';
   const q = searchParams.get('q') || '';
   const page = searchParams.get('page') ? Number(searchParams.get('page')) : 1;
+  const completionStatus = searchParams.get('completionStatus') || '';
 
   useEffect(() => {
     async function fetchProjects() {
@@ -53,6 +56,7 @@ function ProjectsContent() {
         const queryParams = new URLSearchParams();
         if (city) queryParams.set('city', city);
         if (q) queryParams.set('q', q);
+        if (completionStatus) queryParams.set('completionStatus', completionStatus);
         queryParams.set('lang', locale);
         queryParams.set('limit', '21');
         queryParams.set('page', String(page));
@@ -72,7 +76,7 @@ function ProjectsContent() {
     }
 
     fetchProjects();
-  }, [searchParams, locale, city, q, page]);
+  }, [searchParams, locale, city, q, page, completionStatus]);
 
   function updateFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -92,7 +96,7 @@ function ProjectsContent() {
     router.push(pathname);
   }
 
-  const hasActiveFilters = city || q;
+  const hasActiveFilters = city || q || completionStatus;
 
   return (
     <div className="min-h-screen bg-white">
@@ -109,17 +113,97 @@ function ProjectsContent() {
               </h1>
             </div>
             
-            <Link
-              href={`/${locale}/listings`}
-              className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-charcoal text-white hover:bg-primary-600 font-bold text-sm shadow-md transition-all self-start md:self-auto hover:-translate-y-0.5 active:translate-y-0"
-            >
-              <Grid3X3 className="w-4 h-4" />
-              {t('switchToListings')}
-            </Link>
+            <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
+              <Link
+                href={`/${locale}/map`}
+                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 font-bold text-sm shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0"
+              >
+                <Map className="w-4 h-4 text-emerald-400" />
+                <span>{locale === 'ar' ? 'عرض الخريطة' : 'Map View'}</span>
+              </Link>
+              <Link
+                href={`/${locale}/listings`}
+                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-charcoal text-white hover:bg-primary-600 font-bold text-sm shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0"
+              >
+                <Grid3X3 className="w-4 h-4" />
+                {t('switchToListings')}
+              </Link>
+            </div>
           </div>
 
-          {/* Filter Bar */}
-          <div className="flex flex-wrap items-center gap-4">
+          {/* Mobile Search and Filters Button Row */}
+          <div className="flex items-center gap-3 md:hidden">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 group-focus-within:text-primary-600 transition-colors" />
+              <input
+                type="text"
+                placeholder={t('searchPlaceholder') || 'Search area, project or district...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && updateFilter('q', searchQuery)}
+                className="w-full pl-11 pr-4 py-3 rounded-xl border border-surface-200 bg-white text-sm font-medium focus:border-primary-600 outline-none transition-all shadow-sm"
+              />
+            </div>
+            <button
+              onClick={() => setShowMobileFilterBar(!showMobileFilterBar)}
+              className={`flex items-center justify-center p-3.5 rounded-xl border text-sm font-bold transition-all shadow-sm ${showMobileFilterBar || hasActiveFilters
+                ? 'border-primary-600 text-primary-700 bg-primary-50'
+                : 'border-surface-200 text-charcoal hover:border-primary-500 bg-white'
+              }`}
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Collapsible Mobile Filters */}
+          <AnimatePresence>
+            {showMobileFilterBar && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="md:hidden mt-4 bg-white border border-surface-200 rounded-2xl p-4 space-y-4 shadow-md overflow-hidden"
+              >
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-charcoal-muted">
+                    {locale === 'ar' ? 'خيارات التصفية' : 'Search Filters'}
+                  </h4>
+                  {/* City */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'المدينة' : 'City'}</label>
+                    <CityDropdown city={city} onChange={(val) => updateFilter('city', val)} />
+                  </div>
+                  {/* Completion Status */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'حالة المشروع' : 'Completion Status'}</label>
+                    <select
+                      value={completionStatus}
+                      onChange={(e) => updateFilter('completionStatus', e.target.value)}
+                      className="w-full px-5 py-3 rounded-xl border border-surface-200 bg-white text-sm font-bold text-charcoal outline-none transition-all shadow-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-600/5 cursor-pointer"
+                    >
+                      <option value="">{locale === 'ar' ? 'الكل' : 'All Statuses'}</option>
+                      <option value="READY">{locale === 'ar' ? 'جاهز' : 'Ready'}</option>
+                      <option value="OFF_PLAN">{locale === 'ar' ? 'على الخارطة' : 'Off-Plan'}</option>
+                      <option value="UNDER_CONSTRUCTION">{locale === 'ar' ? 'تحت الإنشاء' : 'Under Construction'}</option>
+                    </select>
+                  </div>
+                  {/* Clear Filters */}
+                  {hasActiveFilters && (
+                    <button
+                      onClick={clearFilters}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition-all mt-2"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>{t('clearAll')}</span>
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Desktop Filter Bar */}
+          <div className="hidden md:flex flex-wrap items-center gap-4">
             {/* Text Search */}
             <div className="relative flex-1 min-w-[240px] max-w-md group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 group-focus-within:text-primary-600 transition-colors" />
@@ -135,6 +219,18 @@ function ProjectsContent() {
 
             {/* City */}
             <CityDropdown city={city} onChange={(val) => updateFilter('city', val)} />
+
+            {/* Completion Status Dropdown */}
+            <select
+              value={completionStatus}
+              onChange={(e) => updateFilter('completionStatus', e.target.value)}
+              className="px-5 py-3 rounded-xl border border-surface-200 bg-white text-sm font-bold text-charcoal outline-none transition-all shadow-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-600/5 cursor-pointer"
+            >
+              <option value="">{locale === 'ar' ? 'حالة المشروع' : 'Completion Status'}</option>
+              <option value="READY">{locale === 'ar' ? 'جاهز' : 'Ready'}</option>
+              <option value="OFF_PLAN">{locale === 'ar' ? 'على الخارطة' : 'Off-Plan'}</option>
+              <option value="UNDER_CONSTRUCTION">{locale === 'ar' ? 'تحت الإنشاء' : 'Under Construction'}</option>
+            </select>
 
             {/* Clear Filters */}
             {hasActiveFilters && (

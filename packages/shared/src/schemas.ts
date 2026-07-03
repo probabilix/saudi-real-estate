@@ -111,6 +111,7 @@ export const listingSearchSchema = z.object({
   limit: z.preprocess((val) => (val ? parseInt(val as string, 10) : 20), z.number().int().min(1).max(100).default(20)),
   page: z.preprocess((val) => (val ? parseInt(val as string, 10) : 1), z.number().int().min(1).default(1)),
   q: z.string().max(200).optional(), // free text search
+  sortBy: z.string().optional(),
 });
 
 // ── Buyer profile schemas ──

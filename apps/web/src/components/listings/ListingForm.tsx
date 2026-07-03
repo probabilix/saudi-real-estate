@@ -678,6 +678,8 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       videoUrl: data.videoUrl ?? undefined,
       brochureUrl: data.brochureUrl && (data.brochureUrl as string).trim() !== '' ? (data.brochureUrl as string) : undefined,
       mapEmbedUrl: data.mapEmbedUrl && (data.mapEmbedUrl as string).trim() !== '' ? (data.mapEmbedUrl as string) : undefined,
+      lat: data.lat !== undefined && data.lat !== null ? Number(data.lat) : undefined,
+      lng: data.lng !== undefined && data.lng !== null ? Number(data.lng) : undefined,
       history: ((data.history as any) || []).map((h: any) => ({
         year: h.year,
         event: h.event || 'LISTED',

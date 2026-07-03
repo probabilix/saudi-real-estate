@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { CrmTopBar } from '@/components/CrmSidebar';
 import { crmApi, CrmListing, CrmProject, CrmProjectUnit } from '@/lib/api';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
@@ -59,7 +60,7 @@ export default function MyListingsPage() {
     if (success) {
       let message = '';
       if (success === 'created') {
-        message = `Property ${shortId ? `${shortId} ` : ''}has been successfully listed and sent for review!`;
+        message = `Property ${shortId ? `${shortId} ` : ''}has been successfully listed and is awaiting approval!`;
       } else if (success === 'updated') {
         message = `Property ${shortId ? `${shortId} ` : ''}has been successfully updated!`;
       } else if (success === 'drafted') {
@@ -223,15 +224,13 @@ export default function MyListingsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <a 
-              href={`${WEB_URL}/en/post-property?from=crm${token ? `&token=${token}` : ''}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link 
+              href="/my-listings/create"
               className="bg-[#064e4b] hover:bg-[#043a37] text-white py-2.5 px-4 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 shadow-md shadow-[#064e4b]/10"
             >
               <Plus className="w-4 h-4" />
               <span>Post New Property</span>
-            </a>
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -243,7 +242,7 @@ export default function MyListingsPage() {
               <option value="">All Statuses</option>
               <option value="ACTIVE">Active</option>
               <option value="DRAFT">Draft</option>
-              <option value="FLAGGED">Awaiting Review</option>
+              <option value="FLAGGED">Awaiting Approval</option>
               <option value="SOLD">Sold</option>
               <option value="RENTED">Rented</option>
             </select>
@@ -325,7 +324,7 @@ export default function MyListingsPage() {
                             listing.status === 'FLAGGED' ? "bg-amber-50 text-amber-700 border-amber-100" :
                               "bg-slate-50 text-slate-600 border-slate-100"
                         )}>
-                          {listing.status === 'FLAGGED' ? 'Awaiting Review' : listing.status}
+                          {listing.status === 'FLAGGED' ? 'Awaiting Approval' : listing.status}
                         </div>
                       </td>
                       <td className="py-4 px-6 text-right">
@@ -367,15 +366,13 @@ export default function MyListingsPage() {
                             )
                           )}
 
-                          <a 
-                            href={`${WEB_URL}/en/edit-property/${listing.id}?from=crm${token ? `&token=${token}` : ''}`} 
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <Link 
+                            href={`/my-listings/edit/${listing.id}`} 
                             className="p-2 text-slate-400 hover:text-[#064e4b] hover:bg-slate-100 rounded-lg transition-colors inline-block" 
                             title="Edit Listing"
                           >
                             <Pencil className="w-4 h-4" />
-                          </a>
+                          </Link>
 
                           {/* Delete Property Action */}
                           <button

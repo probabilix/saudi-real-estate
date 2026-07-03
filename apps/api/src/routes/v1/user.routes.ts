@@ -135,6 +135,7 @@ export default async function userRoutes(app: FastifyInstance) {
             regaLicence: userData.regaLicence,
             subscriptionTier: userData.subscriptionTier,
             avatarUrl: userData.avatarUrl,
+            creditsBalance: userData.creditsBalance,
           },
           // Broker-specific extras — only populated if user has a broker_profiles row
           profile: brokerData || null

@@ -66,6 +66,8 @@ export default function SettingsPage() {
         homepage_featured_articles: 'Homepage Featured Articles',
         google_client_id: 'Google Client ID',
         google_client_secret: 'Google Client Secret',
+        google_android_client_id: 'Android OAuth Client ID',
+        google_ios_client_id: 'iOS OAuth Client ID',
         resend_api_key: 'Resend API Key',
         logo_url: 'Platform Logo',
         favicon_url: 'Platform Favicon',
@@ -555,8 +557,43 @@ export default function SettingsPage() {
               </div>
               <p className="text-[10px] text-surface-400 mt-2">The private client secret associated with the ID</p>
             </div>
+
+            <div>
+              <label className="admin-label">Android OAuth Client ID</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  className="admin-input" 
+                  defaultValue={getSettingValue('google_android_client_id')}
+                  onBlur={(e) => handleUpdateSetting('google_android_client_id', e.target.value)}
+                  placeholder="xxxx-xxxx.apps.googleusercontent.com"
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'google_android_client_id' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">Android OAuth client ID for mobile Google Sign-In</p>
+            </div>
+
+            <div>
+              <label className="admin-label">iOS OAuth Client ID</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  className="admin-input" 
+                  defaultValue={getSettingValue('google_ios_client_id')}
+                  onBlur={(e) => handleUpdateSetting('google_ios_client_id', e.target.value)}
+                  placeholder="xxxx-xxxx.apps.googleusercontent.com"
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'google_ios_client_id' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">iOS OAuth client ID for mobile Google Sign-In (Flutter)</p>
+            </div>
           </div>
         </section>
+
 
         {/* Section: Google Maps API Configuration */}
         <section className="space-y-4">

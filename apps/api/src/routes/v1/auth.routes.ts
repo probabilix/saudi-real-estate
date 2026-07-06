@@ -473,4 +473,109 @@ export default async function authRoutes(app: FastifyInstance) {
     reply.clearCookie('refreshToken', { path: '/' });
     return reply.send({ success: true, message: 'Logged out successfully' });
   });
+
+  /**
+   * POST /api/v1/auth/google/mobile
+   * Google Sign-In for Flutter mobile app.
+   * Accepts a native Google ID token, verifies it, then finds or creates the user.
+   * Returns accessToken + refreshToken in body (no cookie — mobile doesn't use cookies).
+   */
+  app.post('/google/mobile', async (request, reply) => {
+    const { idToken } = request.body as { idToken: string };
+
+    if (!idToken) {
+      return reply.code(400).send({ success: false, message: 'idToken is required' });
+    }
+
+    try {
+      // 1. Verify ID token with Google
+      const verifyResponse = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
+      );
+
+      if (!verifyResponse.ok) {
+        return reply.code(401).send({
+          success: false,
+          message: 'Invalid Google token',
+        });
+      }
+
+      const payload = await verifyResponse.json() as {
+        aud: string;
+        email: string;
+        name?: string;
+        picture?: string;
+        error_description?: string;
+      };
+
+      // 2. Verify audience matches the web client ID stored in system_settings
+      const { SystemService } = await import('../../services/system.service');
+      const googleClientId = await SystemService.getSetting('google_client_id', process.env.GOOGLE_CLIENT_ID || '');
+      if (!googleClientId || payload.aud !== googleClientId) {
+        return reply.code(401).send({
+          success: false,
+          message: 'Token audience mismatch',
+        });
+      }
+
+      // 3. Find or create user (same logic as /google/callback)
+      const googleUserEmail = payload.email.toLowerCase().trim();
+      const googleUserName = payload.name || 'Google User';
+      const googlePicture = payload.picture || null;
+
+      let user = await db.query.users.findFirst({
+        where: eq(users.email, googleUserEmail),
+      });
+
+      if (!user) {
+        const newUsers = await db.insert(users).values({
+          email: googleUserEmail,
+          name: googleUserName,
+          role: 'BUYER',
+          passwordHash: 'OAUTH_USER',
+          avatarUrl: googlePicture,
+          isActive: true,
+          regaVerified: false,
+        }).returning();
+        user = newUsers[0];
+      } else {
+        // Sync avatar if it changed
+        if (googlePicture && user.avatarUrl !== googlePicture) {
+          await db.update(users)
+            .set({ avatarUrl: googlePicture, updatedAt: new Date() })
+            .where(eq(users.id, user.id));
+          user.avatarUrl = googlePicture;
+        }
+      }
+
+      // 4. Generate tokens
+      const { accessToken, refreshToken } = AuthService.generateTokens({
+        userId: user.id,
+        role: user.role,
+      });
+
+      // 5. Return tokens in body (no cookie — mobile clients use secure storage)
+      return reply.send({
+        success: true,
+        data: {
+          accessToken,
+          refreshToken,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            avatarUrl: user.avatarUrl,
+            creditsBalance: user.creditsBalance,
+            phone: user.phone,
+            verificationStatus: user.verificationStatus,
+          },
+        },
+      });
+
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Internal Server Error' });
+    }
+  });
 }

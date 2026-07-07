@@ -302,10 +302,10 @@ async function verifyAndCredit(
       return { success: false, message: 'Order not found' };
     }
 
-    // 2. Idempotency guard — only process PENDING orders
-    if (order.status !== 'PENDING') {
+    // 2. Idempotency guard — only skip if already successfully PAID
+    if (order.status === 'PAID') {
       app.log.info({ paymentId, status: order.status, source }, 'verifyAndCredit: already processed');
-      return { success: true, alreadyProcessed: true, message: `Already ${order.status}` };
+      return { success: true, alreadyProcessed: true, message: 'Already PAID' };
     }
 
     // 3. Fetch authoritative payment from Moyasar (server-to-server)
@@ -322,10 +322,6 @@ async function verifyAndCredit(
     }
 
     // 4. Verify status, amount, and currency against our DB record — never trust client claims
-    // Compare exact halalas as numbers on both sides (order.priceSar comes back from
-    // Postgres as a string via Drizzle, so parseFloat it before comparing — comparing
-    // a rounded SAR number directly against that string was always false, which is
-    // why every payment was being marked FAILED regardless of its real status).
     const expectedAmountHalalas = Math.round(parseFloat(order.priceSar as unknown as string) * 100);
     if (
       payment.status !== 'paid' ||
@@ -333,10 +329,17 @@ async function verifyAndCredit(
       payment.currency !== 'SAR'
     ) {
       app.log.warn({ paymentStatus: payment.status, paymentAmount: payment.amount, orderPriceSar: order.priceSar, source }, 'verifyAndCredit: validation failed');
-      await db.update(creditOrders)
-        .set({ status: 'FAILED', metadata: payment, updatedAt: new Date() })
-        .where(eq(creditOrders.id, order.id));
-      return { success: false, message: 'Payment validation failed' };
+      
+      // Only set database status to FAILED if it is a terminal failure (failed/voided/expired)
+      // or if there is an amount/currency mismatch. Otherwise leave it PENDING for retry.
+      const isTerminalFailure = ['failed', 'voided', 'expired'].includes(payment.status);
+      if (isTerminalFailure || payment.amount !== expectedAmountHalalas || payment.currency !== 'SAR') {
+        await db.update(creditOrders)
+          .set({ status: 'FAILED', metadata: payment, updatedAt: new Date() })
+          .where(eq(creditOrders.id, order.id));
+      }
+      
+      return { success: false, message: `Payment validation failed (status: ${payment.status})` };
     }
 
     // 5. All checks passed — credit wallet atomically

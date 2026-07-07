@@ -57,10 +57,13 @@ function CheckoutModal({
 }) {
   const [step, setStep] = useState<'init' | 'form' | 'success' | 'error'>('init');
   const [error, setError] = useState<string | null>(null);
-  const [initData, setInitData] = useState<{ publishableKey: string; orderId: string } | null>(null);
+  const [initData, setInitData] = useState<{ publishableKey: string; orderId: string; reference: string } | null>(null);
   const [newBalance, setNewBalance] = useState<number>(0);
 
   const checkoutStartedRef = useRef(false);
+  const moyasarInitializedRef = useRef(false);
+  // ref callback — fires only after React paints the div to the DOM
+  const formContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (checkoutStartedRef.current) return;
@@ -72,6 +75,8 @@ function CheckoutModal({
   async function initCheckout() {
     setStep('init');
     setError(null);
+    moyasarInitializedRef.current = false;
+    formContainerRef.current = null;
     try {
       const res = await crmApi.initCheckout(pkg.key);
       if (!res.success || !res.data) {
@@ -80,13 +85,19 @@ function CheckoutModal({
         return;
       }
       const data = res.data as any;
-      setInitData({ publishableKey: data.publishableKey, orderId: data.orderId });
+      setInitData({ publishableKey: data.publishableKey, orderId: data.orderId, reference: data.reference });
       setStep('form');
-      // Mount Moyasar form after DOM settles
-      setTimeout(() => mountMoyasarForm(data.publishableKey, data.orderId, pkg.priceSar, data.reference), 100);
     } catch (e: any) {
       setError(e.message || 'Unexpected error.');
       setStep('error');
+    }
+  }
+
+  // Called by React when the container div enters or leaves the DOM
+  function attachFormContainer(el: HTMLDivElement | null) {
+    formContainerRef.current = el;
+    if (el && initData && !moyasarInitializedRef.current) {
+      mountMoyasarForm(initData.publishableKey, initData.orderId, pkg.priceSar, initData.reference);
     }
   }
 
@@ -127,12 +138,15 @@ function CheckoutModal({
 
   function doMount(publishableKey: string, orderId: string, amountSar: number, reference: string) {
     if (!window.Moyasar) return;
-    const el = document.getElementById('moyasar-form-container');
+    const el = formContainerRef.current || document.getElementById('moyasar-form-container');
     if (!el) return;
-    // Clear container first
+    if (moyasarInitializedRef.current) return;
+    moyasarInitializedRef.current = true;
+
+    // Clear container and pass the actual element (not string) to avoid querySelector race
     el.innerHTML = '';
     window.Moyasar.init({
-      element: '#moyasar-form-container',
+      element: el,
       amount: amountSar * 100, // halalas
       currency: 'SAR',
       description: `Tamleeq — ${pkg.nameEn} (${pkg.credits.toLocaleString()} credits)`,
@@ -141,7 +155,6 @@ function CheckoutModal({
       methods: ['creditcard', 'mada'],
       metadata: { orderId, reference },
       on_completed: async (payment: any) => {
-        // Client signal → server verification (per spec: hint only, never trust alone)
         await handleConfirmPayment(payment.id, orderId);
       },
     });
@@ -177,7 +190,7 @@ function CheckoutModal({
                 <ShieldCheck className="w-4 h-4 shrink-0" />
                 <span>Payments are secured by Moyasar. Card details never reach our servers.</span>
               </div>
-              <div id="moyasar-form-container" className="min-h-[280px]" />
+              <div id="moyasar-form-container" ref={attachFormContainer} className="min-h-[280px]" />
             </>
           )}
 

@@ -157,7 +157,7 @@ export default async function billingRoutes(app: FastifyInstance) {
         return reply.code(404).send({ success: false, message: 'Package not found or inactive' });
       }
 
-      // 2. Create our idempotency reference BEFORE contacting Moyasar
+      // 2. Create our idempotency reference
       const reference = `tamleeq-${userId.slice(0, 8)}-${Date.now()}`;
 
       // 3. Create pending order in DB
@@ -171,52 +171,15 @@ export default async function billingRoutes(app: FastifyInstance) {
         metadata: {},
       }).returning();
 
-      // 4. Create payment with Moyasar (server-to-server, using secret key)
-      const backendUrl = process.env.BACKEND_URL || process.env.API_BASE_URL || 'http://localhost:3001';
-      const moyasarPayload = {
-        amount: pkg.priceSar * 100, // Moyasar expects halalas (SAR * 100)
-        currency: 'SAR',
-        description: `Tamleeq Credit Purchase — ${pkg.nameEn} (${pkg.credits} credits)`,
-        callback_url: `${backendUrl}/api/v1/billing/confirm`,
-        source: { type: 'creditcard' },
-        metadata: { orderId: order.id, brokerId: userId, reference },
-      };
-
-      const moyasarRes = await fetch('https://api.moyasar.com/v1/payments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`,
-        },
-        body: JSON.stringify(moyasarPayload),
-      });
-
-      const moyasarData = await moyasarRes.json() as any;
-
-      if (!moyasarRes.ok) {
-        app.log.error({ moyasarData }, 'Moyasar create payment failed');
-        // Mark order as failed
-        await db.update(creditOrders)
-          .set({ status: 'FAILED', updatedAt: new Date(), metadata: moyasarData })
-          .where(eq(creditOrders.id, order.id));
-        return reply.code(502).send({ success: false, message: moyasarData?.message || 'Payment gateway error' });
-      }
-
-      // 5. Store Moyasar payment ID on the order
-      await db.update(creditOrders)
-        .set({ moyasarPaymentId: moyasarData.id, metadata: moyasarData, updatedAt: new Date() })
-        .where(eq(creditOrders.id, order.id));
-
       return reply.send({
         success: true,
         data: {
           orderId: order.id,
           publishableKey,                    // safe to send — it's the public key
-          moyasarPaymentId: moyasarData.id,
-          formUrl: moyasarData.source?.transaction_url,  // for redirect integration
           amount: pkg.priceSar,
           credits: pkg.credits,
           packageName: pkg.nameEn,
+          reference,
         },
       });
     } catch (err: any) {
@@ -234,9 +197,16 @@ export default async function billingRoutes(app: FastifyInstance) {
     const userId = (req as any).user?.userId;
     if (!userId) return reply.code(401).send({ success: false, message: 'Unauthorized' });
 
-    const { paymentId } = req.body as { paymentId?: string };
+    const { paymentId, orderId } = req.body as { paymentId?: string; orderId?: string };
     if (!paymentId) {
       return reply.code(400).send({ success: false, message: 'paymentId is required' });
+    }
+
+    // 1. Associate paymentId with the order if orderId is provided
+    if (orderId) {
+      await db.update(creditOrders)
+        .set({ moyasarPaymentId: paymentId, updatedAt: new Date() })
+        .where(and(eq(creditOrders.id, orderId), eq(creditOrders.brokerId, userId)));
     }
 
     const result = await verifyAndCredit(app, paymentId, 'client-confirm');
@@ -283,8 +253,17 @@ export default async function billingRoutes(app: FastifyInstance) {
     const event = req.body as any;
     const eventType: string = event?.type ?? '';
     const paymentId: string = event?.data?.id ?? '';
+    const metadata = event?.data?.metadata ?? {};
+    const orderId = metadata.orderId;
 
-    app.log.info({ eventType, paymentId }, 'Moyasar webhook received');
+    if (orderId && paymentId) {
+      // Associate order with payment ID
+      await db.update(creditOrders)
+        .set({ moyasarPaymentId: paymentId, updatedAt: new Date() })
+        .where(eq(creditOrders.id, orderId));
+    }
+
+    app.log.info({ eventType, paymentId, orderId }, 'Moyasar webhook received');
 
     if (!paymentId) {
       return reply.code(400).send({ success: false, message: 'No payment ID in webhook payload' });

@@ -57,7 +57,7 @@ function CheckoutModal({
 }) {
   const [step, setStep] = useState<'init' | 'form' | 'success' | 'error'>('init');
   const [error, setError] = useState<string | null>(null);
-  const [initData, setInitData] = useState<{ publishableKey: string; paymentId: string } | null>(null);
+  const [initData, setInitData] = useState<{ publishableKey: string; orderId: string } | null>(null);
   const [newBalance, setNewBalance] = useState<number>(0);
 
   useEffect(() => {
@@ -75,23 +75,24 @@ function CheckoutModal({
         setStep('error');
         return;
       }
-      setInitData({ publishableKey: res.data.publishableKey, paymentId: res.data.moyasarPaymentId });
+      const data = res.data as any;
+      setInitData({ publishableKey: data.publishableKey, orderId: data.orderId });
       setStep('form');
       // Mount Moyasar form after DOM settles
-      setTimeout(() => mountMoyasarForm(res.data!.publishableKey, res.data!.moyasarPaymentId, pkg.priceSar), 100);
+      setTimeout(() => mountMoyasarForm(data.publishableKey, data.orderId, pkg.priceSar, data.reference), 100);
     } catch (e: any) {
       setError(e.message || 'Unexpected error.');
       setStep('error');
     }
   }
 
-  function mountMoyasarForm(publishableKey: string, paymentId: string, amountSar: number) {
+  function mountMoyasarForm(publishableKey: string, orderId: string, amountSar: number, reference: string) {
     // Load Moyasar.js if not already loaded
     if (!document.getElementById('moyasar-js')) {
       const script = document.createElement('script');
       script.id = 'moyasar-js';
       script.src = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.js';
-      script.onload = () => doMount(publishableKey, paymentId, amountSar);
+      script.onload = () => doMount(publishableKey, orderId, amountSar, reference);
       document.head.appendChild(script);
 
       const css = document.createElement('link');
@@ -99,13 +100,13 @@ function CheckoutModal({
       css.href = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.css';
       document.head.appendChild(css);
     } else {
-      doMount(publishableKey, paymentId, amountSar);
+      doMount(publishableKey, orderId, amountSar, reference);
     }
   }
 
-  async function handleConfirmPayment(completedPaymentId: string) {
+  async function handleConfirmPayment(completedPaymentId: string, orderId: string) {
     try {
-      const res = await crmApi.confirmPayment(completedPaymentId);
+      const res = await crmApi.confirmPayment(completedPaymentId, orderId);
       if (res.success) {
         setNewBalance(res.data?.newBalance ?? 0);
         setStep('success');
@@ -120,7 +121,7 @@ function CheckoutModal({
     }
   }
 
-  function doMount(publishableKey: string, paymentId: string, amountSar: number) {
+  function doMount(publishableKey: string, orderId: string, amountSar: number, reference: string) {
     if (!window.Moyasar) return;
     const el = document.getElementById('moyasar-form-container');
     if (!el) return;
@@ -134,9 +135,10 @@ function CheckoutModal({
       publishable_api_key: publishableKey,
       callback_url: window.location.href, // redirect fallback
       methods: ['creditcard', 'mada'],
+      metadata: { orderId, reference },
       on_completed: async (payment: any) => {
         // Client signal → server verification (per spec: hint only, never trust alone)
-        await handleConfirmPayment(payment.id ?? paymentId);
+        await handleConfirmPayment(payment.id, orderId);
       },
     });
   }

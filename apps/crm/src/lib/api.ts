@@ -229,10 +229,10 @@ export const crmApi = {
       method: 'POST',
       body: JSON.stringify({ packageKey }),
     }),
-  confirmPayment: (paymentId: string) =>
+  confirmPayment: (paymentId: string, orderId?: string) =>
     request<{ newBalance?: number }>('/billing/confirm', {
       method: 'POST',
-      body: JSON.stringify({ paymentId }),
+      body: JSON.stringify({ paymentId, orderId }),
     }),
 
   // ── Admin: Credit Packages ──

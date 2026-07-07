@@ -342,6 +342,31 @@ export const adminApi = {
     request(`/admin/projects/${projectId}`, {
       method: 'DELETE',
     }),
+
+  // ── Credit Packages CRUD ──
+  getCreditPackages: () => request<CreditPackage[]>('/admin/credit-packages'),
+  createCreditPackage: (data: Partial<CreditPackage>) =>
+    request<CreditPackage>('/admin/credit-packages', { method: 'POST', body: JSON.stringify(data) }),
+  updateCreditPackage: (id: string, data: Partial<CreditPackage>) =>
+    request<CreditPackage>(`/admin/credit-packages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  // ── Credit Orders ──
+  getCreditOrders: (params?: { status?: string; page?: number; brokerId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.brokerId) q.set('brokerId', params.brokerId);
+    return request<{ data: AdminCreditOrder[]; total: number }>(`/admin/credit-orders?${q}`);
+  },
+
+  // ── Broker Credits Info & Allocation ──
+  getBrokerCredits: (brokerId: string) =>
+    request<BrokerCreditsDetail>(`/admin/brokers/${brokerId}/credits`),
+  grantCredits: (brokerId: string, amount: number, description?: string) =>
+    request(`/admin/brokers/${brokerId}/credits/grant`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, description }),
+    }),
 };
 
 export interface ContactSubmission {
@@ -599,4 +624,58 @@ export interface AdminPropertyReport {
   description: string | null;
   status: string;
   createdAt: string;
+}
+
+// ── Credit Billing Types ──
+
+export interface CreditPackage {
+  id: string;
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  credits: number;
+  priceSar: number;
+  isPopular: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditOrder {
+  id: string;
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+  creditsAmount: number;
+  priceSar: number;
+  moyasarPaymentId: string | null;
+  creditedAt: string | null;
+  createdAt: string;
+  packageKey: string;
+  packageNameEn: string;
+  packageNameAr: string;
+}
+
+export interface CreditLedgerEntry {
+  id: string;
+  type: 'CREDIT_PURCHASE' | 'LISTING_PUBLISH' | 'LISTING_FEATURE' | 'LISTING_BUMP' | 'ADMIN_GRANT' | 'FIRM_GRANT';
+  amount: number;
+  balanceAfter: number;
+  description: string | null;
+  refOrderId: string | null;
+  refListingId: string | null;
+  createdAt: string;
+}
+
+export interface AdminCreditOrder extends CreditOrder {
+  brokerName: string | null;
+  brokerEmail: string;
+  brokerId: string;
+}
+
+export interface BrokerCreditsDetail {
+  broker: { id: string; name: string | null; email: string; creditsBalance: number | null };
+  orders: CreditOrder[];
+  ledger: CreditLedgerEntry[];
 }

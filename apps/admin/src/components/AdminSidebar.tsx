@@ -35,6 +35,13 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Finance',
+    items: [
+      { href: '/admin-credit-packages', label: 'Credit Packages', icon: Layers },
+      { href: '/admin-credit-orders', label: 'Credit Orders', icon: CreditCard },
+    ],
+  },
+  {
     label: 'Content',
     items: [
       { href: '/inbox', label: 'Inbox', icon: Mail },

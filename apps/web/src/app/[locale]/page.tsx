@@ -9,6 +9,7 @@ import TrustSection from '@/components/home/TrustSection';
 import RecentArticlesSection from '@/components/home/RecentArticlesSection';
 import FAQSection from '@/components/home/FAQSection';
 import FooterCTAStrip from '@/components/home/FooterCTAStrip';
+import EligibilityWizardCTA from '@/components/home/EligibilityWizardCTA';
 import ChatWidget from '@/components/chat/ChatWidget';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import { API_BASE_URL } from '@/lib/api';
@@ -132,6 +133,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
       <MapCTACardsSection />
       <FeaturedSection listings={featuredListings} projects={featuredProjects} />
       <HowItWorksSection />
+      <EligibilityWizardCTA />
       <TrustSection stats={homepageStats} />
       <CitySpotlightSection counts={cityCounts} />
       <CTASection contactPhone={contactPhone} whatsappNumber={contactWhatsApp} />

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles, mortgageLeads, projects, listingReports } from '../../db/schema';
+import { users, listings, systemSettings, news, legalPages, contactSubmissions, leads, buyerProfiles, chatMessages, brokerProfiles, mortgageLeads, projects, listingReports, creditPackages, creditOrders, creditLedger } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import { AuthService } from '../../services/auth.service';
 import { EmailService } from '../../services/email.service';
@@ -1506,6 +1506,194 @@ export default async function adminRoutes(app: FastifyInstance) {
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to delete project.', error: err.message });
+    }
+  });
+
+  // ────────────────────────────────────────────────────────
+  // Credit Packages CRUD — Admin only
+  // ────────────────────────────────────────────────────────
+
+  app.get('/credit-packages', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (_req, reply) => {
+    try {
+      const packages = await db.select().from(creditPackages).orderBy(creditPackages.sortOrder);
+      return reply.send({ success: true, data: packages });
+    } catch (err: any) {
+      app.log.error(err, 'admin credit-packages list error');
+      return reply.code(500).send({ success: false, message: 'Failed to load packages' });
+    }
+  });
+
+  app.post('/credit-packages', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (req, reply) => {
+    const body = req.body as {
+      key: string; nameEn: string; nameAr: string;
+      descriptionEn?: string; descriptionAr?: string;
+      credits: number; priceSar: number; isPopular?: boolean;
+      isActive?: boolean; sortOrder?: number;
+    };
+    if (!body.key || !body.nameEn || !body.credits || !body.priceSar) {
+      return reply.code(400).send({ success: false, message: 'key, nameEn, credits and priceSar are required' });
+    }
+    try {
+      const [pkg] = await db.insert(creditPackages).values({
+        key: body.key, nameEn: body.nameEn, nameAr: body.nameAr ?? body.nameEn,
+        descriptionEn: body.descriptionEn, descriptionAr: body.descriptionAr,
+        credits: body.credits, priceSar: body.priceSar,
+        isPopular: body.isPopular ?? false, isActive: body.isActive ?? true,
+        sortOrder: body.sortOrder ?? 0,
+      }).returning();
+      return reply.code(201).send({ success: true, data: pkg });
+    } catch (err: any) {
+      app.log.error(err, 'admin credit-packages create error');
+      if (err.code === '23505') return reply.code(409).send({ success: false, message: 'Package key already exists' });
+      return reply.code(500).send({ success: false, message: 'Failed to create package' });
+    }
+  });
+
+  app.patch('/credit-packages/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as {
+      nameEn?: string; nameAr?: string; descriptionEn?: string; descriptionAr?: string;
+      credits?: number; priceSar?: number; isPopular?: boolean;
+      isActive?: boolean; sortOrder?: number;
+    };
+    try {
+      const updateData: any = { updatedAt: new Date() };
+      if (body.nameEn !== undefined) updateData.nameEn = body.nameEn;
+      if (body.nameAr !== undefined) updateData.nameAr = body.nameAr;
+      if (body.descriptionEn !== undefined) updateData.descriptionEn = body.descriptionEn;
+      if (body.descriptionAr !== undefined) updateData.descriptionAr = body.descriptionAr;
+      if (body.credits !== undefined) updateData.credits = body.credits;
+      if (body.priceSar !== undefined) updateData.priceSar = body.priceSar;
+      if (body.isPopular !== undefined) updateData.isPopular = body.isPopular;
+      if (body.isActive !== undefined) updateData.isActive = body.isActive;
+      if (body.sortOrder !== undefined) updateData.sortOrder = body.sortOrder;
+
+      const [updated] = await db.update(creditPackages).set(updateData)
+        .where(eq(creditPackages.id, id)).returning();
+      if (!updated) return reply.code(404).send({ success: false, message: 'Package not found' });
+      return reply.send({ success: true, data: updated });
+    } catch (err: any) {
+      app.log.error(err, 'admin credit-packages update error');
+      return reply.code(500).send({ success: false, message: 'Failed to update package' });
+    }
+  });
+
+  // ────────────────────────────────────────────────────────
+  // Admin: All credit orders (cross-broker)
+  // ────────────────────────────────────────────────────────
+  app.get('/credit-orders', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (req, reply) => {
+    const query = req.query as { status?: string; page?: string; limit?: string; brokerId?: string };
+    const page = Math.max(1, parseInt(query.page ?? '1', 10));
+    const limit = Math.min(50, parseInt(query.limit ?? '25', 10));
+    const offset = (page - 1) * limit;
+
+    try {
+      const conditions = [];
+      if (query.status) conditions.push(eq(creditOrders.status, query.status as any));
+      if (query.brokerId) conditions.push(eq(creditOrders.brokerId, query.brokerId));
+
+      const orders = await db
+        .select({
+          id: creditOrders.id,
+          status: creditOrders.status,
+          creditsAmount: creditOrders.creditsAmount,
+          priceSar: creditOrders.priceSar,
+          moyasarPaymentId: creditOrders.moyasarPaymentId,
+          creditedAt: creditOrders.creditedAt,
+          createdAt: creditOrders.createdAt,
+          packageKey: creditPackages.key,
+          packageNameEn: creditPackages.nameEn,
+          brokerName: users.name,
+          brokerEmail: users.email,
+          brokerId: creditOrders.brokerId,
+        })
+        .from(creditOrders)
+        .innerJoin(creditPackages, eq(creditOrders.packageId, creditPackages.id))
+        .innerJoin(users, eq(creditOrders.brokerId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(creditOrders.createdAt))
+        .limit(limit).offset(offset);
+
+      const [{ total }] = await db.select({ total: count() }).from(creditOrders)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      return reply.send({ success: true, data: orders, total: Number(total) });
+    } catch (err: any) {
+      app.log.error(err, 'admin credit-orders error');
+      return reply.code(500).send({ success: false, message: 'Failed to fetch orders' });
+    }
+  });
+
+  // ────────────────────────────────────────────────────────
+  // Admin: Broker credit summary (balance + orders + ledger)
+  // ────────────────────────────────────────────────────────
+  app.get('/brokers/:id/credits', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const [user] = await db.select({
+        id: users.id, name: users.name, email: users.email,
+        creditsBalance: users.creditsBalance,
+      }).from(users).where(eq(users.id, id)).limit(1);
+
+      if (!user) return reply.code(404).send({ success: false, message: 'Broker not found' });
+
+      const [orders, ledgerEntries] = await Promise.all([
+        db.select({
+          id: creditOrders.id, status: creditOrders.status,
+          creditsAmount: creditOrders.creditsAmount, priceSar: creditOrders.priceSar,
+          packageNameEn: creditPackages.nameEn,
+          creditedAt: creditOrders.creditedAt, createdAt: creditOrders.createdAt,
+        }).from(creditOrders)
+          .innerJoin(creditPackages, eq(creditOrders.packageId, creditPackages.id))
+          .where(eq(creditOrders.brokerId, id))
+          .orderBy(desc(creditOrders.createdAt)).limit(50),
+
+        db.select().from(creditLedger)
+          .where(eq(creditLedger.brokerId, id))
+          .orderBy(desc(creditLedger.createdAt)).limit(100),
+      ]);
+
+      return reply.send({
+        success: true,
+        data: { broker: user, orders, ledger: ledgerEntries },
+      });
+    } catch (err: any) {
+      app.log.error(err, 'admin broker credits error');
+      return reply.code(500).send({ success: false, message: 'Failed to fetch broker credits' });
+    }
+  });
+
+  // Admin grant credits to a broker (creates ledger entry + updates balance)
+  app.post('/brokers/:id/credits/grant', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const adminId = (req as any).user?.id;
+    const { amount, description } = req.body as { amount: number; description?: string };
+
+    if (!amount || amount <= 0) {
+      return reply.code(400).send({ success: false, message: 'amount must be a positive number' });
+    }
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({ creditsBalance: sql`${users.creditsBalance} + ${amount}`, updatedAt: new Date() })
+        .where(eq(users.id, id))
+        .returning({ creditsBalance: users.creditsBalance });
+
+      if (!updatedUser) return reply.code(404).send({ success: false, message: 'Broker not found' });
+
+      await db.insert(creditLedger).values({
+        brokerId: id,
+        type: 'ADMIN_GRANT',
+        amount,
+        balanceAfter: updatedUser.creditsBalance ?? 0,
+        description: description || `Admin credit grant: ${amount} credits`,
+        performedById: adminId,
+      });
+
+      return reply.send({ success: true, data: { newBalance: updatedUser.creditsBalance } });
+    } catch (err: any) {
+      app.log.error(err, 'admin credit grant error');
+      return reply.code(500).send({ success: false, message: 'Failed to grant credits' });
     }
   });
 }

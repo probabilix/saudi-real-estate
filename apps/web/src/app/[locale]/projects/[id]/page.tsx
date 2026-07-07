@@ -181,6 +181,7 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
   const [narrativeExpanded, setNarrativeExpanded] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [amenitiesModalOpen, setAmenitiesModalOpen] = useState(false);
+  const [layoutZoomOpen, setLayoutZoomOpen] = useState(false);
 
   // Project reporting modal states
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -1169,15 +1170,23 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                           })()}
                         </div>
                         {/* Layout Image stretched */}
-                        <div className="relative w-full aspect-[16/10] md:aspect-[16/9] max-h-[450px] rounded-2xl overflow-hidden border border-surface-200 bg-surface-50 shadow-inner flex items-center justify-center min-h-[260px] p-2">
+                        <div 
+                          onClick={() => setLayoutZoomOpen(true)}
+                          className="relative w-full aspect-[16/10] md:aspect-[16/9] max-h-[450px] rounded-2xl overflow-hidden border border-surface-200 bg-surface-50 shadow-inner flex items-center justify-center min-h-[260px] p-2 cursor-zoom-in group/layout"
+                        >
                           {selectedLayout.photos && selectedLayout.photos[0] ? (
-                            <Image
-                              src={selectedLayout.photos[0]}
-                              alt={getCleanLayoutTitle(selectedLayout)}
-                              fill
-                              className="object-contain p-2"
-                              unoptimized
-                            />
+                            <>
+                              <Image
+                                src={selectedLayout.photos[0]}
+                                alt={getCleanLayoutTitle(selectedLayout)}
+                                fill
+                                className="object-contain p-2 transition-transform duration-300 group-hover/layout:scale-[1.02]"
+                                unoptimized
+                              />
+                              <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full opacity-0 group-hover/layout:opacity-100 transition-opacity">
+                                🔍 {locale === 'ar' ? 'عرض كامل' : 'View Full'}
+                              </div>
+                            </>
                           ) : (
                             <Building className="w-16 h-16 text-surface-300 animate-pulse" />
                           )}
@@ -1804,6 +1813,39 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Zoom view Modal for Layout Floorplan ── */}
+      {layoutZoomOpen && selectedLayout && selectedLayout.photos && selectedLayout.photos[0] && (
+        <div 
+          className="fixed inset-0 z-[200] bg-black/95 flex flex-col justify-center items-center p-4 animate-fade-in cursor-zoom-out"
+          onClick={() => setLayoutZoomOpen(false)}
+        >
+          {/* Close button */}
+          <button 
+            onClick={() => setLayoutZoomOpen(false)}
+            className="absolute top-6 right-6 z-[210] w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors text-2xl font-bold shadow-lg"
+          >
+            ×
+          </button>
+          
+          {/* Zoom view instructions */}
+          <div className="absolute top-6 left-6 text-xs font-bold text-white/50 select-none">
+            {locale === 'ar' ? 'انقر في أي مكان للإغلاق' : 'Click anywhere to close'}
+          </div>
+
+          <div 
+            className="relative w-full h-full max-w-5xl max-h-[85vh] flex items-center justify-center select-none"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={selectedLayout.photos[0]} 
+              alt={getCleanLayoutTitle(selectedLayout)}
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl transition-transform duration-300 active:scale-125 cursor-zoom-in" 
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

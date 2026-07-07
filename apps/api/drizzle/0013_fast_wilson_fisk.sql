@@ -1,0 +1,1 @@
+ALTER TABLE "wizard_leads" ADD COLUMN "notes" jsonb DEFAULT '[]'::jsonb;

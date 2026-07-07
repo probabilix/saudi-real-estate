@@ -5,7 +5,7 @@ import { SystemService } from '../../services/system.service';
 import { CloudinaryService } from '../../services/cloudinary.service';
 import { authenticateJWT, optionalAuthenticateJWT } from '../../middleware/auth.middleware';
 import { db } from '../../db';
-import { leads, buyerProfiles, listings, projects, projectUnits, users, listingReports } from '../../db/schema';
+import { leads, buyerProfiles, listings, projects, projectUnits, users, listingReports, creditLedger } from '../../db/schema';
 import { eq, and, sql, desc, asc, inArray, or, gte, lte, isNull } from 'drizzle-orm';
 
 
@@ -1380,6 +1380,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         ownerId: listings.ownerId,
         isFeatured: listings.isFeatured,
         featuredUntil: listings.featuredUntil,
+        enTitle: listings.enTitle,
+        arTitle: listings.arTitle,
       })
         .from(listings)
         .where(eq(listings.id, id))
@@ -1394,13 +1396,23 @@ export default async function listingsRoutes(app: FastifyInstance) {
         return reply.code(403).send({ success: false, message: 'Unauthorized' });
       }
 
-      // 3. Deduct credits and set featured status
-      const featuredUntilDate = new Date();
+      // Calculate new featuredUntil date:
+      // If already featured and expiry is in the future, append days to that expiry.
+      // Otherwise, start from now.
+      const now = new Date();
+      let baseDate = now;
+      if (listing.isFeatured && listing.featuredUntil && new Date(listing.featuredUntil) > now) {
+        baseDate = new Date(listing.featuredUntil);
+      }
+      const featuredUntilDate = new Date(baseDate.getTime());
       featuredUntilDate.setDate(featuredUntilDate.getDate() + days);
+
+      // 3. Deduct credits and set featured status
+      const updatedBalance = (user.creditsBalance ?? 0) - creditCost;
 
       await db.update(users)
         .set({
-          creditsBalance: sql`${users.creditsBalance} - ${creditCost}`,
+          creditsBalance: updatedBalance,
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId as string));
@@ -1414,12 +1426,24 @@ export default async function listingsRoutes(app: FastifyInstance) {
         .where(eq(listings.id, id))
         .returning();
 
+      // 4. Log to spend ledger
+      const listingTitle = listing.enTitle || listing.arTitle || 'Untitled Property';
+      await db.insert(creditLedger).values({
+        brokerId: userId as string,
+        type: 'LISTING_FEATURE',
+        amount: -creditCost,
+        balanceAfter: updatedBalance,
+        refListingId: listing.id,
+        description: `Featured listing upgrade: +${days} days for property "${listingTitle}"`,
+        performedById: userId as string,
+      });
+
       return reply.send({
         success: true,
         message: `Listing successfully featured for ${days} days!`,
         data: {
           listing: updatedListing,
-          newBalance: (user.creditsBalance ?? 0) - creditCost
+          newBalance: updatedBalance
         }
       });
     } catch (err: any) {

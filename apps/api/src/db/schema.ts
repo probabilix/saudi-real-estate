@@ -796,7 +796,133 @@ export const listingReportsRelations = relations(listingReports, ({ one }) => ({
   }),
 }));
 
+// ─────────────────────────────────────────────────────────────
+// ── Eligibility Wizard Leads Table ──
+// Separate from campaign/website leads — captures public wizard form submissions
+// ─────────────────────────────────────────────────────────────
 
+export const wizardLeadStatusEnum = pgEnum('wizard_lead_status', [
+  'in_progress',
+  'completed',
+  'abandoned',
+]);
 
+export const wizardLeads = pgTable('wizard_leads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  wizardId: varchar('wizard_id', { length: 100 }).notNull().default('buy-in-saudi-eligibility'),
+  status: wizardLeadStatusEnum('status').notNull().default('in_progress'),
+  leadStage: varchar('lead_stage', { length: 50 }).notNull().default('NEW'),
+  fullName: varchar('full_name', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }).notNull(),
+  phone: varchar('phone', { length: 50 }).notNull(),
+  citizenship: varchar('citizenship', { length: 100 }).notNull(),
+  consent: boolean('consent').notNull().default(false),
+  answers: jsonb('answers').default({}),          // { residency: 'outside', digitalId: 'no' }
+  resultKey: varchar('result_key', { length: 50 }), // 'resident' | 'nonresident-id' | 'nonresident-noid'
+  leadTags: text('lead_tags').array().default(sql`'{}'::text[]`),
+  notes: jsonb('notes').default(sql`'[]'::jsonb`),
+  source: varchar('source', { length: 100 }).notNull().default('buy-in-saudi-eligibility'),
+  crmSyncedAt: timestamp('crm_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  emailWizardIdx: index('wizard_lead_email_wizard_idx').on(table.email, table.wizardId),
+  statusIdx: index('wizard_lead_status_idx').on(table.status),
+  stageIdx: index('wizard_lead_stage_idx').on(table.leadStage),
+  createdAtIdx: index('wizard_lead_created_idx').on(table.createdAt),
+}));
+
+// ─────────────────────────────────────────────────────────────
+// ── Credit Billing System ──
+// Three tables: packages (admin-editable), orders (one per
+// Moyasar payment attempt), ledger (immutable audit log of
+// every credit movement — purchase or spend).
+// ─────────────────────────────────────────────────────────────
+
+export const creditOrderStatusEnum = pgEnum('credit_order_status', [
+  'PENDING',   // Payment initiated, awaiting confirmation
+  'PAID',      // Server independently confirmed via Moyasar fetch
+  'FAILED',    // Payment failed or declined
+  'REFUNDED',  // Refunded via Moyasar
+]);
+
+export const creditLedgerTypeEnum = pgEnum('credit_ledger_type', [
+  'CREDIT_PURCHASE',  // Credits added from a paid order
+  'LISTING_PUBLISH',  // Credits spent to publish a listing
+  'LISTING_FEATURE',  // Credits spent to feature a listing
+  'LISTING_BUMP',     // Credits spent to bump a listing
+  'ADMIN_GRANT',      // Admin manually granted credits
+  'FIRM_GRANT',       // Firm owner allocated credits to broker (future)
+]);
+
+// ── Credit Packages (admin-editable price table, source of truth) ──
+export const creditPackages = pgTable('credit_packages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  key: varchar('key', { length: 50 }).notNull().unique(), // e.g. 'starter', 'growth'
+  nameEn: varchar('name_en', { length: 100 }).notNull(),
+  nameAr: varchar('name_ar', { length: 100 }).notNull(),
+  descriptionEn: text('description_en'),
+  descriptionAr: text('description_ar'),
+  credits: integer('credits').notNull(),
+  priceSar: integer('price_sar').notNull(), // Price in whole SAR (not halalas)
+  isPopular: boolean('is_popular').default(false),
+  isActive: boolean('is_active').default(true),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+// ── Credit Orders (one row per Moyasar payment attempt) ──
+export const creditOrders = pgTable('credit_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  brokerId: uuid('broker_id').references(() => users.id).notNull(),
+  packageId: uuid('package_id').references(() => creditPackages.id).notNull(),
+  // Snapshot of package at time of order — immutable after creation
+  creditsAmount: integer('credits_amount').notNull(),
+  priceSar: integer('price_sar').notNull(),
+  // Moyasar payment tracking
+  moyasarPaymentId: varchar('moyasar_payment_id', { length: 100 }).unique(),
+  moyasarReference: varchar('moyasar_reference', { length: 100 }).unique(), // our idempotency ref
+  status: creditOrderStatusEnum('status').notNull().default('PENDING'),
+  creditedAt: timestamp('credited_at', { withTimezone: true }), // only set on PAID
+  metadata: jsonb('metadata').default({}),                       // raw Moyasar response snapshot
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  brokerIdx:    index('credit_order_broker_idx').on(table.brokerId),
+  statusIdx:    index('credit_order_status_idx').on(table.status),
+  moyasarIdx:   index('credit_order_moyasar_idx').on(table.moyasarPaymentId),
+  createdAtIdx: index('credit_order_created_idx').on(table.createdAt),
+}));
+
+// ── Credit Ledger (append-only — every credit movement logged here) ──
+export const creditLedger = pgTable('credit_ledger', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  brokerId: uuid('broker_id').references(() => users.id).notNull(),
+  type: creditLedgerTypeEnum('type').notNull(),
+  amount: integer('amount').notNull(),              // +ve = credit, -ve = debit
+  balanceAfter: integer('balance_after').notNull(), // Wallet snapshot after this entry
+  refOrderId: uuid('ref_order_id').references(() => creditOrders.id),   // for purchases
+  refListingId: uuid('ref_listing_id').references(() => listings.id),   // for spends
+  description: text('description'),
+  performedById: uuid('performed_by_id').references(() => users.id),    // Admin granter or broker
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  brokerIdx:    index('credit_ledger_broker_idx').on(table.brokerId),
+  typeIdx:      index('credit_ledger_type_idx').on(table.type),
+  createdAtIdx: index('credit_ledger_created_idx').on(table.createdAt),
+}));
+
+// ── Relations ──
+export const creditOrdersRelations = relations(creditOrders, ({ one }) => ({
+  broker:  one(users,          { fields: [creditOrders.brokerId],   references: [users.id] }),
+  package: one(creditPackages, { fields: [creditOrders.packageId],  references: [creditPackages.id] }),
+}));
+
+export const creditLedgerRelations = relations(creditLedger, ({ one }) => ({
+  broker:  one(users,         { fields: [creditLedger.brokerId],      references: [users.id] }),
+  order:   one(creditOrders,  { fields: [creditLedger.refOrderId],    references: [creditOrders.id] }),
+  listing: one(listings,      { fields: [creditLedger.refListingId],  references: [listings.id] }),
+}));
 
 

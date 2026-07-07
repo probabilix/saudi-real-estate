@@ -11,6 +11,8 @@ import adminRoutes from './admin.routes';
 import systemRoutes from './system.routes';
 import crmRoutes from './crm.routes';
 import mortgageRoutes from './mortgage.routes';
+import wizardRoutes from './wizard.routes';
+import billingRoutes from './billing.routes';
 
 /**
  * API v1 Route Registration
@@ -66,4 +68,10 @@ export default async function v1Routes(app: FastifyInstance) {
 
   // ── Mortgage Module ──
   await app.register(mortgageRoutes, { prefix: '/mortgage' });
+
+  // ── Eligibility Wizard Module ──
+  await app.register(wizardRoutes, { prefix: '/wizard' });
+
+  // ── Billing & Credits Module ──
+  await app.register(billingRoutes, { prefix: '/billing' });
 }

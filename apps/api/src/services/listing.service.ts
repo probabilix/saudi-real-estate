@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { listings, users, leads, favorites, buyerProfiles } from '../db/schema';
+import { listings, users, leads, favorites, buyerProfiles, creditLedger } from '../db/schema';
 import { eq, and, gte, lte, or, sql, desc, asc, inArray, InferSelectModel, SQL, isNull } from 'drizzle-orm';
 import { ListingSearchInput, extractLatLng } from '@saudi-re/shared';
 import { SystemService } from './system.service';
@@ -662,10 +662,12 @@ export class ListingService {
     // Note: Neon HTTP driver doesn't support db.transaction()
 
     // Deduct Credits from the user performing the action (Skip for ADMIN or Free)
+    let updatedBalance = user.creditsBalance ?? 0;
     if (!isAdmin && finalCost > 0) {
+      updatedBalance = (user.creditsBalance ?? 0) - finalCost;
       await db.update(users)
         .set({
-          creditsBalance: sql`${users.creditsBalance} - ${finalCost}`,
+          creditsBalance: updatedBalance,
           updatedAt: new Date()
         })
         .where(eq(users.id, userId));
@@ -685,9 +687,23 @@ export class ListingService {
 
     if (!result) throw new Error('Failed to update listing status');
 
+    // Log to spend ledger (Only if credits were actually deducted)
+    if (!isAdmin && finalCost > 0) {
+      const listingTitle = result.enTitle || result.arTitle || 'Untitled Property';
+      await db.insert(creditLedger).values({
+        brokerId: userId,
+        type: 'LISTING_PUBLISH',
+        amount: -finalCost,
+        balanceAfter: updatedBalance,
+        refListingId: result.id,
+        description: `Published standard listing: "${listingTitle}"`,
+        performedById: userId,
+      });
+    }
+
     return {
       listing: result,
-      newBalance: (user.creditsBalance ?? 0) - finalCost
+      newBalance: updatedBalance
     };
   }
 

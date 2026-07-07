@@ -25,6 +25,8 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [creditInput, setCreditInput] = useState<number>(0);
   const [updatingCredits, setUpdatingCredits] = useState(false);
+  const [brokerCredits, setBrokerCredits] = useState<any>(null);
+  const [loadingCredits, setLoadingCredits] = useState(false);
 
   // User Provisioning States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -71,6 +73,19 @@ export default function UsersPage() {
       setEditPhone(selectedUser.phone || '');
       setEditRole(selectedUser.role || '');
       setCreditInput(selectedUser.creditsBalance || 0);
+
+      if (['SOLO_BROKER', 'AGENT', 'FIRM'].includes(selectedUser.role)) {
+        setLoadingCredits(true);
+        setBrokerCredits(null);
+        adminApi.getBrokerCredits(selectedUser.id)
+          .then(res => {
+            if (res.success && res.data) {
+              setBrokerCredits(res.data);
+            }
+            setLoadingCredits(false);
+          })
+          .catch(() => setLoadingCredits(false));
+      }
     }
   }, [selectedUser]);
 
@@ -672,6 +687,71 @@ export default function UsersPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Broker Credit History (Orders & Ledger) */}
+                  {['SOLO_BROKER', 'AGENT', 'FIRM'].includes(selectedUser.role) && (
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider">Credit Transactions & History</h3>
+                      
+                      {loadingCredits ? (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
+                        </div>
+                      ) : brokerCredits ? (
+                        <div className="space-y-3">
+                          {/* Ledger Entries */}
+                          <div className="bg-surface-50 rounded-2xl border border-surface-150 p-4">
+                            <h4 className="text-xs font-bold text-surface-750 mb-3">Spend & Activity Ledger</h4>
+                            {!brokerCredits.ledger || brokerCredits.ledger.length === 0 ? (
+                              <p className="text-xs text-surface-400 italic">No credit activities recorded</p>
+                            ) : (
+                              <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                                {brokerCredits.ledger.map((entry: any) => (
+                                  <div key={entry.id} className="flex justify-between items-start text-xs border-b border-surface-200/50 pb-2 last:border-0 last:pb-0">
+                                    <div className="min-w-0 pr-2">
+                                      <p className="font-medium text-slate-800 break-words leading-relaxed">{entry.description || entry.type}</p>
+                                      <p className="text-[10px] text-slate-400 mt-1 font-semibold">{new Date(entry.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                                    </div>
+                                    <span className={clsx("font-bold shrink-0 text-sm", entry.amount < 0 ? "text-red-500" : "text-emerald-600")}>
+                                      {entry.amount < 0 ? '' : '+'}{entry.amount}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Purchase Orders */}
+                          <div className="bg-surface-50 rounded-2xl border border-surface-150 p-4">
+                            <h4 className="text-xs font-bold text-surface-750 mb-3">Purchase Orders</h4>
+                            {!brokerCredits.orders || brokerCredits.orders.length === 0 ? (
+                              <p className="text-xs text-surface-400 italic">No purchase orders found</p>
+                            ) : (
+                              <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                                {brokerCredits.orders.map((order: any) => (
+                                  <div key={order.id} className="flex justify-between items-center text-xs border-b border-surface-200/50 pb-2 last:border-0 last:pb-0">
+                                    <div>
+                                      <p className="font-semibold text-slate-800">{order.packageNameEn || 'Credits'}</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5 font-medium">{order.creditsAmount} cr · {order.priceSar} SAR</p>
+                                    </div>
+                                    <span className={clsx("px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0", 
+                                      order.status === 'PAID' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 
+                                      order.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
+                                      'bg-red-50 text-red-700 border-red-100'
+                                    )}>
+                                      {order.status}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-surface-400 italic">Failed to load credit history.</p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Broker Outreach */}
                   <div className="space-y-4">

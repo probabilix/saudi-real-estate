@@ -1,0 +1,2 @@
+ALTER TABLE "wizard_leads" ADD COLUMN "lead_stage" varchar(50) DEFAULT 'NEW' NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "wizard_lead_stage_idx" ON "wizard_leads" USING btree ("lead_stage");

@@ -78,6 +78,12 @@ export const crmApi = {
   updateWebsiteLeadStatus: (id: string, status: string) =>
     request(`/crm/website-leads/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 
+  updateWizardLeadStage: (id: string, stage: string) =>
+    request(`/wizard/leads/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) }),
+
+  addWizardLeadNote: (id: string, content: string) =>
+    request(`/wizard/leads/${id}/notes`, { method: 'POST', body: JSON.stringify({ content }) }),
+
   assignWebsiteLead: (id: string, agentId: string) =>
     request(`/crm/website-leads/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ agentId }) }),
 
@@ -210,6 +216,48 @@ export const crmApi = {
   deleteListingUnit: (listingId: string, unitId: string) =>
     request(`/listings/${listingId}/units/${unitId}`, {
       method: 'DELETE',
+    }),
+
+  // ── Billing / Credits ──
+  getBillingPackages: () => request<CreditPackage[]>('/billing/packages'),
+  getCreditBalance: () => request<{ balance: number }>('/billing/balance'),
+  getCreditOrders: () => request<CreditOrder[]>('/billing/orders'),
+  getCreditLedger: (page?: number) =>
+    request<CreditLedgerEntry[]>(`/billing/ledger?page=${page ?? 1}`),
+  initCheckout: (packageKey: string) =>
+    request<CheckoutInitResponse>('/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ packageKey }),
+    }),
+  confirmPayment: (paymentId: string) =>
+    request<{ newBalance?: number }>('/billing/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ paymentId }),
+    }),
+
+  // ── Admin: Credit Packages ──
+  adminGetCreditPackages: () => request<CreditPackage[]>('/admin/credit-packages'),
+  adminCreateCreditPackage: (data: Partial<CreditPackage>) =>
+    request<CreditPackage>('/admin/credit-packages', { method: 'POST', body: JSON.stringify(data) }),
+  adminUpdateCreditPackage: (id: string, data: Partial<CreditPackage>) =>
+    request<CreditPackage>(`/admin/credit-packages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  // ── Admin: Credit Orders ──
+  adminGetCreditOrders: (params?: { status?: string; page?: number; brokerId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.brokerId) q.set('brokerId', params.brokerId);
+    return request<{ data: AdminCreditOrder[]; total: number }>(`/admin/credit-orders?${q}`);
+  },
+
+  // ── Admin: Broker Credit Details ──
+  adminGetBrokerCredits: (brokerId: string) =>
+    request<BrokerCreditsDetail>(`/admin/brokers/${brokerId}/credits`),
+  adminGrantCredits: (brokerId: string, amount: number, description?: string) =>
+    request(`/admin/brokers/${brokerId}/credits/grant`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, description }),
     }),
 };
 
@@ -493,4 +541,68 @@ export interface CrmProject {
   city: string;
   district: string | null;
   mapEmbedUrl: string | null;
+}
+
+// ── Credit Billing Types ──
+
+export interface CreditPackage {
+  id: string;
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  credits: number;
+  priceSar: number;
+  isPopular: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditOrder {
+  id: string;
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+  creditsAmount: number;
+  priceSar: number;
+  moyasarPaymentId: string | null;
+  creditedAt: string | null;
+  createdAt: string;
+  packageKey: string;
+  packageNameEn: string;
+  packageNameAr: string;
+}
+
+export interface CreditLedgerEntry {
+  id: string;
+  type: 'CREDIT_PURCHASE' | 'LISTING_PUBLISH' | 'LISTING_FEATURE' | 'LISTING_BUMP' | 'ADMIN_GRANT' | 'FIRM_GRANT';
+  amount: number;
+  balanceAfter: number;
+  description: string | null;
+  refOrderId: string | null;
+  refListingId: string | null;
+  createdAt: string;
+}
+
+export interface CheckoutInitResponse {
+  orderId: string;
+  publishableKey: string;
+  moyasarPaymentId: string;
+  formUrl: string | null;
+  amount: number;
+  credits: number;
+  packageName: string;
+}
+
+export interface AdminCreditOrder extends CreditOrder {
+  brokerName: string | null;
+  brokerEmail: string;
+  brokerId: string;
+}
+
+export interface BrokerCreditsDetail {
+  broker: { id: string; name: string | null; email: string; creditsBalance: number | null };
+  orders: CreditOrder[];
+  ledger: CreditLedgerEntry[];
 }

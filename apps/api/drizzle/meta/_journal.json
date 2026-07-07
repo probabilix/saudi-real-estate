@@ -78,6 +78,34 @@
       "when": 1782896875120,
       "tag": "0010_low_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1783341568875,
+      "tag": "0011_furry_violations",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783402848111,
+      "tag": "0012_colorful_bill_hollister",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1783403603746,
+      "tag": "0013_fast_wilson_fisk",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1783418454408,
+      "tag": "0014_lumpy_wong",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@ import { useCrmAuth } from '@/hooks/use-crm-auth';
 import {
   LayoutDashboard, Globe, Megaphone, Settings,
   LogOut, ChevronRight, ChevronLeft, Building2,
-  X, Menu, AlertCircle, CreditCard, MessageCircle
+  X, Menu, AlertCircle, CreditCard, MessageCircle, Wand2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -18,8 +18,9 @@ const NAV_ADMIN = [
   {
     label: 'Lead Modules',
     items: [
-      { href: '/website-leads',    label: 'Website Leads',    icon: Globe,          desc: 'AI-qualified' },
-      { href: '/campaign-leads',   label: 'Campaign Leads',   icon: Megaphone,      desc: 'Ads & Manual' },
+      { href: '/website-leads',    label: 'Website Leads',    icon: Globe,     desc: 'AI-qualified' },
+      { href: '/campaign-leads',   label: 'Campaign Leads',   icon: Megaphone, desc: 'Ads & Manual' },
+      { href: '/wizard-leads',     label: 'Wizard Leads',     icon: Wand2,     desc: 'Eligibility form' },
       // { href: '/whatsapp-inbox',   label: 'WhatsApp Inbox',   icon: MessageCircle,  desc: 'AI chat agent', badge: 'NEW' },
     ],
   },

@@ -232,25 +232,26 @@ export default async function billingRoutes(app: FastifyInstance) {
       return reply.code(500).send({ success: false, message: 'Webhook not configured' });
     }
 
-    // 1. Verify HMAC-SHA256 signature (Moyasar signs the raw body)
-    const signature = req.headers['x-moyasar-signature'] as string;
-    if (!signature) {
-      return reply.code(401).send({ success: false, message: 'Missing signature' });
+    // 1. Verify body-based secret_token
+    const event = req.body as any;
+    const receivedToken: string = event?.secret_token ?? '';
+
+    if (!receivedToken) {
+      return reply.code(401).send({ success: false, message: 'Missing secret_token' });
     }
 
-    const rawBody = JSON.stringify(req.body);
-    const expectedSig = crypto
-      .createHmac('sha256', webhookSecret)
-      .update(rawBody)
-      .digest('hex');
+    const expected = Buffer.from(webhookSecret);
+    const received = Buffer.from(receivedToken);
 
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
-      app.log.warn({ signature }, 'Webhook signature mismatch — rejecting');
-      return reply.code(401).send({ success: false, message: 'Invalid signature' });
+    const isValid = expected.length === received.length &&
+      crypto.timingSafeEqual(expected, received);
+
+    if (!isValid) {
+      app.log.warn('Webhook secret_token mismatch — rejecting');
+      return reply.code(401).send({ success: false, message: 'Invalid secret_token' });
     }
 
     // 2. Parse event — we care about payment_paid primarily
-    const event = req.body as any;
     const eventType: string = event?.type ?? '';
     const paymentId: string = event?.data?.id ?? '';
     const metadata = event?.data?.metadata ?? {};
@@ -321,10 +322,14 @@ async function verifyAndCredit(
     }
 
     // 4. Verify status, amount, and currency against our DB record — never trust client claims
-    const amountInSar = Math.round(payment.amount / 100); // Convert halalas → SAR
+    // Compare exact halalas as numbers on both sides (order.priceSar comes back from
+    // Postgres as a string via Drizzle, so parseFloat it before comparing — comparing
+    // a rounded SAR number directly against that string was always false, which is
+    // why every payment was being marked FAILED regardless of its real status).
+    const expectedAmountHalalas = Math.round(parseFloat(order.priceSar as unknown as string) * 100);
     if (
       payment.status !== 'paid' ||
-      amountInSar !== order.priceSar ||
+      payment.amount !== expectedAmountHalalas ||
       payment.currency !== 'SAR'
     ) {
       app.log.warn({ paymentStatus: payment.status, paymentAmount: payment.amount, orderPriceSar: order.priceSar, source }, 'verifyAndCredit: validation failed');

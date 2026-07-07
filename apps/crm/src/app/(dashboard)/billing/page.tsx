@@ -85,6 +85,8 @@ function CheckoutModal({
         return;
       }
       const data = res.data as any;
+      // Save orderId so the redirect handler can use it after 3DS page
+      sessionStorage.setItem('tamleeq_pending_order_id', data.orderId);
       setInitData({ publishableKey: data.publishableKey, orderId: data.orderId, reference: data.reference });
       setStep('form');
     } catch (e: any) {
@@ -151,7 +153,7 @@ function CheckoutModal({
       currency: 'SAR',
       description: `Tamleeq — ${pkg.nameEn} (${pkg.credits.toLocaleString()} credits)`,
       publishable_api_key: publishableKey,
-      callback_url: window.location.href, // redirect fallback
+      callback_url: `${window.location.origin}${window.location.pathname}`, // clean URL — no stacking params
       methods: ['creditcard', 'mada'],
       metadata: { orderId, reference },
       on_completed: async (payment: any) => {
@@ -241,6 +243,7 @@ export default function BillingPage() {
   const [ledger, setLedger] = useState<CreditLedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutPkg, setCheckoutPkg] = useState<CreditPackage | null>(null);
+  const [redirectResult, setRedirectResult] = useState<{ status: 'paid' | 'failed'; message: string } | null>(null);
 
   // Promote Property States
   const [listings, setListings] = useState<any[]>([]);
@@ -280,6 +283,42 @@ export default function BillingPage() {
   }, [user]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Handle Moyasar 3DS redirect — fires when page reloads with ?id=...&status=... in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentId = params.get('id');
+    const status = params.get('status');
+    if (!paymentId || !status) return;
+
+    // Strip params from URL immediately so they don’t stack on next redirect
+    window.history.replaceState({}, '', window.location.pathname);
+
+    // Retrieve the orderId saved before the 3DS redirect
+    const savedOrderId = sessionStorage.getItem('tamleeq_pending_order_id') ?? undefined;
+    sessionStorage.removeItem('tamleeq_pending_order_id');
+
+    if (status === 'paid') {
+      setRedirectResult({ status: 'paid', message: 'Verifying payment…' });
+      crmApi.confirmPayment(paymentId, savedOrderId).then((res) => {
+        if (res.success && !(res as any).data?.alreadyProcessed) {
+          setRedirectResult({ status: 'paid', message: 'Payment approved! Your credits have been added.' });
+          loadAll();
+        } else if (res.success) {
+          // alreadyProcessed — webhook beat us to it, just refresh balance
+          setRedirectResult({ status: 'paid', message: 'Payment confirmed! Refreshing your balance…' });
+          loadAll();
+        } else {
+          setRedirectResult({ status: 'failed', message: res.message || 'Payment verification failed.' });
+        }
+      }).catch(() => {
+        setRedirectResult({ status: 'failed', message: 'Could not verify payment. Please contact support.' });
+      });
+    } else {
+      setRedirectResult({ status: 'failed', message: 'Payment declined. Please try again with a different card.' });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePaymentSuccess = (newBalance: number) => {
     setBalance(newBalance);
@@ -334,6 +373,21 @@ export default function BillingPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto p-5 space-y-6 w-full">
+
+          {/* ── Redirect Result Banner (shown after 3DS redirect) ── */}
+          {redirectResult && (
+            <div className={`rounded-2xl p-4 flex items-center gap-3 ${
+              redirectResult.status === 'paid'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border border-red-200 text-red-800'
+            }`}>
+              {redirectResult.status === 'paid'
+                ? <CheckCircle className="w-5 h-5 shrink-0 text-emerald-600" />
+                : <XCircle className="w-5 h-5 shrink-0 text-red-500" />}
+              <p className="text-sm font-medium flex-1">{redirectResult.message}</p>
+              <button onClick={() => setRedirectResult(null)} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
+            </div>
+          )}
 
           {/* ── Balance Hero Card ── */}
           <div className="bg-gradient-to-br from-[#0a3d35] to-[#064e4b] rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">

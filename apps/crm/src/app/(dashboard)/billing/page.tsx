@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CrmTopBar } from '@/components/CrmSidebar';
 import { crmApi, CreditPackage, CreditOrder, CreditLedgerEntry } from '@/lib/api';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
@@ -60,7 +60,11 @@ function CheckoutModal({
   const [initData, setInitData] = useState<{ publishableKey: string; orderId: string } | null>(null);
   const [newBalance, setNewBalance] = useState<number>(0);
 
+  const checkoutStartedRef = useRef(false);
+
   useEffect(() => {
+    if (checkoutStartedRef.current) return;
+    checkoutStartedRef.current = true;
     initCheckout();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

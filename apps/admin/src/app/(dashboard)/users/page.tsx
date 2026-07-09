@@ -9,7 +9,7 @@ import {
   Mail, Phone, Calendar, CreditCard,
   ChevronLeft, ChevronRight, Loader2,
   ExternalLink, CheckCircle2, AlertCircle, Clock, X,
-  Eye, EyeOff, Save, MessageSquare, XCircle, Download
+  Eye, EyeOff, Save, MessageSquare, XCircle, Download, Plus
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -30,6 +30,9 @@ export default function UsersPage() {
   const [updatingCredits, setUpdatingCredits] = useState(false);
   const [brokerCredits, setBrokerCredits] = useState<any>(null);
   const [loadingCredits, setLoadingCredits] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [creditPackages, setCreditPackages] = useState<any[]>([]);
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   // User Provisioning States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -63,6 +66,22 @@ export default function UsersPage() {
     const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Fetch credit packages and manage toast timeout
+  useEffect(() => {
+    adminApi.getCreditPackages().then(res => {
+      if (res.success && res.data) {
+        setCreditPackages(res.data);
+      }
+    }).catch(err => console.error('Failed to load credit packages:', err));
+  }, []);
+
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
 
   // Sync edit mode fields when selected user changes
   useEffect(() => {
@@ -519,12 +538,44 @@ export default function UsersPage() {
                 <div className="w-12 h-12 rounded-2xl bg-primary-50 text-primary-700 flex items-center justify-center font-bold text-lg">
                   {selectedUser.name?.charAt(0) || selectedUser.email.charAt(0).toUpperCase()}
                 </div>
-                <div>
+                 <div>
                   <h2 className="text-base font-bold text-surface-900">
                     {selectedUser.name || 'Anonymous User'}
                   </h2>
-                  <div className="badge badge-gray text-[10px] mt-0.5">{selectedUser.role}</div>
-                </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <select
+                      className="admin-input py-0.5 px-2 text-[10px] w-auto h-auto min-h-0 bg-surface-100 border-surface-200 rounded-lg font-bold text-surface-600 outline-none"
+                      value={selectedUser.role}
+                      onChange={(e) => {
+                        const newRole = e.target.value;
+                        setConfirmModal({
+                          title: 'Change User Role',
+                          message: `Are you sure you want to change this user's role to ${newRole}?`,
+                          onConfirm: async () => {
+                            try {
+                              const res = await adminApi.updateUser(selectedUser.id, { role: newRole });
+                              if (res.success && res.data) {
+                                setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, role: newRole } : u));
+                                setSelectedUser(prev => prev ? { ...prev, role: newRole } : null);
+                                setToast({ message: 'User role updated successfully.', type: 'success' });
+                              }
+                            } catch (err: any) {
+                              setToast({ message: err.message || 'Failed to update user role.', type: 'error' });
+                            }
+                          }
+                        });
+                      }}
+                    >
+                      <option value="BUYER">Buyer</option>
+                      <option value="OWNER">Property Owner</option>
+                      <option value="AGENT">Agent</option>
+                      <option value="SOLO_BROKER">Solo Broker</option>
+                      <option value="FIRM">Firm</option>
+                      <option value="SALES_AGENT">Sales Agent</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </div>
+                 </div>
               </div>
               <button
                 onClick={() => setSelectedUser(null)}
@@ -744,6 +795,69 @@ export default function UsersPage() {
                           >
                             {updatingCredits ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                             <span>Update</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-surface-200/60 pt-3 space-y-2">
+                        <label className="text-xs font-bold text-surface-500">
+                          Grant Credit Package (Adds Credits)
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            className="admin-input flex-1 py-1.5 text-xs bg-white text-surface-700 outline-none"
+                            id="manualPackageSelect"
+                            defaultValue=""
+                          >
+                            <option value="" disabled>Select package...</option>
+                            {creditPackages.map(pkg => (
+                              <option key={pkg.id} value={pkg.credits}>
+                                {pkg.nameEn} (+{pkg.credits} cr - {pkg.priceSar} SAR)
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const selectEl = document.getElementById('manualPackageSelect') as HTMLSelectElement;
+                              const amount = Number(selectEl.value);
+                              if (!amount) return;
+                              const selectedPkgText = selectEl.options[selectEl.selectedIndex].text;
+                              setConfirmModal({
+                                title: 'Grant Credits',
+                                message: `Are you sure you want to manually grant ${amount} credits (${selectedPkgText}) to this user?`,
+                                onConfirm: async () => {
+                                  setUpdatingCredits(true);
+                                  try {
+                                    const res = await adminApi.grantCredits(selectedUser.id, amount, `Admin manually granted: ${selectedPkgText}`);
+                                    if (res.success) {
+                                      const newBalance = (selectedUser.creditsBalance ?? 0) + amount;
+                                      setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, creditsBalance: newBalance } : u));
+                                      setSelectedUser(prev => prev ? { ...prev, creditsBalance: newBalance } : null);
+                                      setCreditInput(newBalance);
+                                      setToast({ message: 'Credits granted successfully!', type: 'success' });
+                                      // reload credit history
+                                      if (['SOLO_BROKER', 'AGENT', 'FIRM'].includes(selectedUser.role)) {
+                                        adminApi.getBrokerCredits(selectedUser.id).then(res => {
+                                          if (res.success && res.data) setBrokerCredits(res.data);
+                                        });
+                                      }
+                                    } else {
+                                      setToast({ message: 'Failed to grant credits.', type: 'error' });
+                                    }
+                                  } catch (err: any) {
+                                    setToast({ message: err.message || 'Failed to grant credits.', type: 'error' });
+                                  } finally {
+                                    setUpdatingCredits(false);
+                                  }
+                                }
+                              });
+                            }}
+                            disabled={updatingCredits}
+                            className="btn-primary bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold py-1.5 px-3 shadow-sm flex items-center gap-1"
+                          >
+                            {updatingCredits ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                            <span>Grant</span>
                           </button>
                         </div>
                       </div>
@@ -1049,6 +1163,45 @@ export default function UsersPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {toast && (
+        <div className={clsx(
+          'fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white animate-in fade-in slide-in-from-top duration-300',
+          toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+        )}>
+          {toast.message}
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-surface-200 shadow-2xl max-w-sm w-full p-6 space-y-6 transform scale-100 transition-all animate-in zoom-in-95 duration-200">
+            <div className="space-y-2">
+              <h3 className="text-base font-bold text-surface-900">{confirmModal.title}</h3>
+              <p className="text-xs text-surface-500 leading-relaxed">{confirmModal.message}</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 btn-secondary justify-center py-2 text-xs font-semibold rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="flex-1 btn-primary bg-primary-600 hover:bg-primary-700 text-white border-none justify-center py-2 text-xs font-semibold rounded-xl"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

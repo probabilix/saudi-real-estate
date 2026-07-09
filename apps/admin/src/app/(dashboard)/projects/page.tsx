@@ -53,6 +53,30 @@ export default function ProjectsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [projectLayouts, setProjectLayouts] = useState<Record<string, LayoutItem[]>>({});
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
+  const handleDeleteProject = (id: string) => {
+    setConfirmModal({
+      title: 'Delete Project',
+      message: 'Are you sure you want to delete this project? This will permanently delete the project and all linked layout listings/units.',
+      onConfirm: async () => {
+        setDeletingId(id);
+        try {
+          const res = await adminApi.deleteProject(id);
+          if (res.success) {
+            setProjects(prev => prev.filter(p => p.id !== id));
+            setToast({ message: 'Project deleted successfully.', type: 'success' });
+          } else {
+            setToast({ message: 'Failed to delete project.', type: 'error' });
+          }
+        } catch (err: any) {
+          setToast({ message: err.message || 'Error deleting project.', type: 'error' });
+        } finally {
+          setDeletingId(null);
+        }
+      }
+    });
+  };
 
   const handleToggleFeatured = async (id: string, isCurrentlyFeatured: boolean) => {
     try {
@@ -918,6 +942,18 @@ export default function ProjectsPage() {
                             >
                               <Edit className="w-4 h-4" />
                             </Link>
+                            <button
+                              onClick={() => handleDeleteProject(project.id)}
+                              disabled={deletingId === project.id}
+                              className="btn-ghost text-surface-400 hover:text-red-600 disabled:opacity-50"
+                              title="Delete Project"
+                            >
+                              {deletingId === project.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1305,6 +1341,36 @@ export default function ProjectsPage() {
               >
                 <FileText className="w-4 h-4" />
                 <span>Download PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-surface-200 shadow-2xl max-w-sm w-full p-6 space-y-6 transform scale-100 transition-all animate-in zoom-in-95 duration-200">
+            <div className="space-y-2">
+              <h3 className="text-base font-bold text-surface-900">{confirmModal.title}</h3>
+              <p className="text-xs text-surface-500 leading-relaxed">{confirmModal.message}</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 btn-secondary justify-center py-2 text-xs font-semibold rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="flex-1 btn-primary bg-primary-600 hover:bg-primary-700 text-white border-none justify-center py-2 text-xs font-semibold rounded-xl"
+              >
+                Confirm
               </button>
             </div>
           </div>

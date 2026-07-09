@@ -96,37 +96,7 @@ export default function ReportedPropertiesPage() {
     }
   };
 
-  const handleDeleteItem = async () => {
-    if (!selectedProperty) return;
-    const targetId = selectedProperty.listingId || selectedProperty.projectId;
-    if (!targetId) return;
 
-    const isProject = selectedProperty.type === 'project';
-    const msg = isProject
-      ? 'Are you sure you want to permanently delete this project? All corresponding layouts and reports will also be cleaned up.'
-      : 'Are you sure you want to permanently delete this listing? All corresponding reports will also be cleaned up.';
-
-    if (!confirm(msg)) {
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      const result = isProject
-        ? await adminApi.deleteProject(targetId)
-        : await adminApi.deleteListing(targetId);
-
-      if (result.success) {
-        // Reload list and close drawer
-        await loadReportedProperties();
-        setSelectedProperty(null);
-      }
-    } catch (err) {
-      console.error(`Failed to delete ${selectedProperty.type}:`, err);
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const getListingStatusLabel = (prop: AdminReportedProperty) => {
     if (prop.pendingCount > 0) return 'Pending Review';
@@ -469,14 +439,6 @@ export default function ReportedPropertiesPage() {
                 >
                   <Check className="w-4 h-4" />
                   Mark Resolved
-                </button>
-                <button
-                  onClick={handleDeleteItem}
-                  disabled={actionLoading}
-                  className="btn-danger bg-red-600 hover:bg-red-700 text-xs py-2 px-3"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  {selectedProperty.type === 'project' ? 'Delete Project' : 'Delete Property'}
                 </button>
               </div>
             </div>

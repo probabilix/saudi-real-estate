@@ -93,16 +93,31 @@ function ProjectsContent() {
     fetchProjects();
   }, [searchParams, locale, city, q, page, completionStatus, type, purpose, minPrice, maxPrice, expectedDelivery]);
 
-  function updateFilter(key: string, value: string) {
+  function updateFilter(keyOrUpdates: string | Record<string, string>, value?: string) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) {
-      params.set(key, value);
+    
+    if (typeof keyOrUpdates === 'string') {
+      if (value) {
+        params.set(keyOrUpdates, value);
+      } else {
+        params.delete(keyOrUpdates);
+      }
+      if (keyOrUpdates !== 'page') {
+        params.delete('page');
+      }
     } else {
-      params.delete(key);
+      Object.entries(keyOrUpdates).forEach(([k, v]) => {
+        if (v) {
+          params.set(k, v);
+        } else {
+          params.delete(k);
+        }
+        if (k !== 'page') {
+          params.delete('page');
+        }
+      });
     }
-    if (key !== 'page') {
-      params.delete('page');
-    }
+    
     router.replace(`${pathname}?${params.toString()}`);
   }
 
@@ -201,14 +216,16 @@ function ProjectsContent() {
                   {/* Price Range */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'نطاق السعر' : 'Price Range'}</label>
-                    <PriceDropdown
-                      minPrice={minPrice ? Number(minPrice) : undefined}
-                      maxPrice={maxPrice ? Number(maxPrice) : undefined}
-                      onChange={(min, max) => {
-                        updateFilter('minPrice', min ? String(min) : '');
-                        updateFilter('maxPrice', max ? String(max) : '');
-                      }}
-                    />
+                     <PriceDropdown
+                       minPrice={minPrice ? Number(minPrice) : undefined}
+                       maxPrice={maxPrice ? Number(maxPrice) : undefined}
+                       onChange={(min, max) => {
+                         updateFilter({
+                           minPrice: min ? String(min) : '',
+                           maxPrice: max ? String(max) : ''
+                         });
+                       }}
+                     />
                   </div>
                   {/* Completion Status */}
                   <div className="space-y-1">
@@ -265,8 +282,10 @@ function ProjectsContent() {
                 minPrice={minPrice ? Number(minPrice) : undefined}
                 maxPrice={maxPrice ? Number(maxPrice) : undefined}
                 onChange={(min, max) => {
-                  updateFilter('minPrice', min ? String(min) : '');
-                  updateFilter('maxPrice', max ? String(max) : '');
+                  updateFilter({
+                    minPrice: min ? String(min) : '',
+                    maxPrice: max ? String(max) : ''
+                  });
                 }}
               />
             </div>

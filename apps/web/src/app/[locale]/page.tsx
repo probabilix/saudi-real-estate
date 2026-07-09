@@ -53,7 +53,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
         if (Array.isArray(slugsVal)) {
           featuredSlugs = slugsVal;
         } else {
-          try { featuredSlugs = JSON.parse(slugsVal); } catch {}
+          try { featuredSlugs = JSON.parse(slugsVal); } catch { }
         }
       }
 

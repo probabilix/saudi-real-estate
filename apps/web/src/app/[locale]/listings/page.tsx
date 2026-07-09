@@ -76,17 +76,32 @@ function ListingsContent() {
     fetchListings();
   }, [searchParams, locale, city, type, purpose, minPrice, maxPrice, bedrooms, q, page, sortBy]);
 
-  function updateFilter(key: string, value: string) {
+  function updateFilter(keyOrUpdates: string | Record<string, string>, value?: string) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) {
-      params.set(key, value);
+    
+    if (typeof keyOrUpdates === 'string') {
+      if (value) {
+        params.set(keyOrUpdates, value);
+      } else {
+        params.delete(keyOrUpdates);
+      }
+      // If we're updating a filter other than page, reset page to 1
+      if (keyOrUpdates !== 'page') {
+        params.delete('page');
+      }
     } else {
-      params.delete(key);
+      Object.entries(keyOrUpdates).forEach(([k, v]) => {
+        if (v) {
+          params.set(k, v);
+        } else {
+          params.delete(k);
+        }
+        if (k !== 'page') {
+          params.delete('page');
+        }
+      });
     }
-    // If we're updating a filter other than page, reset page to 1
-    if (key !== 'page') {
-      params.delete('page');
-    }
+    
     router.replace(`${pathname}?${params.toString()}`);
   }
 
@@ -188,8 +203,10 @@ function ListingsContent() {
                       minPrice={minPrice}
                       maxPrice={maxPrice}
                       onChange={(min, max) => {
-                        updateFilter('minPrice', min ? String(min) : '');
-                        updateFilter('maxPrice', max ? String(max) : '');
+                        updateFilter({
+                          minPrice: min ? String(min) : '',
+                          maxPrice: max ? String(max) : ''
+                        });
                       }}
                     />
                   </div>
@@ -266,8 +283,10 @@ function ListingsContent() {
                 minPrice={minPrice}
                 maxPrice={maxPrice}
                 onChange={(min, max) => {
-                  updateFilter('minPrice', min ? String(min) : '');
-                  updateFilter('maxPrice', max ? String(max) : '');
+                  updateFilter({
+                    minPrice: min ? String(min) : '',
+                    maxPrice: max ? String(max) : ''
+                  });
                 }}
               />
             </div>

@@ -137,7 +137,6 @@ export default function RecentArticlesSection({ articles = [] }: RecentArticlesP
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                     sizes="(max-width: 1024px) 100vw, 60vw"
-                    unoptimized
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-charcoal/70 via-charcoal/10 to-transparent" />
                   {/* Featured badge */}
@@ -197,7 +196,6 @@ export default function RecentArticlesSection({ articles = [] }: RecentArticlesP
                           fill
                           className="object-cover transition-transform duration-500 group-hover:scale-110"
                           sizes="112px"
-                          unoptimized
                         />
                       </div>
                     )}

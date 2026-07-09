@@ -302,11 +302,11 @@ export default function BillingPage() {
       setRedirectResult({ status: 'paid', message: 'Verifying payment…' });
       crmApi.confirmPayment(paymentId, savedOrderId).then((res) => {
         if (res.success && !(res as any).data?.alreadyProcessed) {
-          setRedirectResult({ status: 'paid', message: 'Payment approved! Your credits have been added.' });
+          setRedirectResult({ status: 'paid', message: 'Payment Successful! Your credit balance has been updated.' });
           loadAll();
         } else if (res.success) {
           // alreadyProcessed — webhook beat us to it, just refresh balance
-          setRedirectResult({ status: 'paid', message: 'Payment confirmed! Refreshing your balance…' });
+          setRedirectResult({ status: 'paid', message: 'Payment Successful! Your credit balance has been updated.' });
           loadAll();
         } else {
           setRedirectResult({ status: 'failed', message: res.message || 'Payment verification failed.' });

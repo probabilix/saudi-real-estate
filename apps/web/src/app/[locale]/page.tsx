@@ -23,7 +23,7 @@ export async function generateMetadata({ params: { locale } }: { params: { local
   };
 }
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60; // Revalidate static homepage cache once a minute
 
 export default async function HomePage({ params: { locale } }: { params: { locale: string } }) {
   unstable_setRequestLocale(locale);
@@ -40,7 +40,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
   let contactWhatsApp = '';
 
   try {
-    const settingsRes = await fetch(`${API_BASE_URL}/system/settings`, { cache: 'no-store' }).catch(() => null);
+    const settingsRes = await fetch(`${API_BASE_URL}/system/settings`, { next: { revalidate: 60 } }).catch(() => null);
     if (settingsRes?.ok) {
       const json = await settingsRes.json();
       const d = json?.data || {};
@@ -77,12 +77,12 @@ export default async function HomePage({ params: { locale } }: { params: { local
 
   try {
     const [listingsRes, projectsRes, newsRes, faqsRes, ...cityResponses] = await Promise.all([
-      fetch(`${API_BASE_URL}/listings?limit=${featuredLimit}&isFeatured=true`, { cache: 'no-store' }).catch(() => null),
-      fetch(`${API_BASE_URL}/system/projects?limit=${featuredLimit}&isFeatured=true`, { cache: 'no-store' }).catch(() => null),
-      fetch(`${API_BASE_URL}/news`, { cache: 'no-store' }).catch(() => null),
-      fetch(`${API_BASE_URL}/system/faqs`, { cache: 'no-store' }).catch(() => null),
+      fetch(`${API_BASE_URL}/listings?limit=${featuredLimit}&isFeatured=true`, { next: { revalidate: 60 } }).catch(() => null),
+      fetch(`${API_BASE_URL}/system/projects?limit=${featuredLimit}&isFeatured=true`, { next: { revalidate: 60 } }).catch(() => null),
+      fetch(`${API_BASE_URL}/news`, { next: { revalidate: 60 } }).catch(() => null),
+      fetch(`${API_BASE_URL}/system/faqs`, { next: { revalidate: 60 } }).catch(() => null),
       ...['Riyadh', 'Jeddah', 'Dammam', 'AlUla'].map(city =>
-        fetch(`${API_BASE_URL}/listings?limit=1&city=${city}`, { cache: 'no-store' }).catch(() => null)
+        fetch(`${API_BASE_URL}/listings?limit=1&city=${city}`, { next: { revalidate: 60 } }).catch(() => null)
       )
     ]);
 

@@ -13,13 +13,13 @@ import { API_BASE_URL } from '@/lib/api';
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair',
-  display: 'swap',
+  display: 'fallback',
 });
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
   variable: '--font-dm-sans',
-  display: 'swap',
+  display: 'fallback',
   weight: ['400', '500', '700'],
 });
 
@@ -27,7 +27,7 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
   subsets: ['arabic'],
   weight: ['300', '400', '500', '600', '700'],
   variable: '--font-ibm-plex-arabic',
-  display: 'swap',
+  display: 'fallback',
 });
 
 export function generateStaticParams() {

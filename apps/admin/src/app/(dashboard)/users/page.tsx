@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { AdminTopBar } from '@/components/AdminSidebar';
 import { adminApi, AdminUser } from '@/lib/api';
 import {
@@ -8,15 +9,17 @@ import {
   Mail, Phone, Calendar, CreditCard,
   ChevronLeft, ChevronRight, Loader2,
   ExternalLink, CheckCircle2, AlertCircle, Clock, X,
-  Eye, EyeOff, Save, MessageSquare, XCircle
+  Eye, EyeOff, Save, MessageSquare, XCircle, Download
 } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -197,6 +200,55 @@ export default function UsersPage() {
     setLoading(false);
   }
 
+  const handleExportUsers = async () => {
+    setExporting(true);
+    try {
+      const result = await adminApi.getUsers({
+        role: filterRole || undefined,
+        status: filterStatus || undefined,
+        search: debouncedSearchTerm || undefined,
+        limit: 5000,
+      });
+
+      if (result.success && result.data) {
+        const usersToExport = result.data.users;
+        const csvRows = [
+          ['Name', 'Email', 'Phone', 'Role', 'Subscription Tier', 'Credits Balance', 'Verification Status', 'Rega Licence', 'Active Listings', 'Active Projects', 'Created At']
+        ];
+        
+        usersToExport.forEach((u: any) => {
+          csvRows.push([
+            u.name || '',
+            u.email || '',
+            u.phone || '',
+            u.role || '',
+            u.subscriptionTier || 'FREE',
+            String(u.creditsBalance ?? 0),
+            u.verificationStatus || 'UNVERIFIED',
+            u.regaLicence || '',
+            String(u.listingCount ?? 0),
+            String(u.projectCount ?? 0),
+            new Date(u.createdAt).toLocaleDateString('en-GB')
+          ]);
+        });
+
+        const csvContent = "\uFEFF" + csvRows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `users_export_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      console.error('Failed to export users:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleApprove = async (userId: string) => {
     setActionLoading(userId);
     const result = await adminApi.approveUser(userId);
@@ -272,6 +324,15 @@ export default function UsersPage() {
               <option value="inactive">Inactive</option>
               <option value="pending">Pending Verif.</option>
             </select>
+
+            <button
+              onClick={handleExportUsers}
+              disabled={exporting}
+              className="btn-secondary border border-surface-200 bg-white hover:bg-slate-50 text-surface-700 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 py-2 px-4 shadow-sm disabled:opacity-50"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-surface-500" />}
+              <span>Export CSV</span>
+            </button>
 
             <button
               onClick={() => {
@@ -367,6 +428,12 @@ export default function UsersPage() {
                         <div className="text-[10px] text-surface-400 mt-0.5">
                           Balance: {user.creditsBalance} credits
                         </div>
+                        {['SOLO_BROKER', 'AGENT', 'FIRM'].includes(user.role) && (
+                          <div className="text-[9.5px] text-slate-500 mt-1 font-bold flex flex-col gap-0.5 border-t border-slate-100 pt-1">
+                            <span>Listings: {user.listingCount ?? 0} active</span>
+                            <span>Projects: {user.projectCount ?? 0} active</span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <VerificationBadge status={user.verificationStatus} rega={user.regaVerified} />
@@ -683,7 +750,12 @@ export default function UsersPage() {
 
                       <div className="flex justify-between items-center text-sm border-t border-surface-200/60 pt-3">
                         <span className="text-surface-500">Active Listings</span>
-                        <span className="font-semibold text-surface-900">{selectedUser.listingCount ?? 0} active properties</span>
+                        <span className="font-semibold text-surface-900">{selectedUser.listingCount ?? 0} active listings</span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-sm border-t border-surface-200/60 pt-3">
+                        <span className="text-surface-500">Active Projects</span>
+                        <span className="font-semibold text-surface-900">{selectedUser.projectCount ?? 0} active projects</span>
                       </div>
                     </div>
                   </div>
@@ -710,7 +782,9 @@ export default function UsersPage() {
                                   <div key={entry.id} className="flex justify-between items-start text-xs border-b border-surface-200/50 pb-2 last:border-0 last:pb-0">
                                     <div className="min-w-0 pr-2">
                                       <p className="font-medium text-slate-800 break-words leading-relaxed">{entry.description || entry.type}</p>
-                                      <p className="text-[10px] text-slate-400 mt-1 font-semibold">{new Date(entry.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                                      <p className="text-[10px] text-slate-400 mt-1 font-semibold">
+                                        {new Date(entry.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })} · {new Date(entry.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                      </p>
                                     </div>
                                     <span className={clsx("font-bold shrink-0 text-sm", entry.amount < 0 ? "text-red-500" : "text-emerald-600")}>
                                       {entry.amount < 0 ? '' : '+'}{entry.amount}
@@ -729,9 +803,14 @@ export default function UsersPage() {
                             ) : (
                               <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
                                 {brokerCredits.orders.map((order: any) => (
-                                  <div key={order.id} className="flex justify-between items-center text-xs border-b border-surface-200/50 pb-2 last:border-0 last:pb-0">
+                                  <div
+                                    key={order.id}
+                                    onClick={() => router.push(`/admin-credit-orders?orderId=${order.id}`)}
+                                    className="flex justify-between items-center text-xs border-b border-surface-200/50 pb-2 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-200/55 p-1 rounded transition-all"
+                                    title="Click to view order details in orders view"
+                                  >
                                     <div>
-                                      <p className="font-semibold text-slate-800">{order.packageNameEn || 'Credits'}</p>
+                                      <p className="font-semibold text-slate-800 hover:text-primary-700 transition-colors">{order.packageNameEn || 'Credits'}</p>
                                       <p className="text-[10px] text-slate-400 mt-0.5 font-medium">{order.creditsAmount} cr · {order.priceSar} SAR</p>
                                     </div>
                                     <span className={clsx("px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0", 

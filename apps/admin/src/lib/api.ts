@@ -351,13 +351,16 @@ export const adminApi = {
     request<CreditPackage>(`/admin/credit-packages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   // ── Credit Orders ──
-  getCreditOrders: (params?: { status?: string; page?: number; brokerId?: string }) => {
+  getCreditOrders: (params?: { status?: string; page?: number; brokerId?: string; limit?: number }) => {
     const q = new URLSearchParams();
     if (params?.status) q.set('status', params.status);
     if (params?.page) q.set('page', String(params.page));
     if (params?.brokerId) q.set('brokerId', params.brokerId);
+    if (params?.limit) q.set('limit', String(params.limit));
     return request<{ data: AdminCreditOrder[]; total: number }>(`/admin/credit-orders?${q}`);
   },
+  getCreditOrderDetails: (id: string) =>
+    request<AdminCreditOrder & { metadata?: any; brokerPhone?: string; packageNameAr?: string }>(`/admin/credit-orders/${id}`),
 
   // ── Broker Credits Info & Allocation ──
   getBrokerCredits: (brokerId: string) =>
@@ -408,6 +411,7 @@ export interface AdminUser {
   creditsBalance: number;
   createdAt: string;
   listingCount?: number;
+  projectCount?: number;
   gender?: string | null;
   nationality?: string | null;
   city?: string | null;

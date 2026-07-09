@@ -86,7 +86,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.get('/users', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const query = request.query as { role?: string; status?: string; search?: string; page?: string; limit?: string; hasLicense?: string };
     const page = parseInt(query.page || '1');
-    const limit = Math.min(parseInt(query.limit || '20'), 100);
+    const limit = query.limit === 'all' || query.limit === '5000' ? 5000 : Math.min(parseInt(query.limit || '20'), 100);
     const offset = (page - 1) * limit;
 
     try {
@@ -134,6 +134,8 @@ export default async function adminRoutes(app: FastifyInstance) {
           city: users.city,
           bioEn: brokerProfiles.bioEn,
           bioAr: brokerProfiles.bioAr,
+          listingCount: sql<number>`(SELECT COALESCE(COUNT(*), 0)::int FROM listings WHERE listings.owner_id = ${users.id} AND listings.status = 'ACTIVE' AND listings.project_id IS NULL)`,
+          projectCount: sql<number>`(SELECT COALESCE(COUNT(DISTINCT project_id), 0)::int FROM listings WHERE listings.owner_id = ${users.id} AND listings.status = 'ACTIVE' AND listings.project_id IS NOT NULL)`,
         })
           .from(users)
           .leftJoin(brokerProfiles, eq(users.id, brokerProfiles.userId))
@@ -1584,7 +1586,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.get('/credit-orders', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (req, reply) => {
     const query = req.query as { status?: string; page?: string; limit?: string; brokerId?: string };
     const page = Math.max(1, parseInt(query.page ?? '1', 10));
-    const limit = Math.min(50, parseInt(query.limit ?? '25', 10));
+    const limit = query.limit === 'all' || query.limit === '5000' ? 5000 : Math.min(50, parseInt(query.limit ?? '25', 10));
     const offset = (page - 1) * limit;
 
     try {
@@ -1617,10 +1619,54 @@ export default async function adminRoutes(app: FastifyInstance) {
       const [{ total }] = await db.select({ total: count() }).from(creditOrders)
         .where(conditions.length > 0 ? and(...conditions) : undefined);
 
-      return reply.send({ success: true, data: orders, total: Number(total) });
+      return reply.send({
+        success: true,
+        data: {
+          data: orders,
+          total: Number(total),
+        },
+      });
     } catch (err: any) {
       app.log.error(err, 'admin credit-orders error');
       return reply.code(500).send({ success: false, message: 'Failed to fetch orders' });
+    }
+  });
+
+  // ────────────────────────────────────────────────────────
+  // Admin: Get single credit order details
+  // ────────────────────────────────────────────────────────
+  app.get('/credit-orders/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const [order] = await db
+        .select({
+          id: creditOrders.id,
+          status: creditOrders.status,
+          creditsAmount: creditOrders.creditsAmount,
+          priceSar: creditOrders.priceSar,
+          moyasarPaymentId: creditOrders.moyasarPaymentId,
+          creditedAt: creditOrders.creditedAt,
+          createdAt: creditOrders.createdAt,
+          metadata: creditOrders.metadata,
+          packageKey: creditPackages.key,
+          packageNameEn: creditPackages.nameEn,
+          packageNameAr: creditPackages.nameAr,
+          brokerName: users.name,
+          brokerEmail: users.email,
+          brokerPhone: users.phone,
+          brokerId: creditOrders.brokerId,
+        })
+        .from(creditOrders)
+        .innerJoin(creditPackages, eq(creditOrders.packageId, creditPackages.id))
+        .innerJoin(users, eq(creditOrders.brokerId, users.id))
+        .where(eq(creditOrders.id, id))
+        .limit(1);
+
+      if (!order) return reply.code(404).send({ success: false, message: 'Order not found' });
+      return reply.send({ success: true, data: order });
+    } catch (err: any) {
+      app.log.error(err, 'admin get-single-order error');
+      return reply.code(500).send({ success: false, message: 'Failed to fetch order details' });
     }
   });
 

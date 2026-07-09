@@ -1010,6 +1010,7 @@ ${historyText}
       const limit = Number(query.limit || 20);
 
       const completionStatus = query.completionStatus as string;
+      const expectedDelivery = query.expectedDelivery as string;
 
       const conditions: any[] = [];
       if (city) {
@@ -1021,6 +1022,13 @@ ${historyText}
       if (completionStatus) {
         conditions.push(eq(projects.completionStatus, completionStatus as any));
       }
+      if (expectedDelivery) {
+        if (expectedDelivery === 'AFTER_Q4_2027') {
+          conditions.push(sql`${projects.expectedDelivery} NOT ILIKE '%2024%' AND ${projects.expectedDelivery} NOT ILIKE '%2025%' AND ${projects.expectedDelivery} NOT ILIKE '%2026%' AND ${projects.expectedDelivery} NOT ILIKE '%2027%'`);
+        } else {
+          conditions.push(sql`${projects.expectedDelivery} ILIKE ${`%${expectedDelivery}%`}`);
+        }
+      }
       if (q) {
         const searchPattern = `%${q}%`;
         conditions.push(or(
@@ -1029,6 +1037,39 @@ ${historyText}
           sql`${projects.city} ILIKE ${searchPattern}`,
           sql`${projects.district} ILIKE ${searchPattern}`
         ));
+      }
+
+      // Layout specific conditions (EXISTS subquery for maximum performance)
+      const layoutConditions: any[] = [
+        eq(listings.projectId, projects.id),
+        eq(listings.status, 'ACTIVE'),
+        isNull(listings.deletedAt),
+      ];
+
+      let hasLayoutFilter = false;
+
+      if (query.type) {
+        layoutConditions.push(eq(listings.type, query.type as any));
+        hasLayoutFilter = true;
+      }
+      if (query.purpose) {
+        layoutConditions.push(eq(listings.purpose, query.purpose as any));
+        hasLayoutFilter = true;
+      }
+      if (query.minPrice) {
+        layoutConditions.push(gte(listings.price, Number(query.minPrice)));
+        hasLayoutFilter = true;
+      }
+      if (query.maxPrice) {
+        layoutConditions.push(sql`${listings.price} <= ${Number(query.maxPrice)}`);
+        hasLayoutFilter = true;
+      }
+
+      if (hasLayoutFilter) {
+        conditions.push(sql`EXISTS (
+          SELECT 1 FROM listings 
+          WHERE ${and(...layoutConditions)}
+        )`);
       }
 
       // Count total

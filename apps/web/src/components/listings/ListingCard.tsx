@@ -130,7 +130,7 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
             fill
             className="object-cover transition-transform duration-700 pointer-events-none"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            unoptimized={(photos[currentPhotoIdx] || photo).includes('unsplash')}
+            quality={80}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60 pointer-events-none" />
           

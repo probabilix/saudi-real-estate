@@ -11,7 +11,7 @@ import {
   Square, Bed, Bath, ArrowLeft, ShieldCheck, Star,
   Sparkles, Loader2, ChevronRight, Lock, Mail, Phone,
   MessageSquare, BookOpen, ExternalLink, Zap, Map as MapIcon,
-  ChevronLeft, Share2, Heart, X, Flag, AlertTriangle
+  ChevronLeft, Share2, Heart, X, Flag, AlertTriangle, Maximize2
 } from 'lucide-react';
 import BrochureModal from '@/components/listings/BrochureModal';
 import MediaModal from '@/components/listings/MediaModal';
@@ -1183,8 +1183,9 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                                 className="object-contain p-2 transition-transform duration-300 group-hover/layout:scale-[1.02]"
                                 unoptimized
                               />
-                              <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full opacity-0 group-hover/layout:opacity-100 transition-opacity">
-                                🔍 {locale === 'ar' ? 'عرض كامل' : 'View Full'}
+                              <div className="absolute bottom-3 right-3 bg-charcoal/75 backdrop-blur-sm text-white text-[9.5px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all group-hover/layout:bg-primary-600">
+                                <Maximize2 className="w-3 h-3 text-emerald-400" />
+                                <span>{locale === 'ar' ? 'عرض كامل' : 'View Full'}</span>
                               </div>
                             </>
                           ) : (

@@ -8,6 +8,11 @@ import { Loader2, Search, X, Grid3X3, SlidersHorizontal, Map, Building, MapPin }
 import { motion, AnimatePresence } from 'framer-motion';
 import ProjectCard from '@/components/listings/ProjectCard';
 import CityDropdown from '@/components/search/CityDropdown';
+import PropertyTypeDropdown from '@/components/search/PropertyTypeDropdown';
+import PurposeDropdown from '@/components/search/PurposeDropdown';
+import PriceDropdown from '@/components/search/PriceDropdown';
+import CompletionStatusDropdown from '@/components/search/CompletionStatusDropdown';
+import ExpectedDeliveryDropdown from '@/components/search/ExpectedDeliveryDropdown';
 import { api } from '@/lib/api';
 import clsx from 'clsx';
 
@@ -48,6 +53,11 @@ function ProjectsContent() {
   const q = searchParams.get('q') || '';
   const page = searchParams.get('page') ? Number(searchParams.get('page')) : 1;
   const completionStatus = searchParams.get('completionStatus') || '';
+  const type = searchParams.get('type') || '';
+  const purpose = searchParams.get('purpose') || '';
+  const minPrice = searchParams.get('minPrice') || '';
+  const maxPrice = searchParams.get('maxPrice') || '';
+  const expectedDelivery = searchParams.get('expectedDelivery') || '';
 
   useEffect(() => {
     async function fetchProjects() {
@@ -57,6 +67,11 @@ function ProjectsContent() {
         if (city) queryParams.set('city', city);
         if (q) queryParams.set('q', q);
         if (completionStatus) queryParams.set('completionStatus', completionStatus);
+        if (type) queryParams.set('type', type);
+        if (purpose) queryParams.set('purpose', purpose);
+        if (minPrice) queryParams.set('minPrice', minPrice);
+        if (maxPrice) queryParams.set('maxPrice', maxPrice);
+        if (expectedDelivery) queryParams.set('expectedDelivery', expectedDelivery);
         queryParams.set('lang', locale);
         queryParams.set('limit', '21');
         queryParams.set('page', String(page));
@@ -76,7 +91,7 @@ function ProjectsContent() {
     }
 
     fetchProjects();
-  }, [searchParams, locale, city, q, page, completionStatus]);
+  }, [searchParams, locale, city, q, page, completionStatus, type, purpose, minPrice, maxPrice, expectedDelivery]);
 
   function updateFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -96,7 +111,7 @@ function ProjectsContent() {
     router.push(pathname);
   }
 
-  const hasActiveFilters = city || q || completionStatus;
+  const hasActiveFilters = city || q || completionStatus || type || purpose || minPrice || maxPrice || expectedDelivery;
 
   return (
     <div className="min-h-screen bg-white">
@@ -173,19 +188,37 @@ function ProjectsContent() {
                     <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'المدينة' : 'City'}</label>
                     <CityDropdown city={city} onChange={(val) => updateFilter('city', val)} />
                   </div>
+                  {/* Property Type */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'نوع العقار' : 'Property Type'}</label>
+                    <PropertyTypeDropdown type={type} onChange={(val) => updateFilter('type', val)} />
+                  </div>
+                  {/* Purpose */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'الغرض' : 'Purpose'}</label>
+                    <PurposeDropdown purpose={purpose} onChange={(val) => updateFilter('purpose', val)} className="w-full" />
+                  </div>
+                  {/* Price Range */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'نطاق السعر' : 'Price Range'}</label>
+                    <PriceDropdown
+                      minPrice={minPrice ? Number(minPrice) : undefined}
+                      maxPrice={maxPrice ? Number(maxPrice) : undefined}
+                      onChange={(min, max) => {
+                        updateFilter('minPrice', min ? String(min) : '');
+                        updateFilter('maxPrice', max ? String(max) : '');
+                      }}
+                    />
+                  </div>
                   {/* Completion Status */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'حالة المشروع' : 'Completion Status'}</label>
-                    <select
-                      value={completionStatus}
-                      onChange={(e) => updateFilter('completionStatus', e.target.value)}
-                      className="w-full px-5 py-3 rounded-xl border border-surface-200 bg-white text-sm font-bold text-charcoal outline-none transition-all shadow-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-600/5 cursor-pointer"
-                    >
-                      <option value="">{locale === 'ar' ? 'الكل' : 'All Statuses'}</option>
-                      <option value="READY">{locale === 'ar' ? 'جاهز' : 'Ready'}</option>
-                      <option value="OFF_PLAN">{locale === 'ar' ? 'على الخارطة' : 'Off-Plan'}</option>
-                      <option value="UNDER_CONSTRUCTION">{locale === 'ar' ? 'تحت الإنشاء' : 'Under Construction'}</option>
-                    </select>
+                    <CompletionStatusDropdown status={completionStatus} onChange={(val) => updateFilter('completionStatus', val)} className="w-full" />
+                  </div>
+                  {/* Expected Delivery */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-charcoal-muted px-1">{locale === 'ar' ? 'التسليم المتوقع' : 'Expected Delivery'}</label>
+                    <ExpectedDeliveryDropdown delivery={expectedDelivery} onChange={(val) => updateFilter('expectedDelivery', val)} className="w-full" />
                   </div>
                   {/* Clear Filters */}
                   {hasActiveFilters && (
@@ -220,17 +253,29 @@ function ProjectsContent() {
             {/* City */}
             <CityDropdown city={city} onChange={(val) => updateFilter('city', val)} />
 
-            {/* Completion Status Dropdown */}
-            <select
-              value={completionStatus}
-              onChange={(e) => updateFilter('completionStatus', e.target.value)}
-              className="px-5 py-3 rounded-xl border border-surface-200 bg-white text-sm font-bold text-charcoal outline-none transition-all shadow-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-600/5 cursor-pointer"
-            >
-              <option value="">{locale === 'ar' ? 'حالة المشروع' : 'Completion Status'}</option>
-              <option value="READY">{locale === 'ar' ? 'جاهز' : 'Ready'}</option>
-              <option value="OFF_PLAN">{locale === 'ar' ? 'على الخارطة' : 'Off-Plan'}</option>
-              <option value="UNDER_CONSTRUCTION">{locale === 'ar' ? 'تحت الإنشاء' : 'Under Construction'}</option>
-            </select>
+            {/* Type */}
+            <PropertyTypeDropdown type={type} onChange={(val) => updateFilter('type', val)} />
+
+            {/* Purpose */}
+            <PurposeDropdown purpose={purpose} onChange={(val) => updateFilter('purpose', val)} />
+
+            {/* Price Range */}
+            <div className="z-20">
+              <PriceDropdown
+                minPrice={minPrice ? Number(minPrice) : undefined}
+                maxPrice={maxPrice ? Number(maxPrice) : undefined}
+                onChange={(min, max) => {
+                  updateFilter('minPrice', min ? String(min) : '');
+                  updateFilter('maxPrice', max ? String(max) : '');
+                }}
+              />
+            </div>
+
+            {/* Completion Status */}
+            <CompletionStatusDropdown status={completionStatus} onChange={(val) => updateFilter('completionStatus', val)} />
+
+            {/* Expected Delivery */}
+            <ExpectedDeliveryDropdown delivery={expectedDelivery} onChange={(val) => updateFilter('expectedDelivery', val)} />
 
             {/* Clear Filters */}
             {hasActiveFilters && (

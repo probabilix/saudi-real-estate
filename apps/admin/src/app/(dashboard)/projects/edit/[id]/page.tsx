@@ -557,13 +557,22 @@ export default function EditProjectPage() {
                 {projectData.completionStatus !== 'READY' && (
                   <div>
                     <label className="admin-label">Expected Delivery</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Q3 2026 or Dec 2027"
+                    <select
                       className="admin-input"
                       value={projectData.expectedDelivery}
                       onChange={(e) => handleProjectChange('expectedDelivery', e.target.value)}
-                    />
+                    >
+                      <option value="">Select Expected Delivery</option>
+                      <option value="Q4 2026">Q4 2026</option>
+                      <option value="Q1 2027">Q1 2027</option>
+                      <option value="Q2 2027">Q2 2027</option>
+                      <option value="Q3 2027">Q3 2027</option>
+                      <option value="Q4 2027">Q4 2027</option>
+                      <option value="After Q4 2027">After Q4 2027</option>
+                      {projectData.expectedDelivery && !['Q4 2026', 'Q1 2027', 'Q2 2027', 'Q3 2027', 'Q4 2027', 'After Q4 2027'].includes(projectData.expectedDelivery) && (
+                        <option value={projectData.expectedDelivery}>{projectData.expectedDelivery}</option>
+                      )}
+                    </select>
                   </div>
                 )}
                 {projectData.completionStatus === 'READY' && (

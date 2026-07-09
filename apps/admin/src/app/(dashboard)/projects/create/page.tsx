@@ -345,7 +345,22 @@ export default function CreateProjectPage() {
                 </div>
                 <div>
                   <label className="admin-label flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Expected Delivery</label>
-                  <input type="text" className="admin-input" placeholder="e.g. Q4 2026 or Dec 2026" value={expectedDelivery} onChange={e => setExpectedDelivery(e.target.value)} />
+                  <select
+                    className="admin-input"
+                    value={expectedDelivery}
+                    onChange={e => setExpectedDelivery(e.target.value)}
+                  >
+                    <option value="">Select Expected Delivery</option>
+                    <option value="Q4 2026">Q4 2026</option>
+                    <option value="Q1 2027">Q1 2027</option>
+                    <option value="Q2 2027">Q2 2027</option>
+                    <option value="Q3 2027">Q3 2027</option>
+                    <option value="Q4 2027">Q4 2027</option>
+                    <option value="After Q4 2027">After Q4 2027</option>
+                    {expectedDelivery && !['Q4 2026', 'Q1 2027', 'Q2 2027', 'Q3 2027', 'Q4 2027', 'After Q4 2027'].includes(expectedDelivery) && (
+                      <option value={expectedDelivery}>{expectedDelivery}</option>
+                    )}
+                  </select>
                 </div>
               </div>
 

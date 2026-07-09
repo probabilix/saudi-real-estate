@@ -29,7 +29,6 @@ const NAV_GROUPS = [
       { href: '/listings/featured', label: 'Featured Inventory', icon: Star },
       { href: '/users', label: 'Users & Brokers', icon: Users },
       { href: '/verifications', label: 'Verifications', icon: ShieldCheck },
-      { href: '/leads', label: 'Leads & CRM', icon: Sparkles },
       { href: '/mortgage-leads', label: 'Mortgage Leads', icon: CreditCard },
       { href: '/reported-properties', label: 'Reported Properties', icon: Flag },
     ],

@@ -20,6 +20,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Initialize Fastify Instance
 const app = Fastify({ 
+  pluginTimeout: 30000, // Increase plugin boot timeout for Vercel Serverless cold starts
   logger: {
     level: isProduction ? 'info' : 'debug',
     // Disable pino-pretty in production to avoid worker thread issues on Vercel

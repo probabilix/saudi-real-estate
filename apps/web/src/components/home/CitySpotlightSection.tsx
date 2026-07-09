@@ -103,7 +103,6 @@ export default function CitySpotlightSection({ counts }: CitySpotlightProps) {
                       fill
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
                       sizes="(max-width: 768px) 100vw, 40vw"
-                      unoptimized
                     />
 
                     {/* Gradient overlays */}

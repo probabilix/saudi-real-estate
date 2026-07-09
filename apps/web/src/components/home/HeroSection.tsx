@@ -46,17 +46,16 @@ export default function HeroSection({ contactPhone }: HeroSectionProps) {
   }
 
   return (
-    <section className="relative min-h-[92vh] sm:min-h-screen flex items-center z-20 overflow-hidden">
+    <section className="relative min-h-[92vh] sm:min-h-screen flex items-center z-20">
       {/* Background Image */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 overflow-hidden">
         <Image
-          src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1920&q=90"
+          src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1920"
           alt="Saudi Luxury Real Estate"
           fill
           className="object-cover"
           priority
-          quality={100}
-          unoptimized
+          quality={85}
         />
         {/* Cinematic gradient — darkest at left for readability, opens right */}
         <div className="absolute inset-0 bg-gradient-to-r from-charcoal/85 via-charcoal/60 to-charcoal/30" />

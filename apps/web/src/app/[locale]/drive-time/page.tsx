@@ -91,7 +91,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 function latLngToMercator(lat: number, lng: number, zoom: number) {
   const scale = Math.pow(2, zoom) * 256;
-  const siny  = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
+  const siny = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
   return {
     x: ((lng + 180) / 360) * scale,
     y: (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * scale,
@@ -186,12 +186,12 @@ function DotPin({ pin, selected, locale, faded, onClick }: { pin: CommutePin; se
   const isForeigner = pin.foreignerEligible;
   const isMuslimOnly = pin.muslimOnly;
 
-  let bg = selected 
-    ? '#064e4b' 
+  let bg = selected
+    ? '#064e4b'
     : isForeigner
       ? (isMuslimOnly ? '#ea580c' : '#7c3aed')
-      : isP 
-        ? '#1e40af' 
+      : isP
+        ? '#1e40af'
         : (isFeatured ? '#f59e0b' : '#0d9488');
 
   if (faded) {
@@ -201,11 +201,11 @@ function DotPin({ pin, selected, locale, faded, onClick }: { pin: CommutePin; se
   const Icon = getPinIcon(pin);
 
   return (
-    <div 
-      onClick={onClick} 
-      style={{ 
+    <div
+      onClick={onClick}
+      style={{
         transform: 'translate(-50%, -100%)', // Anchor bottom center
-        cursor: 'pointer', 
+        cursor: 'pointer',
         userSelect: 'none',
         filter: faded ? 'opacity(0.6) grayscale(20%)' : 'drop-shadow(0 3px 6px rgba(0,0,0,0.2))',
       }}
@@ -213,7 +213,7 @@ function DotPin({ pin, selected, locale, faded, onClick }: { pin: CommutePin; se
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Capsule */}
-        <div 
+        <div
           style={{
             background: bg,
             color: 'white',
@@ -231,9 +231,9 @@ function DotPin({ pin, selected, locale, faded, onClick }: { pin: CommutePin; se
             {isP ? (locale === 'ar' ? 'مشروع' : 'Project') : formatPrice(pin.price)}
           </span>
         </div>
-        
+
         {/* Pointer (overlapping border) */}
-        <div 
+        <div
           style={{
             width: 0,
             height: 0,
@@ -244,7 +244,7 @@ function DotPin({ pin, selected, locale, faded, onClick }: { pin: CommutePin; se
             zIndex: 1,
           }}
         />
-        <div 
+        <div
           style={{
             width: 0,
             height: 0,
@@ -375,8 +375,8 @@ function GoogleMapWrapper({
   const selectedListing = selectedPin?.kind === 'listing' ? selectedPin : null;
   const detailUrl = selectedPin
     ? (selectedPin.kind === 'project'
-        ? `/${locale}/projects/${selectedPin.id}`
-        : `/${locale}/listings/${selectedPin.shortId || selectedPin.id}`)
+      ? `/${locale}/projects/${selectedPin.id}`
+      : `/${locale}/listings/${selectedPin.shortId || selectedPin.id}`)
     : '';
 
   return (
@@ -448,7 +448,7 @@ function GoogleMapWrapper({
           mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
           getPixelPositionOffset={() => ({ x: 0, y: 0 })}
         >
-          <div 
+          <div
             className="absolute -translate-x-1/2 -translate-y-[calc(100%+14px)] pointer-events-none drop-shadow-md"
             style={{ zIndex: 99999 }}
           >
@@ -473,7 +473,7 @@ function GoogleMapWrapper({
           mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
           getPixelPositionOffset={() => ({ x: 0, y: 0 })}
         >
-          <div 
+          <div
             className="absolute -translate-x-1/2 -translate-y-[calc(100%+14px)] pointer-events-none drop-shadow-md"
             style={{ zIndex: 99999 }}
           >
@@ -551,7 +551,11 @@ function GoogleMapWrapper({
 
       {/* InfoWindow popup */}
       {selectedPin && (
-        <InfoWindow position={{ lat: selectedPin.lat, lng: selectedPin.lng }} onCloseClick={() => setSelectedPin(null)}>
+        <InfoWindow
+          position={{ lat: selectedPin.lat, lng: selectedPin.lng }}
+          onCloseClick={() => setSelectedPin(null)}
+          options={typeof window !== 'undefined' && window.google ? { pixelOffset: new window.google.maps.Size(0, -32) } : undefined}
+        >
           <div className="bg-white overflow-hidden w-[200px] font-sans">
             {selectedPin.thumb ? (
               <img src={selectedPin.thumb} alt="" className="w-full h-24 object-cover rounded-lg mb-2" />
@@ -561,9 +565,8 @@ function GoogleMapWrapper({
               </div>
             )}
             <div>
-              <span className={`inline-block text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg mb-1 ${
-                selectedPin.kind === 'project' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-700'
-              }`}>
+              <span className={`inline-block text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg mb-1 ${selectedPin.kind === 'project' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-700'
+                }`}>
                 {selectedPin.kind === 'project' ? 'Project' : TYPE_LABELS[selectedPin.type] || selectedPin.type}
               </span>
               <h4 className="text-xs font-bold text-slate-900 truncate">
@@ -615,14 +618,13 @@ function PremiumCommuteCard({ pin, selected, onClick, onMouseEnter }: PremiumCar
     <div
       onClick={onClick}
       onMouseEnter={onMouseEnter}
-      className={`group bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 ${
-        selected
+      className={`group bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 ${selected
           ? 'border-[#064e4b] ring-4 ring-[#064e4b]/5 shadow-lg'
           : 'border-slate-100 hover:border-slate-200/80 hover:shadow-md'
-      } flex lg:flex-col h-[115px] lg:h-auto w-full relative`}
+        } flex lg:flex-col h-[128px] lg:h-auto w-full relative`}
     >
       {/* Image Container */}
-      <div className="relative w-[115px] lg:w-full h-full lg:h-44 overflow-hidden bg-slate-50 shrink-0 pointer-events-none">
+      <div className="relative w-[128px] lg:w-full h-full lg:h-44 overflow-hidden bg-slate-50 shrink-0 pointer-events-none">
         {pin.thumb ? (
           <img
             src={pin.thumb}
@@ -649,9 +651,8 @@ function PremiumCommuteCard({ pin, selected, onClick, onMouseEnter }: PremiumCar
         {/* Purpose Badge overlay (Buy/Rent - Desktop only) */}
         {!isP && (
           <div className="absolute top-2 right-2 z-10 lg:block hidden">
-            <span className={`text-[8.5px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm ${
-              pin.purpose === 'SALE' ? 'bg-[#064e4b] text-white' : 'bg-teal-500 text-white'
-            }`}>
+            <span className={`text-[8.5px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm ${pin.purpose === 'SALE' ? 'bg-[#064e4b] text-white' : 'bg-teal-500 text-white'
+              }`}>
               {pin.purpose === 'SALE' ? 'Buy' : 'Rent'}
             </span>
           </div>
@@ -659,7 +660,7 @@ function PremiumCommuteCard({ pin, selected, onClick, onMouseEnter }: PremiumCar
       </div>
 
       {/* Info / Content Area */}
-      <div className="p-3 lg:p-4 flex-1 flex flex-col justify-between min-w-0 pointer-events-none">
+      <div className="p-3.5 lg:p-4 flex-1 flex flex-col justify-between min-w-0 pointer-events-none">
         <div>
           {/* Price or completion status */}
           <div className="flex items-baseline justify-between gap-1 mb-0.5">
@@ -677,9 +678,8 @@ function PremiumCommuteCard({ pin, selected, onClick, onMouseEnter }: PremiumCar
 
             {/* Purpose Badge overlay (Buy/Rent - Mobile only) */}
             {!isP && (
-              <span className={`lg:hidden text-[7.5px] font-black uppercase tracking-widest px-1 py-0.5 rounded ${
-                pin.purpose === 'SALE' ? 'bg-[#064e4b] text-white' : 'bg-teal-500 text-white'
-              }`}>
+              <span className={`lg:hidden text-[7.5px] font-black uppercase tracking-widest px-1 py-0.5 rounded ${pin.purpose === 'SALE' ? 'bg-[#064e4b] text-white' : 'bg-teal-500 text-white'
+                }`}>
                 {pin.purpose === 'SALE' ? 'Buy' : 'Rent'}
               </span>
             )}
@@ -719,17 +719,16 @@ function PremiumCommuteCard({ pin, selected, onClick, onMouseEnter }: PremiumCar
         {/* Specs footer for listings */}
         {!isP && (
           <div className="flex items-center gap-1.5 pt-1.5 mt-1.5 border-t border-slate-100 text-slate-500 text-[10px] flex-wrap">
-            {pin.bedrooms && (
+            {!!(pin.bedrooms && Number(pin.bedrooms) > 0) && (
               <span className="font-bold">{pin.bedrooms} Beds</span>
             )}
-            {pin.bedrooms && <span className="w-1 h-1 rounded-full bg-slate-200" />}
+            {!!(pin.bedrooms && Number(pin.bedrooms) > 0) && <span className="w-1 h-1 rounded-full bg-slate-200" />}
             <span className="font-semibold truncate">{TYPE_LABELS[pin.type] || pin.type}</span>
             {pin.foreignerEligible && (
               <>
                 <span className="w-1 h-1 rounded-full bg-slate-200" />
-                <span className={`font-bold text-[9px] uppercase tracking-wide shrink-0 ${
-                  pin.muslimOnly ? 'text-orange-600' : 'text-purple-655'
-                }`}>
+                <span className={`font-bold text-[9px] uppercase tracking-wide shrink-0 ${pin.muslimOnly ? 'text-orange-600' : 'text-purple-655'
+                  }`}>
                   {pin.muslimOnly ? '🕌 Muslims' : '🌍 Foreigner Ok'}
                 </span>
               </>
@@ -1169,11 +1168,10 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
               <div className="relative">
                 <button
                   onClick={() => setShowDesktopFilters(prev => !prev)}
-                  className={`px-3.5 py-1.5 rounded-xl border flex items-center justify-center gap-1.5 transition-all text-xs font-black ${
-                    showDesktopFilters || Object.values(filters).some(Boolean)
+                  className={`px-3.5 py-1.5 rounded-xl border flex items-center justify-center gap-1.5 transition-all text-xs font-black ${showDesktopFilters || Object.values(filters).some(Boolean)
                       ? 'bg-emerald-50 text-[#064e4b] border-emerald-300 shadow-sm'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-350'
-                  }`}
+                    }`}
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5 text-[#064e4b]" />
                   <span>Filters</span>
@@ -1305,7 +1303,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                 <h3 className="text-xl font-extrabold text-slate-900 mb-3 font-serif">
                   {locale === 'ar' ? 'ابحث عن مسكنك حسب وقت التنقل' : 'Live Near the Places that Matter to You'}
                 </h3>
-                
+
                 <p className="text-xs font-bold text-slate-700 max-w-sm mb-10 leading-relaxed">
                   {locale === 'ar'
                     ? 'حدد موقع البداية ووقت القيادة المفضل لنعرض لك العقارات والمشاريع المتاحة ضمن نطاق تنقلك اليومي.'
@@ -1375,11 +1373,10 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                       onClick={() => {
                         setKindFilter(k as any);
                       }}
-                      className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider rounded-xl transition-all border ${
-                        kindFilter === k
+                      className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider rounded-xl transition-all border ${kindFilter === k
                           ? 'bg-[#064e4b] text-white border-[#064e4b] shadow-sm'
                           : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       {l}
                     </button>
@@ -1410,28 +1407,28 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                     </div>
                   )}
 
-              {!loading && !error && filteredPins.length > 0 && (
-                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
-                  {desktopListings.map(pin => (
-                    <PremiumCommuteCard
-                      key={`${pin.kind}-${pin.id}`}
-                      pin={pin}
-                      selected={selectedPin?.id === pin.id}
-                      onClick={() => {
-                        const detailUrl = pin.kind === 'project'
-                          ? `/${locale}/projects/${pin.id}`
-                          : `/${locale}/listings/${pin.shortId || pin.id}`;
-                        router.push(detailUrl);
-                      }}
-                      onMouseEnter={() => flyToPin(pin)}
-                    />
-                  ))}
+                  {!loading && !error && filteredPins.length > 0 && (
+                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
+                      {desktopListings.map(pin => (
+                        <PremiumCommuteCard
+                          key={`${pin.kind}-${pin.id}`}
+                          pin={pin}
+                          selected={selectedPin?.id === pin.id}
+                          onClick={() => {
+                            const detailUrl = pin.kind === 'project'
+                              ? `/${locale}/projects/${pin.id}`
+                              : `/${locale}/listings/${pin.shortId || pin.id}`;
+                            router.push(detailUrl);
+                          }}
+                          onMouseEnter={() => flyToPin(pin)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+              </>
+            )}
+          </div>
 
           {/* Right Map */}
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1455,7 +1452,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
 
       {/* ── MOBILE VIEW ── */}
       <div className="lg:hidden flex-1 flex flex-col overflow-hidden relative">
-        
+
         {/* Screen 1: SETUP */}
         {mobileScreen === 'setup' && (
           <div className="flex-1 overflow-y-auto bg-white p-5 flex flex-col gap-6 animate-fade-in">
@@ -1542,11 +1539,10 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                   <button
                     key={mins}
                     onClick={() => setMinutes(mins)}
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
-                      minutes === mins
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${minutes === mins
                         ? 'bg-[#064e4b] text-white border-[#064e4b]'
                         : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-[#064e4b]'
-                    }`}
+                      }`}
                   >
                     {mins} min
                   </button>
@@ -1571,7 +1567,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
             {/* Mobile More Filters (Scrollable on page - Issue 1) */}
             <div className="flex flex-col gap-4 border-t border-slate-100 pt-4">
               <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Search Filters</h3>
-              
+
               {/* Purpose */}
               <div className="flex flex-col gap-1">
                 <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Purpose</label>
@@ -1669,9 +1665,8 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
               </div>
               {/* Instructions row */}
               <div className="px-5 py-4 flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0 ${
-                  activeChoosePoint === 'A' ? 'bg-emerald-600' : 'bg-blue-600'
-                }`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0 ${activeChoosePoint === 'A' ? 'bg-emerald-600' : 'bg-blue-600'
+                  }`}>
                   {activeChoosePoint}
                 </div>
                 <div>
@@ -1695,19 +1690,17 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                   gestureHandling: 'greedy'
                 }}
               />
-              
+
               {/* Premium downward teardrop pin pointer (Issue 3) */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(100%-2px)] z-10 pointer-events-none drop-shadow-lg">
                 <div className="flex flex-col items-center">
                   {/* Teardrop pin body */}
-                  <div className={`relative flex items-center justify-center w-11 h-11 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-md ${
-                    activeChoosePoint === 'A' ? 'bg-emerald-600' : 'bg-blue-600'
-                  }`}>
+                  <div className={`relative flex items-center justify-center w-11 h-11 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-md ${activeChoosePoint === 'A' ? 'bg-emerald-600' : 'bg-blue-600'
+                    }`}>
                     {/* Counter-rotate internal badge to keep text upright */}
                     <div className="w-6.5 h-6.5 rounded-full bg-white flex items-center justify-center -rotate-45 shadow-sm">
-                      <span className={`text-xs font-black ${
-                        activeChoosePoint === 'A' ? 'text-emerald-700' : 'text-blue-700'
-                      }`}>
+                      <span className={`text-xs font-black ${activeChoosePoint === 'A' ? 'text-emerald-700' : 'text-blue-700'
+                        }`}>
                         {activeChoosePoint}
                       </span>
                     </div>
@@ -1749,7 +1742,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
         {/* Screen 3: RESULTS (with list and pagination - Aligned per user specifications) */}
         {mobileScreen === 'results' && (
           <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden animate-fade-in h-full">
-            
+
             {/* Mobile top filter controls (Aligned per user specifications) */}
             <div className="bg-white border-b border-slate-200 py-3.5 px-4 flex flex-col gap-3.5 shrink-0 shadow-sm z-30">
               {/* Row 1: Return CTA on left, Filters CTA on right */}
@@ -1790,11 +1783,10 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                       onClick={() => {
                         setKindFilter(k as any);
                       }}
-                      className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider rounded-lg transition-all ${
-                        isActive
+                      className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider rounded-lg transition-all ${isActive
                           ? 'bg-white text-slate-900 shadow-xs'
                           : 'text-slate-500 hover:text-slate-800'
-                      }`}
+                        }`}
                     >
                       {label}
                     </button>
@@ -1847,21 +1839,21 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                   {/* Mobile pagination controls */}
                   {totalPages > 1 && (
                     <div className="py-4 border-t border-slate-100 flex items-center justify-center gap-1.5 mt-2 bg-white rounded-2xl shadow-sm border border-slate-100">
-                      <button 
+                      <button
                         disabled={currentPage === 1}
                         onClick={() => setCurrentPage(1)}
                         className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
                       >
                         «
                       </button>
-                      <button 
+                      <button
                         disabled={currentPage === 1}
                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                         className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
                       >
                         ‹
                       </button>
-                      
+
                       {Array.from({ length: totalPages }, (_, i) => i + 1)
                         .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
                         .map((p, idx, arr) => {
@@ -1872,11 +1864,10 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                               {showEllipsis && <span className="text-slate-400 px-1">...</span>}
                               <button
                                 onClick={() => setCurrentPage(p)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                                  currentPage === p 
-                                    ? 'bg-[#064e4b] text-white shadow-md' 
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${currentPage === p
+                                    ? 'bg-[#064e4b] text-white shadow-md'
                                     : 'text-slate-600 hover:bg-slate-100'
-                                }`}
+                                  }`}
                               >
                                 {p}
                               </button>
@@ -1884,14 +1875,14 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                           );
                         })}
 
-                      <button 
+                      <button
                         disabled={currentPage === totalPages}
                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                         className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"
                       >
                         ›
                       </button>
-                      <button 
+                      <button
                         disabled={currentPage === totalPages}
                         onClick={() => setCurrentPage(totalPages)}
                         className="px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-100 rounded-xl transition-all"

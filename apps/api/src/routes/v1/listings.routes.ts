@@ -13,7 +13,7 @@ import { eq, and, sql, desc, asc, inArray, or, gte, lte, isNull } from 'drizzle-
  * Listings Routes
  */
 export default async function listingsRoutes(app: FastifyInstance) {
-  
+
   /**
    * GET /api/v1/listings
    * Public search with filters
@@ -42,8 +42,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
       });
     } catch (err: any) {
       console.error('Listings search error:', err);
-      return reply.status(500).send({ 
-        success: false, 
+      return reply.status(500).send({
+        success: false,
         message: 'Failed to fetch listings',
         error: err.message
       });
@@ -63,9 +63,9 @@ export default async function listingsRoutes(app: FastifyInstance) {
       });
     } catch (err: any) {
       console.error('Cloudinary signature error:', err);
-      return reply.status(500).send({ 
-        success: false, 
-        message: 'Failed to generate upload signature' 
+      return reply.status(500).send({
+        success: false,
+        message: 'Failed to generate upload signature'
       });
     }
   });
@@ -79,8 +79,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
 
     try {
       const listing = await ListingService.getListingById(
-        id, 
-        request.user?.role, 
+        id,
+        request.user?.role,
         request.user?.userId
       );
 
@@ -94,8 +94,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
       });
     } catch (err: any) {
       console.error('Listing detail error:', err);
-      return reply.status(500).send({ 
-        success: false, 
+      return reply.status(500).send({
+        success: false,
         message: 'Failed to fetch listing detail',
         error: err.message
       });
@@ -163,7 +163,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const userId = request.user?.userId;
     const userRole = request.user?.role;
-    
+
     // We use partial update schema
     const parsed = updateListingSchema.safeParse(request.body);
 
@@ -200,8 +200,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
       await ListingService.deleteListing(id, userId!, userRole!);
       return reply.send({ success: true, message: 'Listing deleted successfully' });
     } catch (err: any) {
-      const code = err.message === 'Unauthorized to delete this listing' ? 403 : 
-                   err.message === 'Listing not found' ? 404 : 500;
+      const code = err.message === 'Unauthorized to delete this listing' ? 403 :
+        err.message === 'Listing not found' ? 404 : 500;
       return reply.code(code).send({ success: false, error: err.message });
     }
   });
@@ -246,9 +246,9 @@ export default async function listingsRoutes(app: FastifyInstance) {
         status: listings.status,
         aiQualificationActive: listings.aiQualificationActive
       })
-      .from(listings)
-      .where(eq(listings.id, id))
-      .limit(1);
+        .from(listings)
+        .where(eq(listings.id, id))
+        .limit(1);
 
       if (!listing) {
         return reply.code(404).send({ success: false, message: 'Listing not found' });
@@ -289,9 +289,9 @@ export default async function listingsRoutes(app: FastifyInstance) {
       }
 
       if (!canReveal) {
-        return reply.code(403).send({ 
-          success: false, 
-          message: 'Lead qualification required to access contact details' 
+        return reply.code(403).send({
+          success: false,
+          message: 'Lead qualification required to access contact details'
         });
       }
 
@@ -309,11 +309,11 @@ export default async function listingsRoutes(app: FastifyInstance) {
   app.get('/projects', { preHandler: [authenticateJWT] }, async (request, reply) => {
     try {
       const allProjects = await db.select().from(projects).orderBy(desc(projects.createdAt));
-      
+
       const projectIds = allProjects.map(p => p.id);
       const layoutCounts: Record<string, number> = {};
       const leadCounts: Record<string, number> = {};
-      
+
       if (projectIds.length > 0) {
         // Count listings (layouts) per project
         const layouts = await db
@@ -326,7 +326,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
             inArray(listings.projectId, projectIds),
             sql`deleted_at IS NULL`
           ));
-          
+
         layouts.forEach(l => {
           if (l.projectId) {
             layoutCounts[l.projectId] = (layoutCounts[l.projectId] || 0) + 1;
@@ -384,12 +384,12 @@ export default async function listingsRoutes(app: FastifyInstance) {
 
     const north = q.north ? parseFloat(q.north) : null;
     const south = q.south ? parseFloat(q.south) : null;
-    const east  = q.east  ? parseFloat(q.east)  : null;
-    const west  = q.west  ? parseFloat(q.west)  : null;
+    const east = q.east ? parseFloat(q.east) : null;
+    const west = q.west ? parseFloat(q.west) : null;
     const priceMin = q.price_min ? parseInt(q.price_min) : null;
     const priceMax = q.price_max ? parseInt(q.price_max) : null;
-    const type    = q.type    || null;
-    const beds    = q.beds    ? parseInt(q.beds)    : null;
+    const type = q.type || null;
+    const beds = q.beds ? parseInt(q.beds) : null;
     const purpose = q.purpose || null;
     const foreignerEligible = q.foreignerEligible === 'true' || q.foreigner_eligible === 'true';
 
@@ -410,32 +410,32 @@ export default async function listingsRoutes(app: FastifyInstance) {
       }
       if (priceMin !== null) listingConditions.push(gte(listings.price, priceMin));
       if (priceMax !== null) listingConditions.push(lte(listings.price, priceMax));
-      if (type)    listingConditions.push(eq(listings.type, type));
-      if (beds)    listingConditions.push(sql`${listings.bedrooms} >= ${beds}`);
+      if (type) listingConditions.push(eq(listings.type, type));
+      if (beds) listingConditions.push(sql`${listings.bedrooms} >= ${beds}`);
       if (purpose) listingConditions.push(eq(listings.purpose, purpose));
       if (foreignerEligible) listingConditions.push(eq(listings.foreignerEligible, true));
 
       const standalonePins = await db.select({
-        id:        listings.id,
-        shortId:   listings.shortId,
-        lat:       listings.lat,
-        lng:       listings.lng,
-        price:     listings.price,
-        type:      listings.type,
-        purpose:   listings.purpose,
-        bedrooms:  listings.bedrooms,
-        city:      listings.city,
-        district:  listings.district,
-        enTitle:   listings.enTitle,
-        arTitle:   listings.arTitle,
-        thumb:     sql<string>`(${listings.photos})[1]`,
+        id: listings.id,
+        shortId: listings.shortId,
+        lat: listings.lat,
+        lng: listings.lng,
+        price: listings.price,
+        type: listings.type,
+        purpose: listings.purpose,
+        bedrooms: listings.bedrooms,
+        city: listings.city,
+        district: listings.district,
+        enTitle: listings.enTitle,
+        arTitle: listings.arTitle,
+        thumb: sql<string>`(${listings.photos})[1]`,
         isFeatured: listings.isFeatured,
         foreignerEligible: listings.foreignerEligible,
         muslimOnly: listings.muslimOnly,
       })
-      .from(listings)
-      .where(and(...listingConditions))
-      .limit(500);   // Safety cap — Supercluster handles this client-side
+        .from(listings)
+        .where(and(...listingConditions))
+        .limit(500);   // Safety cap — Supercluster handles this client-side
 
       // ── Projects ──────────────────────────────────────────────────────────
       const projectConditions: any[] = [
@@ -465,22 +465,22 @@ export default async function listingsRoutes(app: FastifyInstance) {
       }
 
       const projectPins = await db.select({
-        id:          projects.id,
-        nameEn:      projects.nameEn,
-        nameAr:      projects.nameAr,
-        lat:         projects.lat,
-        lng:         projects.lng,
-        city:        projects.city,
-        district:    projects.district,
-        thumb:       sql<string>`(${projects.photos})[1]`,
-        isFeatured:  projects.isFeatured,
+        id: projects.id,
+        nameEn: projects.nameEn,
+        nameAr: projects.nameAr,
+        lat: projects.lat,
+        lng: projects.lng,
+        city: projects.city,
+        district: projects.district,
+        thumb: sql<string>`(${projects.photos})[1]`,
+        isFeatured: projects.isFeatured,
         completionStatus: projects.completionStatus,
         foreignerEligible: projects.foreignerEligible,
         muslimOnly: projects.muslimOnly,
       })
-      .from(projects)
-      .where(and(...projectConditions))
-      .limit(200);
+        .from(projects)
+        .where(and(...projectConditions))
+        .limit(200);
 
       return reply.send({
         success: true,
@@ -590,8 +590,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         foreignerEligible: listings.foreignerEligible,
         muslimOnly: listings.muslimOnly,
       })
-      .from(listings)
-      .where(and(...listingConditions));
+        .from(listings)
+        .where(and(...listingConditions));
 
       const projectConditions: any[] = [
         sql`CAST(${projects.lat} AS DECIMAL) BETWEEN ${bbox.minLat} AND ${bbox.maxLat}`,
@@ -612,8 +612,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
         foreignerEligible: projects.foreignerEligible,
         muslimOnly: projects.muslimOnly,
       })
-      .from(projects)
-      .where(and(...projectConditions));
+        .from(projects)
+        .where(and(...projectConditions));
 
       // Merge and map
       const mergedCandidates = [
@@ -664,13 +664,13 @@ export default async function listingsRoutes(app: FastifyInstance) {
           const batch = destList.slice(i, i + batchSize);
           const destString = batch.map(d => `${d.lat},${d.lng}`).join('|');
           const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${encodeURIComponent(destString)}&mode=driving&departure_time=now&key=${googleMapsKey}`;
-          
+
           try {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP error ${response.status}`);
             const data = await response.json();
             if (data.status !== 'OK') throw new Error(`API status ${data.status}`);
-            
+
             const elements = data.rows[0].elements;
             elements.forEach((el: any) => {
               if (el.status === 'OK') {
@@ -1235,8 +1235,8 @@ export default async function listingsRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     try {
       const listing = await ListingService.getListingById(
-        id, 
-        request.user?.role, 
+        id,
+        request.user?.role,
         request.user?.userId
       );
 
@@ -1259,7 +1259,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
   app.post('/:id/units', { preHandler: [authenticateJWT] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { units } = request.body as { units: Array<{ unitNumber: string; floor: number; type: string; status?: string; price?: number }> };
-    
+
     if (!Array.isArray(units) || units.length === 0) {
       return reply.code(400).send({ success: false, message: 'units array is required and cannot be empty' });
     }

@@ -761,9 +761,9 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const chooseMapRef = useRef<google.maps.Map | null>(null);
 
-  const [pointA, setPointA] = useState<{ lat: number; lng: number } | null>({ lat: 24.7136, lng: 46.6753 });
+  const [pointA, setPointA] = useState<{ lat: number; lng: number } | null>(null);
   const [pointB, setPointB] = useState<{ lat: number; lng: number } | null>(null);
-  const [pointALabel, setPointALabel] = useState<string>('Riyadh City Center');
+  const [pointALabel, setPointALabel] = useState<string>('');
   const [pointBLabel, setPointBLabel] = useState<string>('');
   const [settingPoint, setSettingPoint] = useState<'A' | 'B'>('A');
 
@@ -1272,56 +1272,143 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
         <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Left List Sidebar */}
           <div className="w-[680px] shrink-0 flex flex-col border-r border-slate-250 bg-white h-full overflow-hidden">
-            {/* Sync instruction bar */}
-            <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose shrink-0">
-              <div className="flex items-center gap-2">
-                <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>Right click on the map to set location Point A or Point B</span>
+            {!pointA ? (
+              /* ONBOARDING GUIDE (takes full height of sidebar when no search has run) */
+              <div className="relative p-8 flex-1 flex flex-col items-center text-center select-none justify-center bg-white h-full">
+                {/* Pointer Arrow pointing to Location A Box */}
+                <div className="absolute top-2 left-[290px] animate-pulse hidden md:block z-25">
+                  <svg width="60" height="75" viewBox="0 0 60 75" fill="none" className="transform -rotate-6">
+                    <path
+                      d="M45 68 C32 50 10 32 10 10"
+                      stroke="#064e4b"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      strokeDasharray="6,6"
+                    />
+                    <path
+                      d="M2 18 L10 5 L20 14"
+                      stroke="#064e4b"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="absolute -left-12 -bottom-6 text-[10px] font-black uppercase tracking-wider text-white bg-[#064e4b] border border-[#064e4b] px-2.5 py-1 rounded-md shadow-md whitespace-nowrap">
+                    {locale === 'ar' ? 'أدخل الموقع هنا' : 'Enter Location A here'}
+                  </span>
+                </div>
+
+                <div className="w-16 h-16 rounded-3xl bg-primary-50 flex items-center justify-center mb-6 shadow-sm">
+                  <Car className="w-8 h-8 text-primary-600 animate-float" />
+                </div>
+
+                <h3 className="text-xl font-extrabold text-slate-900 mb-3 font-serif">
+                  {locale === 'ar' ? 'ابحث عن مسكنك حسب وقت التنقل' : 'Live Near the Places that Matter to You'}
+                </h3>
+                
+                <p className="text-xs font-bold text-slate-700 max-w-sm mb-10 leading-relaxed">
+                  {locale === 'ar'
+                    ? 'حدد موقع البداية ووقت القيادة المفضل لنعرض لك العقارات والمشاريع المتاحة ضمن نطاق تنقلك اليومي.'
+                    : 'Define your daily commute parameters above to discover premium properties reachable within your exact travel budget.'}
+                </p>
+
+                <div className="w-full max-w-xs space-y-6 text-left">
+                  <div className="flex gap-4">
+                    <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                      1
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        {locale === 'ar' ? 'حدد موقع البداية' : 'Set Commute Points'}
+                      </h4>
+                      <p className="text-[10.5px] text-slate-600 font-bold mt-0.5 leading-normal">
+                        {locale === 'ar' ? 'أدخل نقطة البداية (مكان عملك، مدرستك، أو موقع زيارتك).' : 'Enter Location A above, representing your office, school, or daily landmark.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="w-7 h-7 rounded-full bg-[#064e4b] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                      2
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        {locale === 'ar' ? 'اختر وقت القيادة الأقصى' : 'Select Max Commute Time'}
+                      </h4>
+                      <p className="text-[10.5px] text-slate-600 font-bold mt-0.5 leading-normal">
+                        {locale === 'ar' ? 'حدد وقت تنقلك المفضل بالدقائق لحساب النطاق.' : 'Set your maximum driving time budget to define your travel radius.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="w-7 h-7 rounded-full bg-[#C5A059] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                      3
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        {locale === 'ar' ? 'تصفح الخيارات المطابقة' : 'Explore Matching Homes'}
+                      </h4>
+                      <p className="text-[10.5px] text-slate-600 font-bold mt-0.5 leading-normal">
+                        {locale === 'ar' ? 'شاهد العقارات والمشاريع المتاحة وتصفح تفاصيل المخططات.' : 'Browse matching listings and layouts reachable within your parameters.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Properties / Projects Tab Switcher (Desktop) */}
-            <div className="px-5 py-2.5 bg-white border-b border-slate-150 flex gap-2 shrink-0">
-              {[['listing', 'Properties'], ['project', 'Projects']].map(([k, l]) => (
-                <button
-                  key={k}
-                  onClick={() => {
-                    setKindFilter(k as any);
-                  }}
-                  className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider rounded-xl transition-all border ${
-                    kindFilter === k
-                      ? 'bg-[#064e4b] text-white border-[#064e4b] shadow-sm'
-                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex-1 overflow-y-auto" onScroll={handleDesktopScroll}>
-              {loading && (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#064e4b]" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Generating drive time contours...</span>
+            ) : (
+              /* ACTIVE SEARCH VIEW */
+              <>
+                {/* Sync instruction bar */}
+                <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>Right click on the map to set location Point A or Point B</span>
+                  </div>
                 </div>
-              )}
 
-              {error && (
-                <div className="p-4 m-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-700 text-center uppercase tracking-wider leading-loose">
-                  ⚠️ {error}
+                {/* Properties / Projects Tab Switcher (Desktop) */}
+                <div className="px-5 py-2.5 bg-white border-b border-slate-150 flex gap-2 shrink-0">
+                  {[['listing', 'Properties'], ['project', 'Projects']].map(([k, l]) => (
+                    <button
+                      key={k}
+                      onClick={() => {
+                        setKindFilter(k as any);
+                      }}
+                      className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider rounded-xl transition-all border ${
+                        kindFilter === k
+                          ? 'bg-[#064e4b] text-white border-[#064e4b] shadow-sm'
+                          : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {l}
+                    </button>
+                  ))}
                 </div>
-              )}
 
-              {!loading && !error && filteredPins.length === 0 && (
-                <div className="text-center py-16 text-slate-400 px-4">
-                  <Car className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                  <p className="text-xs font-black uppercase tracking-wider">No properties reachable</p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-relaxed">
-                    Try expanding drive time range or moving Point A / B closer to residential zones.
-                  </p>
-                </div>
-              )}
+                <div className="flex-1 overflow-y-auto" onScroll={handleDesktopScroll}>
+                  {loading && (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
+                      <Loader2 className="w-8 h-8 animate-spin text-[#064e4b]" />
+                      <span className="text-xs font-bold uppercase tracking-wider">Generating drive time contours...</span>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="p-4 m-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-700 text-center uppercase tracking-wider leading-loose">
+                      ⚠️ {error}
+                    </div>
+                  )}
+
+                  {!loading && !error && filteredPins.length === 0 && (
+                    <div className="text-center py-16 text-slate-400 px-4">
+                      <Car className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                      <p className="text-xs font-black uppercase tracking-wider">No properties reachable</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-relaxed">
+                        Try expanding drive time range or moving Point A / B closer to residential zones.
+                      </p>
+                    </div>
+                  )}
 
               {!loading && !error && filteredPins.length > 0 && (
                 <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
@@ -1342,7 +1429,9 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                 </div>
               )}
             </div>
-          </div>
+          </>
+        )}
+      </div>
 
           {/* Right Map */}
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1733,7 +1822,7 @@ function DriveTimeInner({ googleMapsKey, locale }: DriveTimeInnerProps) {
                 <div className="text-center py-16 text-slate-400 px-4">
                   <Car className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                   <p className="text-xs font-black uppercase tracking-wider">No properties reachable</p>
-                  <p className="text-[10px] text-slate-455 font-bold mt-1 uppercase tracking-widest leading-relaxed">
+                  <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-relaxed">
                     Try expanding drive time range or moving Point A / B closer to residential zones.
                   </p>
                 </div>

@@ -5,7 +5,7 @@ import { SystemService } from '../../services/system.service';
 import { CloudinaryService } from '../../services/cloudinary.service';
 import { authenticateJWT, optionalAuthenticateJWT } from '../../middleware/auth.middleware';
 import { db } from '../../db';
-import { leads, buyerProfiles, listings, projects, projectUnits, users, listingReports, creditLedger } from '../../db/schema';
+import { leads, buyerProfiles, listings, projects, projectUnits, users, listingReports, creditLedger, listingComparisonPairs } from '../../db/schema';
 import { eq, and, sql, desc, asc, inArray, or, gte, lte, isNull } from 'drizzle-orm';
 
 
@@ -67,6 +67,85 @@ export default async function listingsRoutes(app: FastifyInstance) {
         success: false,
         message: 'Failed to generate upload signature'
       });
+    }
+  });
+
+  /**
+   * GET /api/v1/listings/batch
+   * Fetch multiple listings by their UUIDs
+   */
+  app.get('/batch', { preHandler: [optionalAuthenticateJWT] }, async (request, reply) => {
+    const { ids } = request.query as { ids?: string };
+    if (!ids) {
+      return reply.code(400).send({ success: false, message: 'Missing ids query parameter' });
+    }
+    const idsArray = ids.split(',').filter(Boolean);
+    if (idsArray.length === 0 || idsArray.length > 4) {
+      return reply.code(400).send({ success: false, message: 'Must provide between 1 and 4 IDs' });
+    }
+
+    try {
+      const items = await db.select()
+        .from(listings)
+        .where(and(
+          inArray(listings.id, idsArray),
+          isNull(listings.deletedAt)
+        ));
+      return reply.send({ success: true, data: items });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch batch listings', error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/v1/listings/compare/log
+   * Log a comparison set co-occurrence
+   */
+  app.post('/compare/log', async (request, reply) => {
+    const { ids } = request.body as { ids?: string[] };
+    if (!ids || !Array.isArray(ids) || ids.length < 2 || ids.length > 4) {
+      return reply.code(400).send({ success: false, message: 'Invalid payload: ids must be an array of 2 to 4 UUIDs' });
+    }
+
+    try {
+      // 1. Generate unique pairs from the list of IDs
+      const uniqueIds = Array.from(new Set(ids));
+      const pairs: [string, string][] = [];
+      for (let i = 0; i < uniqueIds.length; i++) {
+        for (let j = i + 1; j < uniqueIds.length; j++) {
+          const idA = uniqueIds[i];
+          const idB = uniqueIds[j];
+          if (idA < idB) {
+            pairs.push([idA, idB]);
+          } else {
+            pairs.push([idB, idA]);
+          }
+        }
+      }
+
+      // 2. Atomic upsert for each pair
+      for (const [idA, idB] of pairs) {
+        // First check if listings exist to prevent foreign key constraint violations
+        const [listingA] = await db.select({ id: listings.id }).from(listings).where(eq(listings.id, idA)).limit(1);
+        const [listingB] = await db.select({ id: listings.id }).from(listings).where(eq(listings.id, idB)).limit(1);
+        if (listingA && listingB) {
+          await db.insert(listingComparisonPairs)
+            .values({ listingIdA: idA, listingIdB: idB, count: 1 })
+            .onConflictDoUpdate({
+              target: [listingComparisonPairs.listingIdA, listingComparisonPairs.listingIdB],
+              set: { 
+                count: sql`${listingComparisonPairs.count} + 1`,
+                updatedAt: new Date()
+              }
+            });
+        }
+      }
+
+      return reply.send({ success: true });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to log listing comparison pairs', error: err.message });
     }
   });
 
@@ -198,6 +277,14 @@ export default async function listingsRoutes(app: FastifyInstance) {
 
     try {
       await ListingService.deleteListing(id, userId!, userRole!);
+      
+      // Cascade delete pairs containing this listing to preserve database state
+      await db.delete(listingComparisonPairs)
+        .where(or(
+          eq(listingComparisonPairs.listingIdA, id),
+          eq(listingComparisonPairs.listingIdB, id)
+        ));
+
       return reply.send({ success: true, message: 'Listing deleted successfully' });
     } catch (err: any) {
       const code = err.message === 'Unauthorized to delete this listing' ? 403 :

@@ -11,7 +11,7 @@ import {
   Square, Bed, Bath, ArrowLeft, ShieldCheck, Star,
   Sparkles, Loader2, ChevronRight, Lock, Mail, Phone,
   MessageSquare, BookOpen, ExternalLink, Zap, Map as MapIcon,
-  ChevronLeft, Share2, Heart, X, Flag, AlertTriangle, Maximize2
+  ChevronLeft, Share2, Heart, X, Flag, AlertTriangle, Maximize2, ArrowRightLeft
 } from 'lucide-react';
 import BrochureModal from '@/components/listings/BrochureModal';
 import MediaModal from '@/components/listings/MediaModal';
@@ -23,6 +23,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Listing } from '@saudi-re/shared';
 import clsx from 'clsx';
 import MortgageCalculator from '@/components/mortgage-calculator/MortgageCalculator';
+import { useCompareStore } from '@/lib/store/useCompareStore';
 
 interface ProjectUnit {
   id: string;
@@ -179,6 +180,21 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
   // Favorites States
   const [projectFavorited, setProjectFavorited] = useState(false);
   const [narrativeExpanded, setNarrativeExpanded] = useState(false);
+
+  const { comparedProjects, addProject, removeProject } = useCompareStore();
+  const isCompared = comparedProjects.includes(id);
+
+  const handleToggleCompare = () => {
+    if (isCompared) {
+      removeProject(id);
+    } else {
+      if (comparedProjects.length >= 4) {
+        alert(locale === 'ar' ? 'يمكنك مقارنة 4 مشاريع كحد أقصى.' : 'You can compare up to 4 projects maximum.');
+        return;
+      }
+      addProject(id);
+    }
+  };
   const [isToggling, setIsToggling] = useState(false);
   const [amenitiesModalOpen, setAmenitiesModalOpen] = useState(false);
   const [layoutZoomOpen, setLayoutZoomOpen] = useState(false);
@@ -518,6 +534,12 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
         </Link>
         <div className="flex items-center gap-2">
           <button
+            onClick={handleToggleCompare}
+            className={`p-2 rounded-full border transition-all ${isCompared ? 'bg-primary-50 text-primary-600 border-primary-200' : 'border-surface-200 hover:bg-surface-50'}`}
+          >
+            <ArrowRightLeft className="w-5 h-5" />
+          </button>
+          <button
             onClick={handleToggleProjectFavorite}
             className={`p-2 rounded-full border transition-all ${projectFavorited ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50'}`}
           >
@@ -551,6 +573,13 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleToggleCompare}
+              title={locale === 'ar' ? 'قارن هذا المشروع' : 'Compare this project'}
+              className={`p-2.5 rounded-xl border transition-all ${isCompared ? 'bg-primary-50 text-primary-600 border-primary-200' : 'border-surface-200 hover:bg-surface-50'}`}
+            >
+              <ArrowRightLeft className="w-5 h-5" />
+            </button>
             <button
               onClick={handleToggleProjectFavorite}
               className={`p-2.5 rounded-xl border transition-all ${projectFavorited ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50'}`}

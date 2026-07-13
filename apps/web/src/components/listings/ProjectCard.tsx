@@ -5,11 +5,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
-import { Square, MapPin, Layers, Sparkles, Shield, Construction, CheckCircle, Clock, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Square, MapPin, Layers, Sparkles, Shield, Construction, CheckCircle, Clock, Heart, ChevronLeft, ChevronRight, Scale, ArrowRightLeft, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatPriceCompact } from '@saudi-re/shared';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api';
+import { useCompareStore } from '@/lib/store/useCompareStore';
 
 interface ProjectCardProps {
   project: {
@@ -47,6 +48,7 @@ export default function ProjectCard({
   onToggleFavorite
 }: ProjectCardProps) {
   const locale = useLocale();
+  const isAr = locale === 'ar';
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
@@ -54,6 +56,24 @@ export default function ProjectCard({
   const [favorited, setFavorited] = useState(!!isFavorited || !!project.isFavorited);
   const [isToggling, setIsToggling] = useState(false);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+
+  const { comparedProjects, addProject, removeProject } = useCompareStore();
+  const isCompared = comparedProjects.includes(project.id);
+
+  const handleToggleCompare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isCompared) {
+      removeProject(project.id);
+    } else {
+      if (comparedProjects.length >= 4) {
+        alert(locale === 'ar' ? 'يمكنك مقارنة 4 مشاريع كحد أقصى.' : 'You can compare up to 4 projects maximum.');
+        return;
+      }
+      addProject(project.id);
+    }
+  };
 
   const photos = project.photos || [];
 
@@ -220,33 +240,49 @@ export default function ProjectCard({
               {locale === 'ar' ? 'موثوق' : 'Verified'}
             </div>
 
-            <button
-              onClick={handleToggleFavorite}
-              className={`p-2 rounded-lg backdrop-blur-md border shadow-sm transition-all relative z-20 ${favorited
-                  ? 'bg-red-50/90 text-red-500 border-red-100'
-                  : 'bg-white/80 text-gray-400 border-gray-100 hover:text-red-500 hover:bg-white'
-                }`}
-            >
-              <Heart className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
-            </button>
+            <div className="flex items-center gap-1.5 relative z-20 pointer-events-auto">
+              <button
+                onClick={handleToggleFavorite}
+                className={`p-2 rounded-lg backdrop-blur-md border shadow-sm transition-all ${favorited
+                    ? 'bg-red-50/90 text-red-500 border-red-100'
+                    : 'bg-white/80 text-gray-400 border-gray-100 hover:text-red-500 hover:bg-white'
+                  }`}
+              >
+                <Heart className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Content Section */}
         <div className="p-5 flex flex-col flex-1 relative z-10 pointer-events-none">
           {/* Status Badge */}
-          <div className="flex items-center gap-1.5 mb-2.5">
-            {project.completionStatus && (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${statusColors[project.completionStatus]}`}>
-                {statusIcons[project.completionStatus]}
-                {statusBadges[project.completionStatus]}
-              </span>
-            )}
-            {project.expectedDelivery && (
-              <span className="text-[10px] font-medium text-surface-500">
-                • {locale === 'ar' ? `التسليم: ${project.expectedDelivery}` : `Delivery: ${project.expectedDelivery}`}
-              </span>
-            )}
+          <div className="flex items-center justify-between gap-1.5 mb-2.5 pointer-events-auto">
+            <div className="flex items-center gap-1.5">
+              {project.completionStatus && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${statusColors[project.completionStatus]}`}>
+                  {statusIcons[project.completionStatus]}
+                  {statusBadges[project.completionStatus]}
+                </span>
+              )}
+              {project.expectedDelivery && (
+                <span className="text-[10px] font-medium text-surface-500">
+                  • {locale === 'ar' ? `التسليم: ${project.expectedDelivery}` : `Delivery: ${project.expectedDelivery}`}
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={handleToggleCompare}
+              className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-md border-2 transition-all relative z-20 shadow-sm ${
+                isCompared
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-white hover:bg-indigo-600 text-indigo-600 hover:text-white border-indigo-200 hover:border-indigo-600'
+              }`}
+            >
+              {isCompared ? <Check className="w-3.5 h-3.5" /> : <ArrowRightLeft className="w-3.5 h-3.5" />}
+              <span>{isCompared ? (isAr ? 'تمت المقارنة' : 'Compared') : (isAr ? 'قارن الآن' : 'Compare')}</span>
+            </button>
           </div>
 
           {/* Title */}

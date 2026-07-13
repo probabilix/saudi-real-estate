@@ -5,7 +5,7 @@ import { useCrmAuth } from '@/hooks/use-crm-auth';
 import {
   LayoutDashboard, Globe, Megaphone, Settings,
   LogOut, ChevronRight, ChevronLeft, Building2,
-  X, Menu, AlertCircle, CreditCard, MessageCircle, Wand2
+  X, Menu, AlertCircle, CreditCard, MessageCircle, Wand2, Scale
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -13,7 +13,10 @@ import clsx from 'clsx';
 const NAV_ADMIN = [
   {
     label: 'Overview',
-    items: [{ href: '/', label: 'Dashboard', icon: LayoutDashboard }],
+    items: [
+      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      // { href: '/comparison-insights', label: 'Comparison Insights', icon: Scale },
+    ],
   },
   {
     label: 'Lead Modules',
@@ -33,7 +36,10 @@ const NAV_ADMIN = [
 const NAV_AGENT = [
   {
     label: 'Overview',
-    items: [{ href: '/', label: 'My Dashboard', icon: LayoutDashboard }],
+    items: [
+      { href: '/', label: 'My Dashboard', icon: LayoutDashboard },
+      // { href: '/comparison-insights', label: 'Comparison Insights', icon: Scale },
+    ],
   },
   {
     label: 'Properties',

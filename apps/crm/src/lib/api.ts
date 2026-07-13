@@ -55,6 +55,8 @@ export const crmApi = {
 
   getDashboard: () => request<CrmDashboardData>('/crm/dashboard'),
 
+  getComparisonInsights: () => request<any[]>('/crm/comparison-insights'),
+
   getTodayFollowups: () => request<CrmFollowup[]>('/crm/followups/today'),
 
   completeFollowup: (id: string) =>

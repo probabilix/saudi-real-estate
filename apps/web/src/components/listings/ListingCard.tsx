@@ -5,12 +5,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
-import { Square, MapPin, Star, Shield, Heart, Bed, Bath, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Square, MapPin, Star, Shield, Heart, Bed, Bath, ChevronLeft, ChevronRight, Scale, ArrowRightLeft, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatPriceCompact } from '@saudi-re/shared';
 import type { Listing } from '@saudi-re/shared';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api';
+import { useCompareStore } from '@/lib/store/useCompareStore';
 
 interface ListingCardProps {
   listing: Listing;
@@ -22,6 +23,7 @@ interface ListingCardProps {
 
 export default function ListingCard({ listing, index = 0, isDashboard, onDelete, onToggleFavorite }: ListingCardProps) {
   const locale = useLocale();
+  const isAr = locale === 'ar';
   const t = useTranslations('listing');
   const tSearch = useTranslations('search');
   const tCommon = useTranslations('common');
@@ -32,6 +34,24 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
   const [favorited, setFavorited] = useState(!!listing.isFavorited);
   const [isToggling, setIsToggling] = useState(false);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+
+  const { comparedListings, addListing, removeListing } = useCompareStore();
+  const isCompared = comparedListings.includes(listing.id);
+
+  const handleToggleCompare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isCompared) {
+      removeListing(listing.id);
+    } else {
+      if (comparedListings.length >= 4) {
+        alert(locale === 'ar' ? 'يمكنك مقارنة 4 عقارات كحد أقصى.' : 'You can compare up to 4 listings maximum.');
+        return;
+      }
+      addListing(listing.id);
+    }
+  };
 
   const photos = listing.photos || [];
 
@@ -195,21 +215,23 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
           </span>
 
           {!isDashboard && (
-            <button
-              onClick={handleToggleFavorite}
-              className={`p-2 rounded-lg backdrop-blur-md border shadow-sm transition-all relative z-20 ${favorited
-                  ? 'bg-red-50/90 text-red-500 border-red-100'
-                  : 'bg-white/80 text-gray-400 border-gray-100 hover:text-red-500 hover:bg-white'
-                }`}
-            >
-              <Heart className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
-            </button>
+            <div className="flex items-center gap-1.5 relative z-20 pointer-events-auto">
+              <button
+                onClick={handleToggleFavorite}
+                className={`p-2 rounded-lg backdrop-blur-md border shadow-sm transition-all ${favorited
+                    ? 'bg-red-50/90 text-red-500 border-red-100'
+                    : 'bg-white/80 text-gray-400 border-gray-100 hover:text-red-500 hover:bg-white'
+                  }`}
+              >
+                <Heart className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
+              </button>
+            </div>
           )}
         </div>
 
         {/* Content Section */}
         <div className="p-5 flex flex-col flex-1 relative z-10 pointer-events-none">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 pointer-events-auto">
             <div className="flex items-baseline gap-1">
               <span className={`text-2xl font-bold text-charcoal tracking-tight ${locale === 'ar' ? 'font-arabic' : ''}`}>
                 {formatPriceCompact(listing.price, locale as 'en' | 'ar')}
@@ -218,6 +240,20 @@ export default function ListingCard({ listing, index = 0, isDashboard, onDelete,
                 <span className="text-xs text-charcoal-muted font-medium">/{t('perYear')}</span>
               )}
             </div>
+
+            {!isDashboard && (
+              <button
+                onClick={handleToggleCompare}
+                className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-md border-2 transition-all relative z-20 shadow-sm ${
+                  isCompared
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                    : 'bg-white hover:bg-indigo-600 text-indigo-600 hover:text-white border-indigo-200 hover:border-indigo-600'
+                }`}
+              >
+                {isCompared ? <Check className="w-3.5 h-3.5" /> : <ArrowRightLeft className="w-3.5 h-3.5" />}
+                <span>{isCompared ? (isAr ? 'تمت المقارنة' : 'Compared') : (isAr ? 'قارن الآن' : 'Compare')}</span>
+              </button>
+            )}
           </div>
 
           <h3 className={`text-base font-semibold text-charcoal mb-2 line-clamp-1 group-hover:text-primary-600 transition-colors ${locale === 'ar' ? 'font-arabic' : ''}`}>

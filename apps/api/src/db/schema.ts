@@ -2,7 +2,7 @@
 // Saudi Real Estate — Drizzle Schema Definition
 // ──────────────────────────────────────────────
 
-import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, decimal, bigint, smallint, text, integer, jsonb, customType, index, foreignKey, unique } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, decimal, bigint, smallint, text, integer, jsonb, customType, index, foreignKey, unique, primaryKey, check } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 
 /**
@@ -924,5 +924,54 @@ export const creditLedgerRelations = relations(creditLedger, ({ one }) => ({
   order:   one(creditOrders,  { fields: [creditLedger.refOrderId],    references: [creditOrders.id] }),
   listing: one(listings,      { fields: [creditLedger.refListingId],  references: [listings.id] }),
 }));
+
+// ── Property/Listing Comparison Pairs Table ──
+export const listingComparisonPairs = pgTable('listing_comparison_pairs', {
+  listingIdA: uuid('listing_id_a').references(() => listings.id, { onDelete: 'cascade' }).notNull(),
+  listingIdB: uuid('listing_id_b').references(() => listings.id, { onDelete: 'cascade' }).notNull(),
+  count: integer('count').default(1).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.listingIdA, table.listingIdB] }),
+  idxA: index('listing_pair_a_idx').on(table.listingIdA),
+  idxB: index('listing_pair_b_idx').on(table.listingIdB),
+  sortCheck: check('listing_pair_sort_check', sql`listing_id_a < listing_id_b`),
+}));
+
+export const listingComparisonPairsRelations = relations(listingComparisonPairs, ({ one }) => ({
+  listingA: one(listings, {
+    fields: [listingComparisonPairs.listingIdA],
+    references: [listings.id],
+  }),
+  listingB: one(listings, {
+    fields: [listingComparisonPairs.listingIdB],
+    references: [listings.id],
+  }),
+}));
+
+// ── Project Comparison Pairs Table ──
+export const projectComparisonPairs = pgTable('project_comparison_pairs', {
+  projectIdA: uuid('project_id_a').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  projectIdB: uuid('project_id_b').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  count: integer('count').default(1).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.projectIdA, table.projectIdB] }),
+  idxA: index('project_pair_a_idx').on(table.projectIdA),
+  idxB: index('project_pair_b_idx').on(table.projectIdB),
+  sortCheck: check('project_pair_sort_check', sql`project_id_a < project_id_b`),
+}));
+
+export const projectComparisonPairsRelations = relations(projectComparisonPairs, ({ one }) => ({
+  projectA: one(projects, {
+    fields: [projectComparisonPairs.projectIdA],
+    references: [projects.id],
+  }),
+  projectB: one(projects, {
+    fields: [projectComparisonPairs.projectIdB],
+    references: [projects.id],
+  }),
+}));
+
 
 

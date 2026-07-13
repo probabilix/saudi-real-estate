@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { db } from '../../db';
-import { systemSettings, users, buyerProfiles, leads, listings, chatMessages, faqs, contactSubmissions, projects, projectUnits, projectFavorites, listingReports } from '../../db/schema';
-import { eq, inArray, sql, and, or, desc, gte, isNull } from 'drizzle-orm';
+import { systemSettings, users, buyerProfiles, leads, listings, chatMessages, faqs, contactSubmissions, projects, projectUnits, projectFavorites, listingReports, projectComparisonPairs } from '../../db/schema';
+import { eq, inArray, sql, and, or, desc, gte, isNull, lte } from 'drizzle-orm';
 import { SystemService } from '../../services/system.service';
 import { ListingService } from '../../services/listing.service';
 import { authenticateJWT, requireRole, optionalAuthenticateJWT } from '../../middleware/auth.middleware';
@@ -893,6 +893,136 @@ ${historyText}
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to fetch chat history.', error: err.message });
+    }
+  });
+
+  // ── GET Public Projects Batch (For Comparison) ──
+  app.get('/projects/batch', { preHandler: [optionalAuthenticateJWT] }, async (request: any, reply) => {
+    const { ids } = request.query as { ids?: string };
+    if (!ids) {
+      return reply.code(400).send({ success: false, message: 'Missing ids query parameter' });
+    }
+    const idsArray = ids.split(',').filter(Boolean);
+    if (idsArray.length === 0 || idsArray.length > 4) {
+      return reply.code(400).send({ success: false, message: 'Must provide between 1 and 4 IDs' });
+    }
+
+    try {
+      const allProjects = await db.select()
+        .from(projects)
+        .where(inArray(projects.id, idsArray));
+
+      if (allProjects.length === 0) {
+        return reply.send({ success: true, data: [] });
+      }
+
+      const projectIds = allProjects.map(p => p.id);
+      const layoutsMap: Record<string, any[]> = {};
+      const favoritedProjectIds = new Set<string>();
+
+      // Fetch layouts to compute price range & bedroom bounds
+      const layouts = await db.select()
+        .from(listings)
+        .where(and(
+          inArray(listings.projectId, projectIds),
+          eq(listings.status, 'ACTIVE'),
+          sql`${listings.deletedAt} IS NULL`
+        ));
+
+      layouts.forEach(l => {
+        if (l.projectId) {
+          if (!layoutsMap[l.projectId]) {
+            layoutsMap[l.projectId] = [];
+          }
+          layoutsMap[l.projectId].push(l);
+        }
+      });
+
+      // Check favorites
+      const userId = request.user?.userId;
+      if (userId && projectIds.length > 0) {
+        const userFavs = await db.select({ projectId: projectFavorites.projectId })
+          .from(projectFavorites)
+          .where(and(
+            eq(projectFavorites.userId, userId),
+            inArray(projectFavorites.projectId, projectIds)
+          ));
+        userFavs.forEach(f => favoritedProjectIds.add(f.projectId));
+      }
+
+      const data = allProjects.map(p => {
+        const projLayouts = layoutsMap[p.id] || [];
+        const layoutCount = projLayouts.length;
+        const prices = projLayouts.map(l => Number(l.price));
+        const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+        const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+        const beds = projLayouts.map(l => l.bedrooms).filter(b => b !== null && b !== undefined) as number[];
+        const uniqueBedrooms = Array.from(new Set(beds)).sort((a, b) => a - b);
+        const minBedrooms = uniqueBedrooms.length > 0 ? uniqueBedrooms[0] : undefined;
+        const maxBedrooms = uniqueBedrooms.length > 0 ? uniqueBedrooms[uniqueBedrooms.length - 1] : undefined;
+
+        return {
+          ...p,
+          layoutCount,
+          minPrice,
+          maxPrice,
+          minBedrooms,
+          maxBedrooms,
+          bedroomsList: uniqueBedrooms,
+          isFavorited: favoritedProjectIds.has(p.id)
+        };
+      });
+
+      return reply.send({ success: true, data });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch batch projects', error: err.message });
+    }
+  });
+
+  // ── POST Log Project Comparison ──
+  app.post('/projects/compare/log', async (request, reply) => {
+    const { ids } = request.body as { ids?: string[] };
+    if (!ids || !Array.isArray(ids) || ids.length < 2 || ids.length > 4) {
+      return reply.code(400).send({ success: false, message: 'Invalid payload: ids must be an array of 2 to 4 UUIDs' });
+    }
+
+    try {
+      const uniqueIds = Array.from(new Set(ids));
+      const pairs: [string, string][] = [];
+      for (let i = 0; i < uniqueIds.length; i++) {
+        for (let j = i + 1; j < uniqueIds.length; j++) {
+          const idA = uniqueIds[i];
+          const idB = uniqueIds[j];
+          if (idA < idB) {
+            pairs.push([idA, idB]);
+          } else {
+            pairs.push([idB, idA]);
+          }
+        }
+      }
+
+      for (const [idA, idB] of pairs) {
+        // Validate existence
+        const [projA] = await db.select({ id: projects.id }).from(projects).where(eq(projects.id, idA)).limit(1);
+        const [projB] = await db.select({ id: projects.id }).from(projects).where(eq(projects.id, idB)).limit(1);
+        if (projA && projB) {
+          await db.insert(projectComparisonPairs)
+            .values({ projectIdA: idA, projectIdB: idB, count: 1 })
+            .onConflictDoUpdate({
+              target: [projectComparisonPairs.projectIdA, projectComparisonPairs.projectIdB],
+              set: { 
+                count: sql`${projectComparisonPairs.count} + 1`,
+                updatedAt: new Date()
+              }
+            });
+        }
+      }
+
+      return reply.send({ success: true });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to log project comparison pairs', error: err.message });
     }
   });
 

@@ -296,6 +296,28 @@ class ApiClient {
     return this.fetcher<{ items: any[]; total: number }>(`/system/projects?${queryString}`);
   }
 
+  async getListingsBatch(ids: string[]) {
+    return this.fetcher<Listing[]>(`/listings/batch?ids=${ids.join(',')}`);
+  }
+
+  async getProjectsBatch(ids: string[]) {
+    return this.fetcher<any[]>(`/system/projects/batch?ids=${ids.join(',')}`);
+  }
+
+  async logListingsComparison(ids: string[]) {
+    return this.fetcher<{ success: boolean }>('/listings/compare/log', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+  }
+
+  async logProjectsComparison(ids: string[]) {
+    return this.fetcher<{ success: boolean }>('/system/projects/compare/log', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+  }
+
   async revealProjectContact(id: string) {
     return this.fetcher<{ phone: string; email: string }>(`/system/projects/${id}/reveal`, {
       method: 'POST',

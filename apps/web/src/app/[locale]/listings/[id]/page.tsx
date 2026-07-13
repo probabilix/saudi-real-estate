@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Maximize2, Zap,
   Info, Calculator, Map as MapIcon,
-  Mail, Loader2, BookOpen, Flag, AlertTriangle
+  Mail, Loader2, BookOpen, Flag, AlertTriangle, ArrowRightLeft
 } from 'lucide-react';
 import { formatPrice, formatPriceCompact, ListingWithOwner, Listing, PropertyHistoryEvent } from '@saudi-re/shared';
 import { api, API_BASE_URL } from '@/lib/api';
@@ -23,6 +23,7 @@ import MediaModal from '@/components/listings/MediaModal';
 import BrochureModal from '@/components/listings/BrochureModal';
 import ChatWidget from '@/components/chat/ChatWidget';
 import MortgageCalculator from '@/components/mortgage-calculator/MortgageCalculator';
+import { useCompareStore } from '@/lib/store/useCompareStore';
 
 const AMENITY_METADATA: Record<string, { labelEn: string; labelAr: string }> = {
   swimming_pool: { labelEn: 'Swimming Pool', labelAr: 'مسبح' },
@@ -83,6 +84,21 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const [amenitiesModalOpen, setAmenitiesModalOpen] = useState(false);
   const [isQualified, setIsQualified] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+
+  const { comparedListings, addListing, removeListing } = useCompareStore();
+  const isCompared = comparedListings.includes(id);
+
+  const handleToggleCompare = () => {
+    if (isCompared) {
+      removeListing(id);
+    } else {
+      if (comparedListings.length >= 4) {
+        alert(locale === 'ar' ? 'يمكنك مقارنة 4 عقارات كحد أقصى.' : 'You can compare up to 4 listings maximum.');
+        return;
+      }
+      addListing(id);
+    }
+  };
   const [revealedContact, setRevealedContact] = useState<{ phone?: string; email?: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [sidebarAdImage, setSidebarAdImage] = useState<string>('');
@@ -360,6 +376,12 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
         </Link>
         <div className="flex items-center gap-2">
           <button
+            onClick={handleToggleCompare}
+            className={`p-2 rounded-full border transition-all ${isCompared ? 'bg-primary-50 text-primary-600 border-primary-200' : 'border-surface-200 hover:bg-surface-50'}`}
+          >
+            <ArrowRightLeft className="w-5 h-5" />
+          </button>
+          <button
             onClick={handleToggleFavorite}
             className={`p-2 rounded-full border transition-all ${shortlisted ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50'}`}
           >
@@ -401,6 +423,13 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleToggleCompare}
+              title={locale === 'ar' ? 'قارن هذا العقار' : 'Compare this property'}
+              className={`p-2.5 rounded-xl border transition-all ${isCompared ? 'bg-primary-50 text-primary-600 border-primary-200' : 'border-surface-200 hover:bg-surface-50'}`}
+            >
+              <ArrowRightLeft className="w-5 h-5" />
+            </button>
             <button onClick={handleToggleFavorite} className={`p-2.5 rounded-xl border transition-all ${shortlisted ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50'}`}>
               <Heart className={`w-5 h-5 ${shortlisted ? 'fill-current' : ''}`} />
             </button>
@@ -497,6 +526,12 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
                 </div>
                 {/* Desktop-only save/share here; mobile has them in header */}
                 <div className="hidden md:flex items-center gap-3">
+                  <button
+                    onClick={handleToggleCompare}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 font-bold text-sm transition-all ${isCompared ? 'bg-primary-50 text-primary-600 border-primary-200' : 'border-surface-200 hover:bg-surface-50 text-charcoal-muted'}`}
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />{isCompared ? (locale === 'ar' ? 'تمت الإضافة' : 'Compared') : (locale === 'ar' ? 'قارن' : 'Compare')}
+                  </button>
                   <button onClick={handleToggleFavorite} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 font-bold text-sm transition-all ${shortlisted ? 'bg-red-50 text-red-500 border-red-200' : 'border-surface-200 hover:bg-surface-50 text-charcoal-muted'}`}>
                     <Heart className={`w-4 h-4 ${shortlisted ? 'fill-current' : ''}`} />{shortlisted ? t('saved') : t('save')}
                   </button>

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db } from '../../db';
 import {
   crmLeads, crmNotes, crmActivities, crmFollowups,
-  leads, buyerProfiles, chatMessages, listings, users, projects
+  leads, buyerProfiles, chatMessages, listings, users, projects, listingComparisonPairs
 } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import {
@@ -840,5 +840,94 @@ export default async function crmRoutes(app: FastifyInstance) {
     }
 
     return reply.send('EVENT_RECEIVED');
+  });
+
+  /** GET /crm/comparison-insights */
+  app.get('/comparison-insights', { preHandler: [authenticateJWT] }, async (req, reply) => {
+    const user = (req as any).user;
+    const userId = user.userId;
+    const userRole = user.role;
+
+    try {
+      // 1. Fetch broker's listings
+      // If ADMIN: fetch all listings. If Solo Broker/Agent: fetch own listings
+      const brokerListings = await db.select({
+        id: listings.id,
+        enTitle: listings.enTitle,
+        arTitle: listings.arTitle,
+        price: listings.price,
+        city: listings.city,
+        district: listings.district,
+        bedrooms: listings.bedrooms,
+        bathrooms: listings.bathrooms,
+        areaSqm: listings.areaSqm,
+        photos: listings.photos,
+      })
+        .from(listings)
+        .where(
+          and(
+            userRole !== 'ADMIN' ? eq(listings.ownerId, userId) : undefined,
+            isNull(listings.deletedAt)
+          )
+        );
+
+      if (brokerListings.length === 0) {
+        return reply.send({ success: true, data: [] });
+      }
+
+      const listingIds = brokerListings.map(l => l.id);
+
+      // 2. Fetch comparison pair counts for these listing IDs
+      // We do a query of all pairs where listingIdA or listingIdB is in the listingIds
+      const pairs = await db.select()
+        .from(listingComparisonPairs)
+        .where(
+          or(
+            inArray(listingComparisonPairs.listingIdA, listingIds),
+            inArray(listingComparisonPairs.listingIdB, listingIds)
+          )
+        )
+        .orderBy(desc(listingComparisonPairs.count));
+
+      // 3. For the top compared pairs, pull details of the competitor properties
+      const enrichedPairs = await Promise.all(pairs.map(async (pair) => {
+        const isA = listingIds.includes(pair.listingIdA);
+        const myListingId = isA ? pair.listingIdA : pair.listingIdB;
+        const competitorListingId = isA ? pair.listingIdB : pair.listingIdA;
+
+        // Fetch details of both
+        const [myListing] = brokerListings.filter(l => l.id === myListingId);
+        const [competitorListing] = await db.select({
+          id: listings.id,
+          enTitle: listings.enTitle,
+          arTitle: listings.arTitle,
+          price: listings.price,
+          city: listings.city,
+          district: listings.district,
+          bedrooms: listings.bedrooms,
+          bathrooms: listings.bathrooms,
+          areaSqm: listings.areaSqm,
+          photos: listings.photos,
+        })
+          .from(listings)
+          .where(eq(listings.id, competitorListingId))
+          .limit(1);
+
+        return {
+          myListing,
+          competitorListing: competitorListing || null,
+          count: pair.count,
+          updatedAt: pair.updatedAt
+        };
+      }));
+
+      // Filter out if competitor listing was not found (e.g. hard deleted)
+      const validPairs = enrichedPairs.filter(p => p.competitorListing !== null);
+
+      return reply.send({ success: true, data: validPairs });
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.code(500).send({ success: false, message: 'Failed to fetch comparison insights', error: err.message });
+    }
   });
 }

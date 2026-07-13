@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Header from './Header';
 import Footer from './Footer';
+import ComparisonTray from '../listings/ComparisonTray';
 
 interface NavWrapperProps {
   children: React.ReactNode;
@@ -18,7 +19,8 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
     pathname.includes('/forgot-password') ||
     pathname.includes('/verify') ||
     pathname.includes('/post-property') ||
-    pathname.includes('/edit-property');
+    pathname.includes('/edit-property') ||
+    pathname.includes('/compare');
 
   if (isMinimalPage) {
     return <main className="flex-1">{children}</main>;
@@ -26,6 +28,7 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
 
   const isDashboardPage = pathname.includes('/dashboard');
   const isMapOrDriveTime = pathname.includes('/map') || pathname.includes('/drive-time');
+  const showCompareTray = (pathname.includes('/listings') || pathname.includes('/projects')) && !pathname.includes('/compare');
 
   if (isMapOrDriveTime) {
     return (
@@ -51,6 +54,7 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
         >
           {children}
         </div>
+        {showCompareTray && <ComparisonTray />}
       </>
     );
   }
@@ -62,6 +66,7 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
         {children}
       </main>
       {!isDashboardPage && <Footer />}
+      {showCompareTray && <ComparisonTray />}
     </>
   );
 }

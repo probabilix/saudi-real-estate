@@ -818,8 +818,9 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             <div ref={sectionRefs.calculator} className="scroll-mt-40 border-t border-surface-200 pt-12">
               <MortgageCalculator
                 price={listing.price}
-                propertyExternalId={listing.shortId || listing.id}
+                propertyExternalId={listing.id}
                 locale={locale}
+                propertyType="listing"
               />
             </div>
 

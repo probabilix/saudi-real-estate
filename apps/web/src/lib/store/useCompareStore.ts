@@ -12,7 +12,7 @@ interface CompareStore {
   removeProject: (id: string) => void;
   clearAllListings: () => void;
   clearAllProjects: () => void;
-  syncLoggedComparison: (type: 'listings' | 'projects') => void;
+  syncLoggedComparison: (type: 'listings' | 'projects', ids?: string[]) => void;
 }
 
 export const useCompareStore = create<CompareStore>()(
@@ -55,9 +55,9 @@ export const useCompareStore = create<CompareStore>()(
       clearAllListings: () => set({ comparedListings: [] }),
       clearAllProjects: () => set({ comparedProjects: [] }),
 
-      syncLoggedComparison: async (type) => {
+      syncLoggedComparison: async (type, idsInput) => {
         const { comparedListings, comparedProjects, loggedSets } = get();
-        const ids = type === 'listings' ? comparedListings : comparedProjects;
+        const ids = idsInput || (type === 'listings' ? comparedListings : comparedProjects);
         
         // Log relations only when we have at least 2 items compared
         if (ids.length < 2) return;

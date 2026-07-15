@@ -1009,7 +1009,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   // ── Mortgage Leads Management ──
 
-  app.get('/mortgage-leads', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+  app.get('/mortgage-leads', { preHandler: [authenticateJWT] }, async (request, reply) => {
     const query = request.query as {
       page?: string;
       limit?: string;
@@ -1067,19 +1067,31 @@ export default async function adminRoutes(app: FastifyInstance) {
       // Fetch corresponding listings and projects for target name resolution
       const propertyIds = [...new Set(data.map(l => l.propertyExternalId))].filter(Boolean);
 
-      const matchedListings = propertyIds.length > 0
+      const validUuids = propertyIds.filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+      const shortIds = propertyIds.filter(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+
+      const listingConditions: any[] = [];
+      if (validUuids.length > 0) {
+        listingConditions.push(inArray(listings.id, validUuids));
+      }
+      if (shortIds.length > 0) {
+        listingConditions.push(inArray(listings.shortId, shortIds));
+      }
+
+      const listingWhere = listingConditions.length > 0
+        ? (listingConditions.length > 1 ? or(...listingConditions) : listingConditions[0])
+        : undefined;
+
+      const matchedListings = propertyIds.length > 0 && listingWhere
         ? await db.select({ id: listings.id, shortId: listings.shortId, enTitle: listings.enTitle, arTitle: listings.arTitle })
             .from(listings)
-            .where(or(
-              inArray(listings.id, propertyIds),
-              inArray(listings.shortId, propertyIds)
-            ))
+            .where(listingWhere)
         : [];
 
-      const matchedProjects = propertyIds.length > 0
+      const matchedProjects = validUuids.length > 0
         ? await db.select({ id: projects.id, nameEn: projects.nameEn, nameAr: projects.nameAr })
             .from(projects)
-            .where(inArray(projects.id, propertyIds))
+            .where(inArray(projects.id, validUuids))
         : [];
 
       const listingsMap = new Map<string, typeof matchedListings[0]>();
@@ -1093,6 +1105,20 @@ export default async function adminRoutes(app: FastifyInstance) {
       const projectsMap = new Map<string, typeof matchedProjects[0]>();
       matchedProjects.forEach(p => {
         projectsMap.set(p.id, p);
+      });
+
+      // Fetch corresponding user profiles to match email strictly by userId
+      const userIds = [...new Set(data.map(l => l.userId))].filter(Boolean) as string[];
+      const matchedUsers = userIds.length > 0
+        ? await db.select({ id: users.id, email: users.email })
+            .from(users)
+            .where(inArray(users.id, userIds))
+        : [];
+      const usersMap = new Map<string, string>(); // userId -> email
+      matchedUsers.forEach(u => {
+        if (u.id && u.email) {
+          usersMap.set(u.id, u.email);
+        }
       });
 
       const enrichedLeads = data.map(l => {
@@ -1110,10 +1136,15 @@ export default async function adminRoutes(app: FastifyInstance) {
           targetNameAr = project.nameAr || 'مشروع بدون عنوان';
         }
 
+        const email = l.userId ? usersMap.get(l.userId) || null : null;
+        const propertyType = listing ? 'listing' : (project ? 'project' : 'listing');
+
         return {
           ...l,
           targetNameEn,
-          targetNameAr
+          targetNameAr,
+          propertyType,
+          email
         };
       });
 
@@ -1135,7 +1166,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/mortgage-leads/export', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+  app.get('/mortgage-leads/export', { preHandler: [authenticateJWT] }, async (request, reply) => {
     const query = request.query as {
       search?: string;
       status?: string;
@@ -1181,19 +1212,31 @@ export default async function adminRoutes(app: FastifyInstance) {
       // Fetch corresponding listings and projects for target name resolution in CSV export
       const propertyIds = [...new Set(leadsData.map(l => l.propertyExternalId))].filter(Boolean);
 
-      const matchedListings = propertyIds.length > 0
+      const validUuids = propertyIds.filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+      const shortIds = propertyIds.filter(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+
+      const listingConditions: any[] = [];
+      if (validUuids.length > 0) {
+        listingConditions.push(inArray(listings.id, validUuids));
+      }
+      if (shortIds.length > 0) {
+        listingConditions.push(inArray(listings.shortId, shortIds));
+      }
+
+      const listingWhere = listingConditions.length > 0
+        ? (listingConditions.length > 1 ? or(...listingConditions) : listingConditions[0])
+        : undefined;
+
+      const matchedListings = propertyIds.length > 0 && listingWhere
         ? await db.select({ id: listings.id, shortId: listings.shortId, enTitle: listings.enTitle })
             .from(listings)
-            .where(or(
-              inArray(listings.id, propertyIds),
-              inArray(listings.shortId, propertyIds)
-            ))
+            .where(listingWhere)
         : [];
 
-      const matchedProjects = propertyIds.length > 0
+      const matchedProjects = validUuids.length > 0
         ? await db.select({ id: projects.id, nameEn: projects.nameEn })
             .from(projects)
-            .where(inArray(projects.id, propertyIds))
+            .where(inArray(projects.id, validUuids))
         : [];
 
       const listingsMap = new Map<string, typeof matchedListings[0]>();
@@ -1209,8 +1252,22 @@ export default async function adminRoutes(app: FastifyInstance) {
         projectsMap.set(p.id, p);
       });
 
+      // Fetch corresponding user profiles to match email strictly by userId
+      const userIds = [...new Set(leadsData.map(l => l.userId))].filter(Boolean) as string[];
+      const matchedUsers = userIds.length > 0
+        ? await db.select({ id: users.id, email: users.email })
+            .from(users)
+            .where(inArray(users.id, userIds))
+        : [];
+      const usersMap = new Map<string, string>(); // userId -> email
+      matchedUsers.forEach(u => {
+        if (u.id && u.email) {
+          usersMap.set(u.id, u.email);
+        }
+      });
+
       const headers = [
-        'ID', 'Full Name', 'Phone Number', 'Monthly Income', 'REDF Supported',
+        'ID', 'Full Name', 'Phone Number', 'Email', 'Monthly Income', 'REDF Supported',
         'Monthly Obligations', 'Property ID', 'Property Target Name', 'Property Price', 'Is Citizen',
         'Is First Home', 'Down Payment Amount', 'Loan Period Years', 'Bank Name',
         'Applied Rate %', 'Monthly Installment', 'Total Loan Amount', 'Total Payable Value',
@@ -1232,10 +1289,13 @@ export default async function adminRoutes(app: FastifyInstance) {
           targetName = lead.propertyExternalId;
         }
 
+        const email = lead.userId ? usersMap.get(lead.userId) || '' : '';
+
         const row = [
           lead.id,
           `"${(lead.fullName || '').replace(/"/g, '""')}"`,
           `"${(lead.phoneNumber || '').replace(/"/g, '""')}"`,
+          `"${email.replace(/"/g, '""')}"`,
           lead.monthlyIncome || '',
           lead.redfSupported ? 'Yes' : 'No',
           lead.monthlyObligations || '',
@@ -1269,7 +1329,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/mortgage-leads/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+  app.get('/mortgage-leads/:id', { preHandler: [authenticateJWT] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
       const [lead] = await db.select().from(mortgageLeads).where(eq(mortgageLeads.id, id)).limit(1);
@@ -1278,17 +1338,15 @@ export default async function adminRoutes(app: FastifyInstance) {
       }
 
       // Fetch corresponding listing or project details
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lead.propertyExternalId || '');
       const [listing] = lead.propertyExternalId
         ? await db.select({ enTitle: listings.enTitle, arTitle: listings.arTitle })
             .from(listings)
-            .where(or(
-              eq(listings.id, lead.propertyExternalId),
-              eq(listings.shortId, lead.propertyExternalId)
-            ))
+            .where(isUuid ? or(eq(listings.id, lead.propertyExternalId), eq(listings.shortId, lead.propertyExternalId)) : eq(listings.shortId, lead.propertyExternalId))
             .limit(1)
         : [null];
 
-      const [project] = lead.propertyExternalId && !listing
+      const [project] = lead.propertyExternalId && !listing && isUuid
         ? await db.select({ nameEn: projects.nameEn, nameAr: projects.nameAr })
             .from(projects)
             .where(eq(projects.id, lead.propertyExternalId))
@@ -1306,10 +1364,17 @@ export default async function adminRoutes(app: FastifyInstance) {
         targetNameAr = project.nameAr || 'مشروع بدون عنوان';
       }
 
+      const [dbUser] = lead.userId
+        ? await db.select({ email: users.email }).from(users).where(eq(users.id, lead.userId)).limit(1)
+        : [null];
+      const email = dbUser?.email || null;
+
       const enrichedLead = {
         ...lead,
         targetNameEn,
-        targetNameAr
+        targetNameAr,
+        propertyType: listing ? 'listing' : (project ? 'project' : 'listing'),
+        email
       };
 
       return reply.send({ success: true, data: enrichedLead });
@@ -1319,17 +1384,30 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/mortgage-leads/:id/status', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
+  app.patch('/mortgage-leads/:id/status', { preHandler: [authenticateJWT] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { status } = request.body as { status: string };
-
-    if (!status) {
-      return reply.code(400).send({ success: false, message: 'Status is required.' });
-    }
+    const { status, notes } = request.body as { status?: string; notes?: string };
 
     try {
+      const updateData: any = {};
+      if (status !== undefined) updateData.status = status;
+
+      if (notes !== undefined && notes.trim() !== '') {
+        const [existingLead] = await db.select({ notes: mortgageLeads.notes })
+          .from(mortgageLeads)
+          .where(eq(mortgageLeads.id, id))
+          .limit(1);
+
+        const notesArray = existingLead?.notes || [];
+        notesArray.push({
+          text: notes,
+          createdAt: new Date().toISOString(),
+        });
+        updateData.notes = notesArray;
+      }
+
       const [updated] = await db.update(mortgageLeads)
-        .set({ status })
+        .set(updateData)
         .where(eq(mortgageLeads.id, id))
         .returning();
 
@@ -1340,7 +1418,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       return reply.send({ success: true, data: updated });
     } catch (err: any) {
       app.log.error(err);
-      return reply.code(500).send({ success: false, message: 'Failed to update lead status.' });
+      return reply.code(500).send({ success: false, message: 'Failed to update lead status/notes.' });
     }
   });
 

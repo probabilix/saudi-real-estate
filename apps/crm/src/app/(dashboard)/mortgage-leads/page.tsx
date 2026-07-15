@@ -1,12 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { AdminTopBar } from '@/components/AdminSidebar';
-import { adminApi, AdminMortgageLead } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { crmApi, CrmMortgageLead } from '@/lib/api';
+import { CrmTopBar } from '@/components/CrmSidebar';
+import { useCrmAuth } from '@/hooks/use-crm-auth';
 import {
-  CreditCard, Search, Calendar, FileDown, CheckCircle2, AlertCircle,
-  Clock, ChevronLeft, ChevronRight, Loader2, User, Building2,
-  TrendingUp, X, ArrowUpRight, ChevronDown, Check, Coins, ShieldCheck
+  Loader2,
+  CreditCard,
+  Mail,
+  Phone,
+  Calendar,
+  Search,
+  AlertCircle,
+  X,
+  ChevronDown,
+  FileDown,
+  ArrowUpRight,
+  Building2
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -14,25 +24,25 @@ const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 const BANKS_LIST = [
-  { slug: 'emirates-nbd', name: 'Emirates NBD' },
-  { slug: 'bsf', name: 'BSF' },
-  { slug: 'al-jazira', name: 'Al Jazira' },
-  { slug: 'fab', name: 'FAB' },
-  { slug: 'al-rajhi', name: 'Al Rajhi' },
-  { slug: 'snb', name: 'SNB' },
-  { slug: 'riyad-bank', name: 'Riyad Bank' },
-  { slug: 'shl', name: 'SHL' },
-  { slug: 'sab', name: 'SAB' },
-  { slug: 'dar-al-tamleek', name: 'Dar Al Tamleek' }
+  { slug: 'alrajhi', name: 'Al Rajhi Bank' },
+  { slug: 'snb', name: 'SNB (AlAhli)' },
+  { slug: 'riyad', name: 'Riyad Bank' },
+  { slug: 'alinma', name: 'Alinma Bank' },
+  { slug: 'bsf', name: 'Banque Saudi Fransi' },
+  { slug: 'sabb', name: 'SABB (Alawwal)' },
+  { slug: 'anb', name: 'Arab National Bank' },
+  { slug: 'bid', name: 'Bank AlBilad' },
+  { slug: 'jazeera', name: 'Bank AlJazira' },
+  { slug: 'srec', name: 'Saudi Real Estate Refinance Company' },
 ];
 
 export default function MortgageLeadsPage() {
-  const [leads, setLeads] = useState<AdminMortgageLead[]>([]);
+  const { user } = useCrmAuth();
+  const [loading, setLoading] = useState(true);
+  const [leads, setLeads] = useState<CrmMortgageLead[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,8 +54,9 @@ export default function MortgageLeadsPage() {
   const [filterDateEnd, setFilterDateEnd] = useState('');
 
   // Selected Lead for Drawer
-  const [selectedLead, setSelectedLead] = useState<AdminMortgageLead | null>(null);
+  const [selectedLead, setSelectedLead] = useState<CrmMortgageLead | null>(null);
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -65,7 +76,7 @@ export default function MortgageLeadsPage() {
   async function loadLeads() {
     setLoading(true);
     try {
-      const result = await adminApi.getMortgageLeads({
+      const result = await crmApi.getMortgageLeads({
         page,
         limit: 15,
         search: debouncedSearch || undefined,
@@ -93,7 +104,7 @@ export default function MortgageLeadsPage() {
   const handleUpdateStatus = async (leadId: string, status: string) => {
     setStatusUpdating(leadId);
     try {
-      const result = await adminApi.updateMortgageLeadStatus(leadId, status);
+      const result = await crmApi.updateMortgageLeadStatus(leadId, status);
       if (result.success) {
         setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status } : l));
         if (selectedLead && selectedLead.id === leadId) {
@@ -110,7 +121,6 @@ export default function MortgageLeadsPage() {
   const [notesText, setNotesText] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Reset input when a different lead is opened
   useEffect(() => {
     setNotesText('');
   }, [selectedLead?.id]);
@@ -119,7 +129,7 @@ export default function MortgageLeadsPage() {
     if (!selectedLead || !notesText.trim()) return;
     setSavingNotes(true);
     try {
-      const result = await adminApi.updateMortgageLeadStatus(selectedLead.id, undefined, notesText.trim());
+      const result = await crmApi.updateMortgageLeadStatus(selectedLead.id, undefined, notesText.trim());
       if (result.success) {
         const newEntry = { text: notesText.trim(), createdAt: new Date().toISOString() };
         const updatedNotes = [...(selectedLead.notes || []), newEntry];
@@ -145,8 +155,8 @@ export default function MortgageLeadsPage() {
       if (filterDateStart) q.set('dateStart', filterDateStart);
       if (filterDateEnd) q.set('dateEnd', filterDateEnd);
 
-      const token = localStorage.getItem('adminToken');
-      const response = await fetch(`${API_BASE}/admin/mortgage-leads/export?${q}`, {
+      const token = localStorage.getItem('crmToken');
+      const response = await fetch(`${API_BASE}/mortgage-leads/export?${q}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -175,14 +185,9 @@ export default function MortgageLeadsPage() {
     return `${Math.round(num).toLocaleString()} SAR`;
   };
 
-  // Check if ID is a standard 36-character UUID
-  const isUUID = (str: string) => {
-    return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
-  };
-
   return (
     <div className="flex flex-col h-full bg-canvas/30">
-      <AdminTopBar title="Mortgage Leads Registry" />
+      <CrmTopBar title="Mortgage Leads Registry" />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         
@@ -190,7 +195,7 @@ export default function MortgageLeadsPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-xl font-black text-slate-800 flex items-center gap-2">
-              <CreditCard className="w-6 h-6 text-primary-600 animate-pulse" />
+              <CreditCard className="w-6 h-6 text-primary-600" />
               Mortgage Lead Pipelines
             </h1>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">
@@ -303,21 +308,21 @@ export default function MortgageLeadsPage() {
         </div>
 
         {/* Leads Table Card */}
-        <div className="admin-card overflow-hidden border border-slate-100 shadow-sm rounded-2xl">
+        <div className="admin-card overflow-hidden border border-slate-100 shadow-sm rounded-2xl bg-white">
           <div className="overflow-x-auto">
-            <table className="admin-table">
+            <table className="admin-table w-full">
               <thead>
-                <tr>
-                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">User</th>
-                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Property / Target</th>
-                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Bank Deal</th>
-                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Finance Details</th>
-                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Installment</th>
-                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5">Status</th>
-                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 bg-slate-50/50 py-3.5 text-right">Stage Action</th>
+                <tr className="border-b border-slate-100 bg-slate-50/50">
+                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 py-3.5 pl-6 text-left">User</th>
+                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 py-3.5 text-left">Property / Target</th>
+                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 py-3.5 text-left">Bank Deal</th>
+                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 py-3.5 text-left">Finance Details</th>
+                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 py-3.5 text-left">Installment</th>
+                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 py-3.5 text-left">Status</th>
+                  <th className="font-black uppercase tracking-wider text-[10px] text-slate-400 py-3.5 text-right pr-6">Stage Action</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="py-20 text-center">
@@ -327,45 +332,31 @@ export default function MortgageLeadsPage() {
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-20 text-center">
-                      <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-slate-100">
-                        <CreditCard className="w-6 h-6 text-slate-300" />
-                      </div>
-                      <p className="text-sm font-bold text-slate-700">No mortgage leads recorded yet</p>
-                      <p className="text-xs text-slate-400 mt-1">Estimations submitted from detail pages will register here</p>
+                    <td colSpan={7} className="py-20 text-center text-xs font-semibold text-slate-400">
+                      No matching mortgage leads found.
                     </td>
                   </tr>
                 ) : (
                   leads.map((lead) => {
-                    const downPct = Math.round((parseFloat(lead.downPaymentAmount) / parseFloat(lead.propertyPrice)) * 100);
+                    const price = parseFloat(lead.propertyPrice);
+                    const down = parseFloat(lead.downPaymentAmount);
+                    const downPct = price > 0 ? Math.round((down / price) * 100) : 0;
                     return (
                       <tr
                         key={lead.id}
                         onClick={() => setSelectedLead(lead)}
-                        className="group cursor-pointer hover:bg-slate-50/40 transition-colors"
+                        className="hover:bg-slate-50/40 cursor-pointer transition-all"
                       >
-                        <td>
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/10 to-emerald-500/10 text-teal-600 flex items-center justify-center font-bold text-sm border border-teal-500/5 shadow-sm">
-                              {lead.fullName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-sm font-bold text-slate-800 truncate">{lead.fullName}</div>
-                              <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5 font-medium">
-                                <Clock className="w-3 h-3 text-slate-400" />
-                                {new Date(lead.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            </div>
+                        <td className="py-4 pl-6">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-800">{lead.fullName}</span>
+                            <span className="text-[10px] text-slate-400 font-semibold font-mono mt-0.5">{lead.phoneNumber}</span>
                           </div>
                         </td>
                         <td>
-                          <div className="max-w-[200px] truncate space-y-0.5">
-                            <div className="text-xs font-bold text-slate-800 truncate" title={lead.targetNameEn || lead.propertyExternalId}>
-                              {lead.targetNameEn || `ID: ${lead.propertyExternalId}`}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono font-semibold">
-                              Base: {formatCurrency(lead.propertyPrice)}
-                            </div>
+                          <div className="flex flex-col max-w-[200px]">
+                            <span className="text-xs font-bold text-slate-700 truncate">{lead.targetNameEn || 'Unknown Property'}</span>
+                            <span className="text-[9px] font-mono text-slate-400 font-semibold truncate mt-0.5">{lead.propertyExternalId}</span>
                           </div>
                         </td>
                         <td>
@@ -392,7 +383,7 @@ export default function MortgageLeadsPage() {
                         </td>
                         <td>
                           <span className={clsx(
-                            "badge font-black uppercase tracking-wider text-[9px] py-1 px-2.5 border",
+                            "badge font-black uppercase tracking-wider text-[9px] py-1 px-2.5 border rounded-full",
                             lead.status === 'new' && "badge-blue bg-blue-50/50 text-blue-600 border-blue-100",
                             lead.status === 'attempted_contact' && "badge-indigo bg-indigo-50/50 text-indigo-600 border-indigo-100",
                             lead.status === 'contacted' && "badge-yellow bg-amber-50/50 text-amber-600 border-amber-100",
@@ -407,7 +398,7 @@ export default function MortgageLeadsPage() {
                              lead.status}
                           </span>
                         </td>
-                        <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <td className="text-right pr-6" onClick={(e) => e.stopPropagation()}>
                           <div className="relative inline-block text-left">
                             <select
                               disabled={statusUpdating === lead.id}
@@ -439,23 +430,21 @@ export default function MortgageLeadsPage() {
               <div className="text-xs font-semibold text-slate-400">
                 Showing <b>{leads.length}</b> of <b>{total}</b> mortgage leads
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
-                  className="btn-secondary p-1.5 disabled:opacity-50"
                   disabled={page === 1}
-                  onClick={() => setPage(p => p - 1)}
+                  onClick={() => setPage(page - 1)}
+                  className="px-3.5 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-bold rounded-lg text-xs disabled:opacity-50 transition-all"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  Prev
                 </button>
-                <div className="text-xs font-black text-slate-700 px-3 bg-white border border-slate-200 py-1.5 rounded-lg">
-                  Page {page} of {totalPages}
-                </div>
+                <span className="text-xs font-bold text-slate-500 px-2">Page {page} of {totalPages}</span>
                 <button
-                  className="btn-secondary p-1.5 disabled:opacity-50"
                   disabled={page === totalPages}
-                  onClick={() => setPage(p => p + 1)}
+                  onClick={() => setPage(page + 1)}
+                  className="px-3.5 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-bold rounded-lg text-xs disabled:opacity-50 transition-all"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  Next
                 </button>
               </div>
             </div>
@@ -463,47 +452,46 @@ export default function MortgageLeadsPage() {
         </div>
       </div>
 
-      {/* Slide-Over Drawer for Mortgage Lead Details */}
+      {/* Details Slideover Drawer */}
       {selectedLead && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+          {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity"
             onClick={() => setSelectedLead(null)}
           />
 
-          <div className="relative w-full max-w-xl bg-white h-full shadow-2xl flex flex-col z-10 transform transition-transform duration-300 ease-out translate-x-0 animate-slide-in">
+          {/* Drawer Body */}
+          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col z-10 animate-slide-in border-l border-slate-200">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-teal-100">
-                  {selectedLead.fullName.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h2 className="text-base font-black text-slate-800 flex items-center gap-2">
-                    {selectedLead.fullName}
-                  </h2>
-                  <div className="flex flex-col gap-0.5 mt-0.5 text-[10px] text-slate-400 font-semibold">
-                    <span>Lead ID: {selectedLead.id}</span>
-                    {selectedLead.email && <span className="text-slate-500 font-medium">{selectedLead.email}</span>}
-                  </div>
-                </div>
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <div>
+                <h2 className="text-sm font-black text-slate-800">{selectedLead.fullName}</h2>
+                <p className="text-[10px] text-slate-400 font-semibold font-mono mt-0.5">
+                  Lead ID: {selectedLead.id}
+                </p>
+                {selectedLead.email && (
+                  <p className="text-[10px] text-[#006169] font-bold font-mono mt-0.5">
+                    {selectedLead.email}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setSelectedLead(null)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                title="Close"
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                aria-label="Close details"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Drawer Body */}
+            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               
-              {/* Target Property */}
+              {/* Target Property block */}
               <div className="space-y-2">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target Inventory</h3>
-                <div className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all group">
+                <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 flex items-center justify-between gap-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200">
                       <Building2 className="w-5 h-5 text-slate-400" />
@@ -536,7 +524,7 @@ export default function MortgageLeadsPage() {
               {/* Lead Information */}
               <div className="space-y-2">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Applicant Details</h3>
-                <div className="grid grid-cols-2 gap-4 bg-slate-50/50 rounded-2xl border border-slate-100 p-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-2 gap-y-3.5 gap-x-6">
                   <div className="space-y-1 col-span-2 border-b border-slate-200/50 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Phone Number</span>
@@ -633,7 +621,6 @@ export default function MortgageLeadsPage() {
               <div className="space-y-2">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Agent Notes</h3>
                 <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                  {/* Existing notes log */}
                   {selectedLead.notes && selectedLead.notes.length > 0 && (
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {[...selectedLead.notes].reverse().map((note, idx) => (
@@ -646,7 +633,6 @@ export default function MortgageLeadsPage() {
                       ))}
                     </div>
                   )}
-                  {/* New note input */}
                   <textarea
                     className="w-full min-h-[80px] text-xs p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder-slate-400 bg-white text-slate-700 font-semibold"
                     placeholder="Add a new note..."

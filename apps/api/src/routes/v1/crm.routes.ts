@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db } from '../../db';
 import {
   crmLeads, crmNotes, crmActivities, crmFollowups,
-  leads, buyerProfiles, chatMessages, listings, users, projects, listingComparisonPairs
+  leads, buyerProfiles, chatMessages, listings, users, projects, listingComparisonPairs, projectComparisonPairs
 } from '../../db/schema';
 import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import {
@@ -846,11 +846,9 @@ export default async function crmRoutes(app: FastifyInstance) {
   app.get('/comparison-insights', { preHandler: [authenticateJWT] }, async (req, reply) => {
     const user = (req as any).user;
     const userId = user.userId;
-    const userRole = user.role;
 
     try {
-      // 1. Fetch broker's listings
-      // If ADMIN: fetch all listings. If Solo Broker/Agent: fetch own listings
+      // 1. Fetch broker's listings (strictly own listings, even if ADMIN, since they act as a broker/owner)
       const brokerListings = await db.select({
         id: listings.id,
         enTitle: listings.enTitle,
@@ -866,37 +864,123 @@ export default async function crmRoutes(app: FastifyInstance) {
         .from(listings)
         .where(
           and(
-            userRole !== 'ADMIN' ? eq(listings.ownerId, userId) : undefined,
+            eq(listings.ownerId, userId),
             isNull(listings.deletedAt)
           )
         );
 
-      if (brokerListings.length === 0) {
-        return reply.send({ success: true, data: [] });
-      }
-
-      const listingIds = brokerListings.map(l => l.id);
-
-      // 2. Fetch comparison pair counts for these listing IDs
-      // We do a query of all pairs where listingIdA or listingIdB is in the listingIds
-      const pairs = await db.select()
-        .from(listingComparisonPairs)
+      // 2. Fetch broker's projects (projects where the broker owns at least one layout/listing)
+      const brokerProjects = await db.selectDistinct({
+        id: projects.id,
+        nameEn: projects.nameEn,
+        nameAr: projects.nameAr,
+        city: projects.city,
+        district: projects.district,
+        photos: projects.photos,
+        completionStatus: projects.completionStatus,
+        expectedDelivery: projects.expectedDelivery,
+      })
+        .from(projects)
+        .innerJoin(listings, eq(listings.projectId, projects.id))
         .where(
-          or(
-            inArray(listingComparisonPairs.listingIdA, listingIds),
-            inArray(listingComparisonPairs.listingIdB, listingIds)
+          and(
+            eq(listings.ownerId, userId),
+            isNull(listings.deletedAt)
           )
-        )
-        .orderBy(desc(listingComparisonPairs.count));
+        );
 
-      // 3. For the top compared pairs, pull details of the competitor properties
-      const enrichedPairs = await Promise.all(pairs.map(async (pair) => {
+      // 3. Retrieve price & bedroom information for layouts belonging to those projects
+      const projectIds = brokerProjects.map(p => p.id);
+      const projectLayouts = projectIds.length > 0
+        ? await db.select({
+            projectId: listings.projectId,
+            price: listings.price,
+            bedrooms: listings.bedrooms,
+          })
+            .from(listings)
+            .where(
+              and(
+                inArray(listings.projectId, projectIds),
+                isNull(listings.deletedAt)
+              )
+            )
+        : [];
+
+      const projectStats: Record<string, {
+        layoutCount: number;
+        minPrice: number;
+        maxPrice: number;
+        bedroomsList: number[];
+      }> = {};
+
+      projectLayouts.forEach(l => {
+        if (l.projectId) {
+          if (!projectStats[l.projectId]) {
+            projectStats[l.projectId] = {
+              layoutCount: 0,
+              minPrice: Infinity,
+              maxPrice: -Infinity,
+              bedroomsList: [],
+            };
+          }
+
+          const stats = projectStats[l.projectId];
+          stats.layoutCount += 1;
+
+          const price = Number(l.price) || 0;
+          if (price < stats.minPrice) {
+            stats.minPrice = price;
+          }
+          if (price > stats.maxPrice) {
+            stats.maxPrice = price;
+          }
+
+          if (l.bedrooms !== null && l.bedrooms !== undefined) {
+            const beds = Number(l.bedrooms);
+            if (!stats.bedroomsList.includes(beds)) {
+              stats.bedroomsList.push(beds);
+            }
+          }
+        }
+      });
+
+      // Sort bedrooms list for all broker projects
+      Object.values(projectStats).forEach(stats => {
+        stats.bedroomsList.sort((a, b) => a - b);
+      });
+
+      // 4. Fetch listing comparison pairs
+      const listingIds = brokerListings.map(l => l.id);
+      const listingPairs = listingIds.length > 0
+        ? await db.select()
+            .from(listingComparisonPairs)
+            .where(
+              or(
+                inArray(listingComparisonPairs.listingIdA, listingIds),
+                inArray(listingComparisonPairs.listingIdB, listingIds)
+              )
+            )
+        : [];
+
+      // 5. Fetch project comparison pairs
+      const projectPairs = projectIds.length > 0
+        ? await db.select()
+            .from(projectComparisonPairs)
+            .where(
+              or(
+                inArray(projectComparisonPairs.projectIdA, projectIds),
+                inArray(projectComparisonPairs.projectIdB, projectIds)
+              )
+            )
+        : [];
+
+      // 6. Enrich Listing Pairs
+      const enrichedListingPairs = await Promise.all(listingPairs.map(async (pair) => {
         const isA = listingIds.includes(pair.listingIdA);
-        const myListingId = isA ? pair.listingIdA : pair.listingIdB;
-        const competitorListingId = isA ? pair.listingIdB : pair.listingIdA;
+        const myId = isA ? pair.listingIdA : pair.listingIdB;
+        const competitorId = isA ? pair.listingIdB : pair.listingIdA;
 
-        // Fetch details of both
-        const [myListing] = brokerListings.filter(l => l.id === myListingId);
+        const myListing = brokerListings.find(l => l.id === myId);
         const [competitorListing] = await db.select({
           id: listings.id,
           enTitle: listings.enTitle,
@@ -910,21 +994,103 @@ export default async function crmRoutes(app: FastifyInstance) {
           photos: listings.photos,
         })
           .from(listings)
-          .where(eq(listings.id, competitorListingId))
+          .where(eq(listings.id, competitorId))
           .limit(1);
 
         return {
-          myListing,
-          competitorListing: competitorListing || null,
+          myListing: myListing ? { ...myListing, propertyType: 'listing' } : null,
+          competitorListing: competitorListing ? { ...competitorListing, propertyType: 'listing' } : null,
           count: pair.count,
           updatedAt: pair.updatedAt
         };
       }));
 
-      // Filter out if competitor listing was not found (e.g. hard deleted)
-      const validPairs = enrichedPairs.filter(p => p.competitorListing !== null);
+      // 7. Enrich Project Pairs
+      const enrichedProjectPairs = await Promise.all(projectPairs.map(async (pair) => {
+        const isA = projectIds.includes(pair.projectIdA);
+        const myId = isA ? pair.projectIdA : pair.projectIdB;
+        const competitorId = isA ? pair.projectIdB : pair.projectIdA;
 
-      return reply.send({ success: true, data: validPairs });
+        const myProj = brokerProjects.find(p => p.id === myId);
+        const [competitorProj] = await db.select({
+          id: projects.id,
+          nameEn: projects.nameEn,
+          nameAr: projects.nameAr,
+          city: projects.city,
+          district: projects.district,
+          photos: projects.photos,
+          completionStatus: projects.completionStatus,
+          expectedDelivery: projects.expectedDelivery,
+        })
+          .from(projects)
+          .where(eq(projects.id, competitorId))
+          .limit(1);
+
+        // Fetch minPrice and layouts stats for competitor project
+        const compLayouts = await db.select({
+          price: listings.price,
+          bedrooms: listings.bedrooms,
+        })
+          .from(listings)
+          .where(
+            and(
+              eq(listings.projectId, competitorId),
+              isNull(listings.deletedAt)
+            )
+          );
+
+        const compLayoutCount = compLayouts.length;
+        const compPrices = compLayouts.map(l => Number(l.price) || 0);
+        const compMinPrice = compPrices.length > 0 ? Math.min(...compPrices) : 0;
+        const compMaxPrice = compPrices.length > 0 ? Math.max(...compPrices) : 0;
+
+        const compBeds = compLayouts.map(l => l.bedrooms).filter(b => b !== null && b !== undefined) as number[];
+        const compBedroomsList = Array.from(new Set(compBeds)).sort((a, b) => a - b);
+
+        return {
+          myListing: myProj ? {
+            id: myProj.id,
+            enTitle: myProj.nameEn,
+            arTitle: myProj.nameAr,
+            price: projectStats[myProj.id]?.minPrice !== Infinity ? projectStats[myProj.id]?.minPrice : 0,
+            minPrice: projectStats[myProj.id]?.minPrice !== Infinity ? projectStats[myProj.id]?.minPrice : 0,
+            maxPrice: projectStats[myProj.id]?.maxPrice !== -Infinity ? projectStats[myProj.id]?.maxPrice : 0,
+            city: myProj.city,
+            district: myProj.district,
+            photos: myProj.photos,
+            propertyType: 'project',
+            completionStatus: myProj.completionStatus,
+            expectedDelivery: myProj.expectedDelivery,
+            layoutCount: projectStats[myProj.id]?.layoutCount || 0,
+            bedroomsList: projectStats[myProj.id]?.bedroomsList || [],
+          } : null,
+          competitorListing: competitorProj ? {
+            id: competitorProj.id,
+            enTitle: competitorProj.nameEn,
+            arTitle: competitorProj.nameAr,
+            price: compMinPrice,
+            minPrice: compMinPrice,
+            maxPrice: compMaxPrice,
+            city: competitorProj.city,
+            district: competitorProj.district,
+            photos: competitorProj.photos,
+            propertyType: 'project',
+            completionStatus: competitorProj.completionStatus,
+            expectedDelivery: competitorProj.expectedDelivery,
+            layoutCount: compLayoutCount,
+            bedroomsList: compBedroomsList,
+          } : null,
+          count: pair.count,
+          updatedAt: pair.updatedAt
+        };
+      }));
+
+      // 8. Combine and filter out nulls
+      const combined = [...enrichedListingPairs, ...enrichedProjectPairs].filter(
+        p => p.myListing !== null && p.competitorListing !== null
+      );
+
+      return reply.send({ success: true, data: combined });
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to fetch comparison insights', error: err.message });

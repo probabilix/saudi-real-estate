@@ -120,13 +120,13 @@ function ComparePageContent({ params: { locale } }: { params: { locale: string }
           const res = await api.getListingsBatch(activeIds);
           if (res.success && res.data && !ignore) {
             setItemsData(res.data);
-            syncLoggedComparison('listings');
+            syncLoggedComparison('listings', activeIds);
           }
         } else {
           const res = await api.getProjectsBatch(activeIds);
           if (res.success && res.data && !ignore) {
             setItemsData(res.data);
-            syncLoggedComparison('projects');
+            syncLoggedComparison('projects', activeIds);
           }
         }
       } catch (e) {

@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Sparkles, X, CheckCircle2, Coins, AlertCircle, Check, ChevronLeft, ChevronRight, Globe, Search, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
+import { useAuth } from '@/hooks/use-auth';
+import { api } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCountryCallingCode } from 'react-phone-number-input';
 import type { CountryCode } from 'libphonenumber-js';
@@ -41,6 +43,7 @@ interface MortgageCalculatorProps {
   propertyExternalId: string;
   locale: string;
   maxPriceAllowed?: number;
+  propertyType: 'listing' | 'project';
 }
 
 interface BankRate {
@@ -145,10 +148,21 @@ export default function MortgageCalculator({
   price: basePropertyPrice,
   propertyExternalId,
   locale = 'en',
-  maxPriceAllowed: maxPriceAllowedProp
+  maxPriceAllowed: maxPriceAllowedProp,
+  propertyType
 }: MortgageCalculatorProps) {
   const isAr = locale === 'ar';
   const t = TRANSLATIONS[isAr ? 'ar' : 'en'];
+
+  const { isAuthenticated } = useAuth();
+  const [hasLoggedUsage, setHasLoggedUsage] = useState(false);
+
+  const logInteraction = React.useCallback(() => {
+    if (!isAuthenticated || hasLoggedUsage) return;
+    setHasLoggedUsage(true);
+    api.logCalculatorUsage(propertyExternalId, propertyType)
+      .catch((err) => console.error('[MortgageCalculator] Failed to log usage:', err));
+  }, [isAuthenticated, hasLoggedUsage, propertyExternalId, propertyType]);
 
   // Config & Dataset states
   const [config, setConfig] = useState<CalculatorConfig | null>(null);
@@ -279,7 +293,7 @@ export default function MortgageCalculator({
     setDownPaymentAmount(defaultDown);
   }, [price, isCitizen, isFirstHome, config]);
 
-  // Perform client-side calculations in real-time
+
   const calculated = React.useMemo(() => {
     if (loading || !config || !selectedBankSlug || price <= 0 || downPaymentAmount <= 0) return null;
 
@@ -370,9 +384,13 @@ export default function MortgageCalculator({
     setFormError(null);
 
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const res = await fetch(`${API_BASE_URL}/mortgage/leads`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           fullName,
           phoneNumber: fullPhoneFormatted,
@@ -463,6 +481,7 @@ export default function MortgageCalculator({
                   onClick={() => {
                     setIsCitizen(true);
                     setIsFirstHome(true);
+                    logInteraction();
                   }}
                   className={clsx(
                     'px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all',
@@ -476,6 +495,7 @@ export default function MortgageCalculator({
                   onClick={() => {
                     setIsCitizen(false);
                     setIsFirstHome(false);
+                    logInteraction();
                   }}
                   className={clsx(
                     'px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all',
@@ -496,7 +516,10 @@ export default function MortgageCalculator({
                 <div className="inline-flex p-1 bg-surface-50 border border-surface-200 rounded-xl">
                   <button
                     type="button"
-                    onClick={() => setIsFirstHome(true)}
+                    onClick={() => {
+                      setIsFirstHome(true);
+                      logInteraction();
+                    }}
                     className={clsx(
                       'px-5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all',
                       isFirstHome ? 'bg-white text-[#006169] shadow-sm border border-surface-200/50 font-black' : 'text-charcoal-muted hover:text-charcoal'
@@ -506,7 +529,10 @@ export default function MortgageCalculator({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsFirstHome(false)}
+                    onClick={() => {
+                      setIsFirstHome(false);
+                      logInteraction();
+                    }}
                     className={clsx(
                       'px-5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all',
                       !isFirstHome ? 'bg-white text-[#006169] shadow-sm border border-surface-200/50 font-black' : 'text-charcoal-muted hover:text-charcoal'
@@ -549,7 +575,10 @@ export default function MortgageCalculator({
                   <button
                     key={b.slug}
                     type="button"
-                    onClick={() => setSelectedBankSlug(b.slug)}
+                    onClick={() => {
+                      setSelectedBankSlug(b.slug);
+                      logInteraction();
+                    }}
                     className={clsx(
                       'px-5 py-4 rounded-xl border font-bold text-xs shrink-0 transition-all flex flex-col items-center justify-center min-w-[120px]',
                       selectedBankSlug === b.slug
@@ -606,6 +635,7 @@ export default function MortgageCalculator({
                         setPrice(0);
                         setPriceInput('');
                       }
+                      logInteraction();
                     }}
                     onBlur={() => {
                       setIsPriceFocused(false);
@@ -625,7 +655,10 @@ export default function MortgageCalculator({
                   max={maxPriceAllowed}
                   step="5000"
                   value={price}
-                  onChange={(e) => setPrice(Number(e.target.value))}
+                  onChange={(e) => {
+                    setPrice(Number(e.target.value));
+                    logInteraction();
+                  }}
                   style={{ background: getSliderBackground(price, basePropertyPrice, maxPriceAllowed) }}
                   className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#006169]"
                 />
@@ -666,6 +699,7 @@ export default function MortgageCalculator({
                           setDownPaymentAmount(0);
                           setDownPaymentInput('');
                         }
+                        logInteraction();
                       }}
                       onBlur={() => {
                         setIsDownFocused(false);
@@ -686,7 +720,10 @@ export default function MortgageCalculator({
                   max={maxDownAllowed}
                   step="5000"
                   value={downPaymentAmount}
-                  onChange={(e) => setDownPaymentAmount(Number(e.target.value))}
+                  onChange={(e) => {
+                    setDownPaymentAmount(Number(e.target.value));
+                    logInteraction();
+                  }}
                   style={{ background: getSliderBackground(downPaymentAmount, minDownAllowed, maxDownAllowed) }}
                   className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#006169]"
                 />
@@ -722,6 +759,7 @@ export default function MortgageCalculator({
                         setLoanPeriodYears(0);
                         setLoanPeriodInput('');
                       }
+                      logInteraction();
                     }}
                     onBlur={() => {
                       setIsPeriodFocused(false);
@@ -741,7 +779,10 @@ export default function MortgageCalculator({
                   max={config.maxLoanPeriodYears}
                   step="1"
                   value={loanPeriodYears}
-                  onChange={(e) => setLoanPeriodYears(Number(e.target.value))}
+                  onChange={(e) => {
+                    setLoanPeriodYears(Number(e.target.value));
+                    logInteraction();
+                  }}
                   style={{ background: getSliderBackground(loanPeriodYears, config.minLoanPeriodYears, config.maxLoanPeriodYears) }}
                   className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-surface-200 accent-[#006169]"
                 />

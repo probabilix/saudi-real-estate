@@ -624,6 +624,7 @@ export const mortgageBankRates = pgTable('mortgage_bank_rates', {
 
 export const mortgageLeads = pgTable('mortgage_leads', {
   id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id),
   fullName: varchar('full_name', { length: 255 }).notNull(),
   phoneNumber: varchar('phone_number', { length: 50 }).notNull(),
   monthlyIncome: decimal('monthly_income', { precision: 12, scale: 2 }),
@@ -642,8 +643,22 @@ export const mortgageLeads = pgTable('mortgage_leads', {
   totalPayableValue: decimal('total_payable_value', { precision: 12, scale: 2 }).notNull(),
   totalLoanAmount: decimal('total_loan_amount', { precision: 12, scale: 2 }).notNull(),
   status: varchar('status', { length: 50 }).default('new').notNull(),
+  notes: jsonb('notes').$type<{ text: string; createdAt: string }[]>().default([]).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const mortgageCalculatorUsage = pgTable('mortgage_calculator_usage', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  propertyExternalId: varchar('property_external_id', { length: 100 }).notNull(),
+  propertyType: varchar('property_type', { length: 20 }).notNull(), // 'listing' | 'project'
+  status: varchar('status', { length: 50 }).default('new').notNull(),
+  notes: jsonb('notes').$type<{ text: string; createdAt: string }[]>().default([]).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  unqUserProj: unique('unq_user_proj_usage').on(table.userId, table.propertyExternalId, table.propertyType),
+}));
 
 export const mortgageBanksRelations = relations(mortgageBanks, ({ many }) => ({
   rates: many(mortgageBankRates),

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
-const CITIES = ['Riyadh', 'Jeddah', 'Mecca', 'Medina', 'Dammam', 'Khobar', 'Al-Ahsa', 'Tabuk', 'Buraidah', 'Abha'];
+const CITIES = ['Riyadh', 'Jeddah', 'Mecca', 'Madinah', 'Dammam', 'Khobar', 'Al-Ahsa', 'Tabuk', 'Buraidah', 'Abha'];
 
 const AMENITY_OPTIONS = [
   { key: 'swimming_pool', label: 'Swimming Pool', labelAr: 'مسبح' },

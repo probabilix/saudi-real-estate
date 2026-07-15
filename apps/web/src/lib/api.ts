@@ -318,6 +318,13 @@ class ApiClient {
     });
   }
 
+  async logCalculatorUsage(propertyExternalId: string, propertyType: 'listing' | 'project') {
+    return this.fetcher<{ success: boolean }>('/mortgage/calculator-log', {
+      method: 'POST',
+      body: JSON.stringify({ propertyExternalId, propertyType }),
+    });
+  }
+
   async revealProjectContact(id: string) {
     return this.fetcher<{ phone: string; email: string }>(`/system/projects/${id}/reveal`, {
       method: 'POST',

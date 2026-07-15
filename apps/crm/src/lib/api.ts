@@ -56,6 +56,44 @@ export const crmApi = {
   getDashboard: () => request<CrmDashboardData>('/crm/dashboard'),
 
   getComparisonInsights: () => request<any[]>('/crm/comparison-insights'),
+  getCalculatorLeads: () => request<any[]>('/mortgage/calculator-leads'),
+
+  updateCalculatorLeadStatus: (userId: string, status?: string, notes?: string) =>
+    request<any>(`/mortgage/calculator-leads/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, notes }),
+    }),
+
+  getMortgageLeads: (params?: {
+    search?: string;
+    status?: string;
+    bank?: string;
+    isCitizen?: string;
+    dateStart?: string;
+    dateEnd?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.search) q.set('search', params.search);
+    if (params?.status) q.set('status', params.status);
+    if (params?.bank) q.set('bank', params.bank);
+    if (params?.isCitizen) q.set('isCitizen', params.isCitizen);
+    if (params?.dateStart) q.set('dateStart', params.dateStart);
+    if (params?.dateEnd) q.set('dateEnd', params.dateEnd);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    return request<{ leads: CrmMortgageLead[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>(`/admin/mortgage-leads?${q}`);
+  },
+
+  getMortgageLead: (id: string) =>
+    request<CrmMortgageLead>(`/admin/mortgage-leads/${id}`),
+
+  updateMortgageLeadStatus: (id: string, status?: string, notes?: string) =>
+    request<CrmMortgageLead>(`/admin/mortgage-leads/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, notes }),
+    }),
 
   getTodayFollowups: () => request<CrmFollowup[]>('/crm/followups/today'),
 
@@ -607,4 +645,32 @@ export interface BrokerCreditsDetail {
   broker: { id: string; name: string | null; email: string; creditsBalance: number | null };
   orders: CreditOrder[];
   ledger: CreditLedgerEntry[];
+}
+
+export interface CrmMortgageLead {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  monthlyIncome: string | null;
+  redfSupported: boolean | null;
+  monthlyObligations: string | null;
+  propertyExternalId: string;
+  propertyPrice: string;
+  isCitizen: boolean;
+  isFirstHome: boolean | null;
+  downPaymentAmount: string;
+  loanPeriodYears: number;
+  bankSlug: string;
+  bankNameEn: string;
+  appliedRatePct: string;
+  monthlyInstalment: string;
+  totalPayableValue: string;
+  totalLoanAmount: string;
+  status: string;
+  notes?: { text: string; createdAt: string }[] | null;
+  createdAt: string;
+  targetNameEn?: string;
+  targetNameAr?: string;
+  email?: string | null;
+  propertyType?: 'listing' | 'project';
 }

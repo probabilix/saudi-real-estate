@@ -319,10 +319,19 @@ export const adminApi = {
   getMortgageLead: (id: string) =>
     request<AdminMortgageLead>(`/admin/mortgage-leads/${id}`),
 
-  updateMortgageLeadStatus: (id: string, status: string) =>
+  updateMortgageLeadStatus: (id: string, status?: string, notes?: string) =>
     request<AdminMortgageLead>(`/admin/mortgage-leads/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, notes }),
+    }),
+
+  getCalculatorLeads: () =>
+    request<any[]>('/mortgage/calculator-leads'),
+
+  updateCalculatorLeadStatus: (userId: string, status?: string, notes?: string) =>
+    request<any>(`/mortgage/calculator-leads/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, notes }),
     }),
 
   // ── Reported Properties ──
@@ -598,9 +607,12 @@ export interface AdminMortgageLead {
   totalPayableValue: string;
   totalLoanAmount: string;
   status: string;
+  notes?: { text: string; createdAt: string }[] | null;
   createdAt: string;
   targetNameEn?: string;
   targetNameAr?: string;
+  email?: string | null;
+  propertyType?: 'listing' | 'project';
 }
 
 export interface AdminReportedProperty {

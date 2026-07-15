@@ -1355,6 +1355,7 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                   maxPriceAllowed={Math.round(maxPrice * 1.15)}
                   propertyExternalId={project.id}
                   locale={locale}
+                  propertyType="project"
                 />
               </div>
             )}

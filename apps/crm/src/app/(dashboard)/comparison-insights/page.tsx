@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { crmApi } from '@/lib/api';
 import { CrmTopBar } from '@/components/CrmSidebar';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
-import { Scale, Loader2, ArrowRightLeft, TrendingUp, HelpCircle, BarChart3, AlertCircle, X, Square, Bed, Bath, MapPin, ExternalLink, Search } from 'lucide-react';
+import { Scale, Loader2, ArrowRightLeft, TrendingUp, HelpCircle, BarChart3, AlertCircle, X, Square, Bed, Bath, MapPin, ExternalLink, Search, Building2, Layers } from 'lucide-react';
 import Image from 'next/image';
 
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
@@ -345,11 +345,26 @@ export default function ComparisonInsightsPage() {
                                      />
                                    </div>
                                    <div className="flex flex-col min-w-0">
-                                     <span className="font-semibold text-xs text-surface-900 truncate max-w-[200px] group-hover:text-primary-650 transition-colors">
-                                       {pair.myListing?.enTitle || pair.myListing?.arTitle}
-                                     </span>
+                                     <div className="flex items-center gap-1.5">
+                                       <span className="font-semibold text-xs text-surface-900 truncate max-w-[140px] group-hover:text-primary-650 transition-colors">
+                                         {pair.myListing?.enTitle || pair.myListing?.arTitle}
+                                       </span>
+                                       <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                                         pair.myListing?.propertyType === 'project'
+                                           ? 'bg-purple-50 text-purple-600 border border-purple-150'
+                                           : 'bg-blue-50 text-blue-600 border border-blue-150'
+                                       }`}>
+                                         {pair.myListing?.propertyType === 'project' ? 'Project' : 'Property'}
+                                       </span>
+                                     </div>
                                      <span className="text-[10px] font-black text-primary-600 mt-0.5">
-                                       {pair.myListing?.price ? `${pair.myListing.price.toLocaleString()} SAR` : 'N/A'}
+                                       {pair.myListing?.propertyType === 'project'
+                                         ? pair.myListing.minPrice && pair.myListing.maxPrice
+                                           ? pair.myListing.minPrice === pair.myListing.maxPrice
+                                             ? `${pair.myListing.minPrice.toLocaleString()} SAR`
+                                             : `${pair.myListing.minPrice.toLocaleString()} - ${pair.myListing.maxPrice.toLocaleString()} SAR`
+                                           : pair.myListing?.price ? `${pair.myListing.price.toLocaleString()} SAR` : 'N/A'
+                                         : pair.myListing?.price ? `${pair.myListing.price.toLocaleString()} SAR` : 'N/A'}
                                      </span>
                                    </div>
                                  </div>
@@ -370,14 +385,29 @@ export default function ComparisonInsightsPage() {
                                      />
                                    </div>
                                    <div className="flex flex-col min-w-0">
-                                     <span className="font-semibold text-xs text-surface-950 truncate max-w-[200px] group-hover:text-primary-650 transition-colors">
-                                       {pair.competitorListing?.enTitle || pair.competitorListing?.arTitle}
-                                     </span>
+                                     <div className="flex items-center gap-1.5">
+                                       <span className="font-semibold text-xs text-surface-950 truncate max-w-[140px] group-hover:text-primary-650 transition-colors">
+                                         {pair.competitorListing?.enTitle || pair.competitorListing?.arTitle}
+                                       </span>
+                                       <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                                         pair.competitorListing?.propertyType === 'project'
+                                           ? 'bg-purple-50 text-purple-600 border border-purple-150'
+                                           : 'bg-blue-50 text-blue-600 border border-blue-150'
+                                       }`}>
+                                         {pair.competitorListing?.propertyType === 'project' ? 'Project' : 'Property'}
+                                       </span>
+                                     </div>
                                      <span className="text-[10px] text-surface-500 mt-0.5">
                                        {pair.competitorListing?.district}, {pair.competitorListing?.city}
                                      </span>
                                      <span className="text-[10px] font-bold text-surface-700 mt-0.5">
-                                       {pair.competitorListing?.price ? `${pair.competitorListing.price.toLocaleString()} SAR` : 'N/A'}
+                                       {pair.competitorListing?.propertyType === 'project'
+                                         ? pair.competitorListing.minPrice && pair.competitorListing.maxPrice
+                                           ? pair.competitorListing.minPrice === pair.competitorListing.maxPrice
+                                             ? `${pair.competitorListing.minPrice.toLocaleString()} SAR`
+                                             : `${pair.competitorListing.minPrice.toLocaleString()} - ${pair.competitorListing.maxPrice.toLocaleString()} SAR`
+                                           : pair.competitorListing?.price ? `${pair.competitorListing.price.toLocaleString()} SAR` : 'N/A'
+                                         : pair.competitorListing?.price ? `${pair.competitorListing.price.toLocaleString()} SAR` : 'N/A'}
                                      </span>
                                    </div>
                                  </div>
@@ -452,35 +482,71 @@ export default function ComparisonInsightsPage() {
 
               {/* Price tag */}
               <div className="inline-flex items-center px-3 py-1 rounded-xl bg-primary-50 border border-primary-100 text-primary-700 font-bold text-sm">
-                {selectedListing.price ? `${selectedListing.price.toLocaleString()} SAR` : 'Ask Price'}
+                {selectedListing.propertyType === 'project'
+                  ? selectedListing.minPrice && selectedListing.maxPrice
+                    ? selectedListing.minPrice === selectedListing.maxPrice
+                      ? `${selectedListing.minPrice.toLocaleString()} SAR`
+                      : `${selectedListing.minPrice.toLocaleString()} - ${selectedListing.maxPrice.toLocaleString()} SAR`
+                    : selectedListing.price ? `${selectedListing.price.toLocaleString()} SAR` : 'Ask Price'
+                  : selectedListing.price ? `${selectedListing.price.toLocaleString()} SAR` : 'Ask Price'}
               </div>
 
               {/* Specs */}
-              <div className="grid grid-cols-3 gap-2.5 pt-3 border-t border-surface-100">
-                <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
-                  <Square className="w-3.5 h-3.5 text-primary-500/70" />
-                  <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Area</span>
-                  <span className="text-xs font-semibold text-surface-700">
-                    {selectedListing.areaSqm ? `${selectedListing.areaSqm} sqm` : 'N/A'}
-                  </span>
-                </div>
-                
-                <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
-                  <Bed className="w-3.5 h-3.5 text-primary-500/70" />
-                  <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Beds</span>
-                  <span className="text-xs font-semibold text-surface-700">
-                    {selectedListing.bedrooms !== undefined && selectedListing.bedrooms !== null ? selectedListing.bedrooms : 'N/A'}
-                  </span>
-                </div>
+              {selectedListing.propertyType === 'project' ? (
+                <div className="grid grid-cols-3 gap-2.5 pt-3 border-t border-surface-100">
+                  <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
+                    <Layers className="w-3.5 h-3.5 text-primary-500/70" />
+                    <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Layouts</span>
+                    <span className="text-xs font-semibold text-surface-700">
+                      {selectedListing.layoutCount || '0'} plans
+                    </span>
+                  </div>
+                  
+                  <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
+                    <Bed className="w-3.5 h-3.5 text-primary-500/70" />
+                    <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Beds</span>
+                    <span className="text-xs font-semibold text-surface-700">
+                      {selectedListing.bedroomsList && selectedListing.bedroomsList.length > 0
+                        ? `${selectedListing.bedroomsList.join(', ')} BHK`
+                        : 'N/A'}
+                    </span>
+                  </div>
 
-                <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
-                  <Bath className="w-3.5 h-3.5 text-primary-500/70" />
-                  <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Baths</span>
-                  <span className="text-xs font-semibold text-surface-700">
-                    {selectedListing.bathrooms !== undefined && selectedListing.bathrooms !== null ? selectedListing.bathrooms : 'N/A'}
-                  </span>
+                  <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
+                    <Building2 className="w-3.5 h-3.5 text-primary-500/70" />
+                    <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Delivery</span>
+                    <span className="text-xs font-semibold text-surface-700 truncate max-w-full text-center" title={selectedListing.expectedDelivery || selectedListing.completionStatus}>
+                      {selectedListing.expectedDelivery || selectedListing.completionStatus || 'N/A'}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2.5 pt-3 border-t border-surface-100">
+                  <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
+                    <Square className="w-3.5 h-3.5 text-primary-500/70" />
+                    <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Area</span>
+                    <span className="text-xs font-semibold text-surface-700">
+                      {selectedListing.areaSqm ? `${selectedListing.areaSqm} sqm` : 'N/A'}
+                    </span>
+                  </div>
+                  
+                  <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
+                    <Bed className="w-3.5 h-3.5 text-primary-500/70" />
+                    <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Beds</span>
+                    <span className="text-xs font-semibold text-surface-700">
+                      {selectedListing.bedrooms !== undefined && selectedListing.bedrooms !== null ? selectedListing.bedrooms : 'N/A'}
+                    </span>
+                  </div>
+
+                  <div className="bg-surface-50 p-2 rounded-xl flex flex-col items-center justify-center gap-1 text-center">
+                    <Bath className="w-3.5 h-3.5 text-primary-500/70" />
+                    <span className="text-[9px] text-surface-400 font-bold uppercase tracking-wider">Baths</span>
+                    <span className="text-xs font-semibold text-surface-700">
+                      {selectedListing.bathrooms !== undefined && selectedListing.bathrooms !== null ? selectedListing.bathrooms : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center gap-3 pt-3">
@@ -491,12 +557,16 @@ export default function ComparisonInsightsPage() {
                   Close
                 </button>
                 <a
-                  href={`${WEB_URL}/en/listings/${selectedListing.id}`}
+                  href={
+                    selectedListing.propertyType === 'project'
+                      ? `${WEB_URL}/en/projects/${selectedListing.id}`
+                      : `${WEB_URL}/en/listings/${selectedListing.id}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 py-2.5 px-4 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-md shadow-primary-900/10"
                 >
-                  <span>View Listing</span>
+                  <span>{selectedListing.propertyType === 'project' ? 'View Project' : 'View Listing'}</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>

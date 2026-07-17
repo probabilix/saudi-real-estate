@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { crmApi } from '@/lib/api';
 import { CrmTopBar } from '@/components/CrmSidebar';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
-import { Scale, Loader2, ArrowRightLeft, TrendingUp, HelpCircle, BarChart3, AlertCircle, X, Square, Bed, Bath, MapPin, ExternalLink, Search, Building2, Layers } from 'lucide-react';
+import { Scale, Loader2, ArrowRightLeft, TrendingUp, HelpCircle, BarChart3, AlertCircle, X, Square, Bed, Bath, MapPin, ExternalLink, Search, Building2, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
@@ -14,12 +14,18 @@ export default function ComparisonInsightsPage() {
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState<any[]>([]);
   const [selectedListing, setSelectedListing] = useState<any | null>(null);
+  const [page, setPage] = useState(1);
 
   // Filter & Sort States
   const [selectedMyListingFilter, setSelectedMyListingFilter] = useState<string>('all');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'count_desc' | 'count_asc' | 'date_desc' | 'date_asc'>('count_desc');
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [selectedMyListingFilter, selectedCityFilter, searchTerm, sortBy]);
 
   useEffect(() => {
     async function load() {
@@ -156,6 +162,10 @@ export default function ComparisonInsightsPage() {
       return 0;
     });
 
+  const LIMIT = 15;
+  const totalPages = Math.ceil(filteredInsights.length / LIMIT) || 1;
+  const paginatedInsights = filteredInsights.slice((page - 1) * LIMIT, page * LIMIT);
+
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-surface-50 overflow-y-auto">
       <CrmTopBar title="Comparison Insights" />
@@ -247,7 +257,7 @@ export default function ComparisonInsightsPage() {
                 <div className="px-6 py-4 border-b border-surface-150 bg-surface-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h3 className="font-bold text-sm text-surface-800">Comparison Pairs Analytics</h3>
                   <span className="text-[10px] font-bold text-surface-500 bg-surface-100 py-1 px-3 rounded-full border border-surface-200 self-start">
-                    Showing {filteredInsights.length} of {insights.length} pairs
+                    Showing {paginatedInsights.length} of {filteredInsights.length} matching pairs
                   </span>
                 </div>
 
@@ -317,14 +327,14 @@ export default function ComparisonInsightsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
-                      {filteredInsights.length === 0 ? (
+                      {paginatedInsights.length === 0 ? (
                         <tr>
                           <td colSpan={4} className="p-12 text-center text-xs text-surface-400 font-medium">
                             No co-comparison records match your current filters. Try resetting search or filter criteria.
                           </td>
                         </tr>
                       ) : (
-                        filteredInsights.map((pair, index) => {
+                        paginatedInsights.map((pair, index) => {
                           const myPhoto = pair.myListing?.photos?.[0] || '/placeholder.png';
                           const compPhoto = pair.competitorListing?.photos?.[0] || '/placeholder.png';
 
@@ -437,6 +447,32 @@ export default function ComparisonInsightsPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="p-4 bg-surface-50 border-t border-surface-200 flex items-center justify-between">
+                    <div className="text-xs font-semibold text-slate-400">
+                      Showing Page {page} of {totalPages}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        className="btn-secondary p-1.5 disabled:opacity-50"
+                        disabled={page === 1}
+                        onClick={() => setPage(p => p - 1)}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <div className="text-xs font-black text-slate-700 px-3 bg-white border border-slate-200 py-1.5 rounded-lg">Page {page} of {totalPages}</div>
+                      <button 
+                        className="btn-secondary p-1.5 disabled:opacity-50"
+                        disabled={page === totalPages}
+                        onClick={() => setPage(p => p + 1)}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>

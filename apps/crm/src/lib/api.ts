@@ -56,7 +56,13 @@ export const crmApi = {
   getDashboard: () => request<CrmDashboardData>('/crm/dashboard'),
 
   getComparisonInsights: () => request<any[]>('/crm/comparison-insights'),
-  getCalculatorLeads: () => request<any[]>('/mortgage/calculator-leads'),
+  getCalculatorLeads: (params?: { page?: number; limit?: number; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    return request<any>(`/mortgage/calculator-leads?${q}`);
+  },
 
   updateCalculatorLeadStatus: (userId: string, status?: string, notes?: string) =>
     request<any>(`/mortgage/calculator-leads/${userId}`, {
@@ -246,6 +252,10 @@ export const crmApi = {
     }),
 
   getProjects: () => request<CrmProject[]>('/listings/projects'),
+
+  getPropertyViewStats: (propertyId: string, period: string) =>
+    request<Array<{ day: string; views: number }>>(`/views/stats/${propertyId}?period=${period}`),
+
 
   addListingUnits: (listingId: string, units: Array<{ unitNumber: string; floor: number; type: string; status?: string; price?: number }>) =>
     request<CrmProjectUnit[]>(`/listings/${listingId}/units`, {

@@ -16,7 +16,9 @@ import {
   X,
   ChevronDown,
   Building2,
-  ArrowUpRight
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -48,6 +50,11 @@ export default function CalculatorLeadsPage() {
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<CalculatorLead[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   // Drawer details states
   const [selectedLead, setSelectedLead] = useState<CalculatorLead | null>(null);
@@ -55,16 +62,37 @@ export default function CalculatorLeadsPage() {
   const [notesText, setNotesText] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => timer ? clearTimeout(timer) : undefined;
+  }, [searchTerm]);
+
+  // Reset page when search term changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearchTerm]);
+
   useEffect(() => {
     loadData();
-  }, []);
+  }, [page, debouncedSearchTerm]);
 
   async function loadData() {
     setLoading(true);
     try {
-      const res = await crmApi.getCalculatorLeads();
+      const res = await crmApi.getCalculatorLeads({
+        page,
+        limit: 20,
+        search: debouncedSearchTerm || undefined,
+      });
       if (res.success && res.data) {
-        setLeads(res.data);
+        if (Array.isArray(res.data)) {
+          setLeads(res.data);
+          setTotal(res.data.length);
+        } else {
+          setLeads(res.data.leads);
+          setTotal(res.data.total);
+        }
       }
     } catch (err) {
       console.error('Failed to load calculator leads', err);
@@ -74,16 +102,7 @@ export default function CalculatorLeadsPage() {
   }
 
   // Filter leads by search term (name, email, or phone)
-  const filteredLeads = leads.filter((lead) => {
-    const term = searchTerm.toLowerCase().trim();
-    if (!term) return true;
-
-    return (
-      lead.name.toLowerCase().includes(term) ||
-      lead.email.toLowerCase().includes(term) ||
-      lead.phone.toLowerCase().includes(term)
-    );
-  });
+  const filteredLeads = leads;
 
   const handleUpdateStatus = async (userId: string, status: string) => {
     setStatusUpdating(userId);
@@ -288,6 +307,32 @@ export default function CalculatorLeadsPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination */}
+                {!loading && leads.length > 0 && (
+                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                    <div className="text-xs font-semibold text-slate-400">
+                      Showing <b>{leads.length}</b> of <b>{total}</b> calculator leads
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        className="btn-secondary p-1.5 disabled:opacity-50"
+                        disabled={page === 1}
+                        onClick={() => setPage(p => p - 1)}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <div className="text-xs font-black text-slate-700 px-3 bg-white border border-slate-200 py-1.5 rounded-lg">Page {page} of {Math.ceil(total / 20) || 1}</div>
+                      <button 
+                        className="btn-secondary p-1.5 disabled:opacity-50"
+                        disabled={page * 20 >= total}
+                        onClick={() => setPage(p => p + 1)}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

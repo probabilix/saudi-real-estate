@@ -13,6 +13,7 @@ import {
   AlertTriangle, Bot, Link as LinkIcon, Unlink as UnlinkIcon
 } from 'lucide-react';
 import clsx from 'clsx';
+import PropertyAnalyticsModal from '@/components/PropertyAnalyticsModal';
 
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 
@@ -23,6 +24,18 @@ export default function ListingsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [analyticsModal, setAnalyticsModal] = useState<{
+    isOpen: boolean;
+    propertyId: string;
+    propertyTitle: string;
+    shortId?: string;
+    totalViews: number;
+  }>({
+    isOpen: false,
+    propertyId: '',
+    propertyTitle: '',
+    totalViews: 0,
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -336,8 +349,24 @@ export default function ListingsPage() {
                             <div className="text-sm font-bold text-surface-900 truncate">
                               {listing.enTitle || listing.arTitle}
                             </div>
-                            <div className="text-[10px] text-surface-400 font-mono mt-0.5">
-                              ID: {listing.shortId || listing.id.slice(0, 8)}
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] text-surface-400 font-mono">
+                                ID: {listing.shortId || listing.id.slice(0, 8)}
+                              </span>
+                              <button
+                                onClick={() => setAnalyticsModal({
+                                  isOpen: true,
+                                  propertyId: listing.id,
+                                  propertyTitle: listing.enTitle || listing.arTitle || 'Listing ' + listing.shortId,
+                                  shortId: listing.shortId || undefined,
+                                  totalViews: listing.viewsCount || 0
+                                })}
+                                className="inline-flex items-center gap-0.5 text-[9px] font-bold text-primary-700 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 px-1.5 py-0.5 rounded-full transition-all border border-primary-100"
+                                title="Click to view traffic chart"
+                              >
+                                <Eye className="w-2.5 h-2.5" />
+                                <span>{listing.viewsCount || 0}</span>
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -627,6 +656,16 @@ export default function ListingsPage() {
           </div>
         </div>
       )}
+
+      {/* Analytics Graph Modal */}
+      <PropertyAnalyticsModal
+        isOpen={analyticsModal.isOpen}
+        onClose={() => setAnalyticsModal(prev => ({ ...prev, isOpen: false }))}
+        propertyId={analyticsModal.propertyId}
+        propertyTitle={analyticsModal.propertyTitle}
+        shortId={analyticsModal.shortId}
+        totalViews={analyticsModal.totalViews}
+      />
     </div>
   );
 }

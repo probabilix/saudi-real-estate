@@ -8,7 +8,7 @@ import { extractLatLng, isShortGoogleMapsUrl } from '@saudi-re/shared';
 import {
   Building2, MapPin, Ruler, Banknote, ShieldCheck,
   Image as ImageIcon, Loader2, Save, Send, AlertCircle,
-  Bed, Bath, Sofa, Layout, ArrowRight, ChevronRight,
+  Bed, Bath, Sofa, Layout, ArrowLeft, ArrowRight, ChevronRight, Star,
   Wifi, Car, Waves, Dumbbell, Trees, UserCheck,
   DoorOpen, Warehouse, CheckCircle2, ChevronLeft,
   Video, Youtube, History, Building, Shield, Wind,
@@ -244,6 +244,45 @@ export default function ListingForm({ initialData, isEdit = false }: ListingForm
   const [muslimOnly, setMuslimOnly] = useState(false);
 
   const [photos, setPhotos] = useState<string[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isOverIndex, setIsOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex !== index) {
+      setIsOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    setDraggedIndex(null);
+    setIsOverIndex(null);
+    if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
+
+    setPhotos(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(sourceIndex, 1);
+      updated.splice(targetIndex, 0, moved);
+      return updated;
+    });
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setIsOverIndex(null);
+  };
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
 
@@ -644,7 +683,14 @@ export default function ListingForm({ initialData, isEdit = false }: ListingForm
       if (res.success) {
         router.push(`/my-listings?success=${isEdit ? 'updated' : 'created'}&shortId=${(res.data as any)?.shortId || ''}`);
       } else {
-        setError(res.error || res.message || 'An error occurred while saving the listing.');
+        if (res && res.errors) {
+          const errorMsgs = Object.entries(res.errors)
+            .filter(([key]) => key !== '_errors')
+            .map(([key, val]: [string, any]) => `${key}: ${val._errors?.join(', ') || 'Invalid value'}`);
+          setError(`Validation errors: ${errorMsgs.join(' | ')}`);
+        } else {
+          setError(res.error || res.message || 'An error occurred while saving the listing.');
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (err: any) {
@@ -1386,7 +1432,12 @@ export default function ListingForm({ initialData, isEdit = false }: ListingForm
             {photos.length > 0 && (
               <div className="space-y-3">
                 <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                  <span>Uploaded Photos ({photos.length})</span>
+                  <span className="flex items-center gap-1.5">
+                    Uploaded Photos ({photos.length})
+                    <span className="text-[9px] text-slate-400 font-normal lowercase normal-case">
+                      (drag to reorder)
+                    </span>
+                  </span>
                   {photos.length < 3 && (
                     <span className="text-rose-500 animate-pulse">Need {3 - photos.length} more</span>
                   )}
@@ -1394,14 +1445,86 @@ export default function ListingForm({ initialData, isEdit = false }: ListingForm
 
                 <div className="grid grid-cols-2 gap-3 mt-4">
                   {photos.map((url, idx) => (
-                    <div key={idx} className="relative group rounded-xl overflow-hidden aspect-video border border-slate-200 shadow-sm bg-slate-100">
-                      <img src={url} alt={`Listing photo ${idx + 1}`} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        {idx === 0 && (
-                          <span className="absolute top-2 left-2 bg-emerald-600 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow">
-                            Main
-                          </span>
+                    <div
+                      key={idx}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragOver={(e) => handleDragOver(e, idx)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      onDragEnd={handleDragEnd}
+                      className={clsx(
+                        "relative group rounded-xl overflow-hidden aspect-video border transition-all duration-200 cursor-grab active:cursor-grabbing bg-slate-100",
+                        draggedIndex === idx ? "opacity-40 border-emerald-500 scale-95" : "border-slate-200 shadow-sm",
+                        isOverIndex === idx ? "border-dashed border-2 border-emerald-500 scale-105" : ""
+                      )}
+                    >
+                      <img src={url} alt={`Listing photo ${idx + 1}`} className="w-full h-full object-cover select-none pointer-events-none" />
+                      
+                      {/* Main Cover Badge (always visible on first image) */}
+                      {idx === 0 && (
+                        <span className="absolute top-2 left-2 bg-emerald-600 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow z-10 select-none">
+                          Main
+                        </span>
+                      )}
+
+                      {/* Control Overlays */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20">
+                        {idx > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPhotos(prev => {
+                                const updated = [...prev];
+                                const [item] = updated.splice(idx, 1);
+                                updated.unshift(item);
+                                return updated;
+                              });
+                            }}
+                            className="p-1.5 bg-white/20 hover:bg-white/40 text-amber-300 rounded-lg transition-all shadow-md"
+                            title="Set as main photo"
+                          >
+                            <Star className="w-3.5 h-3.5 fill-amber-300" />
+                          </button>
                         )}
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            setPhotos(prev => {
+                              const updated = [...prev];
+                              const [item] = updated.splice(idx, 1);
+                              updated.splice(idx - 1, 0, item);
+                              return updated;
+                            });
+                          }}
+                          className={clsx(
+                            "p-1.5 bg-white/20 text-white rounded-lg transition-all shadow-md",
+                            idx === 0 ? "opacity-30 cursor-not-allowed" : "hover:bg-white/40"
+                          )}
+                          title="Move left"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === photos.length - 1}
+                          onClick={() => {
+                            setPhotos(prev => {
+                              const updated = [...prev];
+                              const [item] = updated.splice(idx, 1);
+                              updated.splice(idx + 1, 0, item);
+                              return updated;
+                            });
+                          }}
+                          className={clsx(
+                            "p-1.5 bg-white/20 text-white rounded-lg transition-all shadow-md",
+                            idx === photos.length - 1 ? "opacity-30 cursor-not-allowed" : "hover:bg-white/40"
+                          )}
+                          title="Move right"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleRemovePhoto(idx)}

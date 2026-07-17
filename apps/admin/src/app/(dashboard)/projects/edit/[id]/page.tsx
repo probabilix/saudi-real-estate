@@ -7,7 +7,7 @@ import { AdminTopBar } from '@/components/AdminSidebar';
 import { adminApi } from '@/lib/api';
 import { CldUploadWidget } from 'next-cloudinary';
 import {
-  Plus, Trash2, Save, X, ArrowLeft, Loader2,
+  Plus, Trash2, Save, X, ArrowLeft, ArrowRight, Loader2,
   Upload, Image as ImageIcon, Check,
   AlertCircle, Sparkles, Building, Layers, Star,
   ShieldCheck, Building2
@@ -79,6 +79,44 @@ export default function EditProjectPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   // Only save a draft when the user has ACTUALLY changed something after the initial DB load
   const hasUserEdited = useRef(false);
+
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isOverIndex, setIsOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex !== index) {
+      setIsOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    setDraggedIndex(null);
+    setIsOverIndex(null);
+    if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
+
+    const updated = [...projectData.photos];
+    const [moved] = updated.splice(sourceIndex, 1);
+    updated.splice(targetIndex, 0, moved);
+    handleProjectChange('photos', updated);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setIsOverIndex(null);
+  };
 
   // Project Data State
   const [projectData, setProjectData] = useState<ProjectFormState>({
@@ -718,18 +756,107 @@ export default function EditProjectPage() {
 
               {/* Cover Photo Gallery */}
               <div className="space-y-3">
-                <label className="admin-label">Project gallery cover photos</label>
-                <div className="flex flex-wrap gap-4 items-center">
+                <label className="admin-label">
+                  Project gallery cover photos
+                  <span className="text-[10px] text-surface-400 font-normal normal-case ml-2">
+                    (Drag & drop to reorder, first image is cover)
+                  </span>
+                </label>
+                <div className="flex flex-wrap gap-4 items-center p-3 bg-surface-50 border border-surface-200 rounded-xl">
                   {projectData.photos.map((photoUrl, index) => (
-                    <div key={index} className="w-24 h-16 rounded-xl border border-surface-200 overflow-hidden relative group">
-                      <img src={photoUrl} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => handleProjectChange('photos', projectData.photos.filter((_, i) => i !== index))}
-                        className="absolute inset-0 bg-black/55 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                      </button>
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className={clsx(
+                        "relative w-28 h-24 rounded-lg overflow-hidden group border transition-all duration-200 cursor-grab active:cursor-grabbing bg-white",
+                        draggedIndex === index ? "opacity-40 border-primary-500 scale-95" : "border-surface-200",
+                        isOverIndex === index ? "border-dashed border-2 border-primary-500 scale-105" : ""
+                      )}
+                    >
+                      <img src={photoUrl} className="w-full h-full object-cover select-none pointer-events-none" />
+                      
+                      {/* Cover/Main badge */}
+                      {index === 0 && (
+                        <div className="absolute top-1 left-1 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-0.5 z-10 select-none">
+                          <Star className="w-2.5 h-2.5 fill-white" />
+                          <span>Cover</span>
+                        </div>
+                      )}
+
+                      {/* Control Overlays */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5 z-20">
+                        {/* Top row: Set Main (Star) & Delete (Trash) */}
+                        <div className="flex items-center justify-between">
+                          {index > 0 ? (
+                            <button
+                              type="button"
+                              title="Set as cover image"
+                              onClick={() => {
+                                const updated = [...projectData.photos];
+                                const [item] = updated.splice(index, 1);
+                                updated.unshift(item);
+                                handleProjectChange('photos', updated);
+                              }}
+                              className="p-1 rounded bg-white/20 hover:bg-white/40 text-amber-300 transition-colors"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-amber-300" />
+                            </button>
+                          ) : (
+                            <div className="w-5" />
+                          )}
+                          <button
+                            type="button"
+                            title="Delete photo"
+                            onClick={() => handleProjectChange('photos', projectData.photos.filter((_, i) => i !== index))}
+                            className="p-1 rounded bg-white/20 hover:bg-red-500/85 text-white transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-200" />
+                          </button>
+                        </div>
+
+                        {/* Bottom row: Move Left / Move Right shortcuts */}
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            title="Move left"
+                            onClick={() => {
+                              const updated = [...projectData.photos];
+                              const [item] = updated.splice(index, 1);
+                              updated.splice(index - 1, 0, item);
+                              handleProjectChange('photos', updated);
+                            }}
+                            className={clsx(
+                              "p-1 rounded bg-white/20 text-white transition-colors",
+                              index === 0 ? "opacity-30 cursor-not-allowed" : "hover:bg-white/40"
+                            )}
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === projectData.photos.length - 1}
+                            title="Move right"
+                            onClick={() => {
+                              const updated = [...projectData.photos];
+                              const [item] = updated.splice(index, 1);
+                              updated.splice(index + 1, 0, item);
+                              handleProjectChange('photos', updated);
+                            }}
+                            className={clsx(
+                              "p-1 rounded bg-white/20 text-white transition-colors",
+                              index === projectData.photos.length - 1 ? "opacity-30 cursor-not-allowed" : "hover:bg-white/40"
+                            )}
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                   
@@ -748,7 +875,7 @@ export default function EditProjectPage() {
                       <button
                         type="button"
                         onClick={() => open()}
-                        className="w-24 h-16 border-2 border-dashed border-surface-200 rounded-xl hover:bg-surface-50 flex flex-col items-center justify-center gap-1 text-surface-400 transition-colors"
+                        className="w-28 h-24 border-2 border-dashed border-surface-200 rounded-lg hover:bg-surface-50 flex flex-col items-center justify-center gap-1 text-surface-400 transition-colors bg-white"
                       >
                         <Plus className="w-5 h-5 text-surface-400" />
                         <span className="text-[10px] font-semibold">Add Photo</span>

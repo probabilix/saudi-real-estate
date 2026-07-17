@@ -12,6 +12,7 @@ import {
   AlertCircle, Eye, EyeOff
 } from 'lucide-react';
 import clsx from 'clsx';
+import PropertyAnalyticsModal from '@/components/listings/PropertyAnalyticsModal';
 
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 
@@ -21,6 +22,18 @@ export default function MyListingsPage() {
   const router = useRouter();
   const [listings, setListings] = useState<CrmListing[]>([]);
   const [token, setToken] = useState<string | null>(null);
+  const [analyticsModal, setAnalyticsModal] = useState<{
+    isOpen: boolean;
+    propertyId: string;
+    propertyTitle: string;
+    shortId?: string;
+    totalViews: number;
+  }>({
+    isOpen: false,
+    propertyId: '',
+    propertyTitle: '',
+    totalViews: 0,
+  });
 
   useEffect(() => {
     setToken(localStorage.getItem('crmToken'));
@@ -313,9 +326,20 @@ export default function MyListingsPage() {
                         <div className="font-bold text-slate-900">
                           {listing.price.toLocaleString()} SAR
                         </div>
-                        <div className="text-[10px] text-slate-400">
-                          Views: {listing.viewsCount}
-                        </div>
+                        <button
+                          onClick={() => setAnalyticsModal({
+                            isOpen: true,
+                            propertyId: listing.id,
+                            propertyTitle: listing.enTitle || listing.arTitle || 'Listing ' + listing.shortId,
+                            shortId: listing.shortId || undefined,
+                            totalViews: listing.viewsCount || 0
+                          })}
+                          className="flex items-center gap-1 mt-0.5 text-[10px] font-bold text-[#064e4b] hover:text-emerald-700 bg-[#064e4b]/5 hover:bg-[#064e4b]/10 px-2 py-0.5 rounded-full transition-all"
+                          title="Click to view detailed traffic chart"
+                        >
+                          <Eye className="w-3 h-3 shrink-0" />
+                          <span>Views: {listing.viewsCount || 0}</span>
+                        </button>
                       </td>
                       <td className="py-4 px-6">
                         <div className={clsx(
@@ -453,7 +477,15 @@ export default function MyListingsPage() {
         </div>
       )}
 
-
+      {/* Analytics Graph Modal */}
+      <PropertyAnalyticsModal
+        isOpen={analyticsModal.isOpen}
+        onClose={() => setAnalyticsModal(prev => ({ ...prev, isOpen: false }))}
+        propertyId={analyticsModal.propertyId}
+        propertyTitle={analyticsModal.propertyTitle}
+        shortId={analyticsModal.shortId}
+        totalViews={analyticsModal.totalViews}
+      />
     </div>
   );
 }

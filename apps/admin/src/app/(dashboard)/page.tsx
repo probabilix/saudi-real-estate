@@ -5,7 +5,7 @@ import { AdminTopBar } from '@/components/AdminSidebar';
 import { adminApi, AdminStats } from '@/lib/api';
 import {
   Users, Building2, ShieldCheck, CheckCircle2, AlertCircle, Clock,
-  ArrowUpRight, ArrowDownRight
+  ArrowUpRight, ArrowDownRight, Layers
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -13,19 +13,23 @@ import {
 } from 'recharts';
 import clsx from 'clsx';
 
-const INITIAL_STATS: AdminStats = {
+const INITIAL_STATS = {
   totalUsers: 0,
   totalListings: 0,
   activeListings: 0,
+  totalProjects: 0,
+  activeProjects: 0,
   pendingVerifications: 0,
+  pendingBrokerVerifications: 0,
+  pendingListingVerifications: 0,
   totalRevenueSar: 0,
   newUsersToday: 0,
   newListingsToday: 0,
   platformHealth: 'healthy',
-  usersByRole: {},
-  listingsByStatus: {},
-  listingsByCity: {},
-  revenueByMonth: [],
+  usersByRole: {} as Record<string, number>,
+  listingsByStatus: {} as Record<string, number>,
+  listingsByCity: {} as Record<string, number>,
+  revenueByMonth: [] as Array<{ month: string; revenue: number }>,
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -44,7 +48,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<AdminStats>(INITIAL_STATS);
+  const [stats, setStats] = useState<any>(INITIAL_STATS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -103,8 +107,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* KPI Row (3 Columns) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* KPI Row (5 Columns Grid) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard
             label="Total Users"
             value={stats.totalUsers.toLocaleString()}
@@ -113,24 +117,47 @@ export default function DashboardPage() {
             icon={<Users className="w-5 h-5 text-blue-600" />}
             iconBg="bg-blue-50"
             loading={loading}
+            href="/users"
           />
           <StatCard
             label="Active Listings"
             value={stats.activeListings.toLocaleString()}
-            sub={`${stats.totalListings.toLocaleString()} total`}
+            sub={`${stats.totalListings.toLocaleString()} total listings`}
             trend="up"
             icon={<Building2 className="w-5 h-5 text-primary-600" />}
             iconBg="bg-primary-50"
             loading={loading}
+            href="/listings"
           />
           <StatCard
-            label="Pending Verifications"
-            value={stats.pendingVerifications.toString()}
-            sub="Requires attention"
-            trend={stats.pendingVerifications > 10 ? 'warn' : 'neutral'}
+            label="Active Projects"
+            value={stats.activeProjects.toLocaleString()}
+            sub={`${stats.totalProjects.toLocaleString()} total projects`}
+            trend="up"
+            icon={<Layers className="w-5 h-5 text-purple-600" />}
+            iconBg="bg-purple-50"
+            loading={loading}
+            href="/projects"
+          />
+          <StatCard
+            label="Pending Brokers"
+            value={stats.pendingBrokerVerifications.toString()}
+            sub="Awaiting review"
+            trend={stats.pendingBrokerVerifications > 0 ? 'warn' : 'neutral'}
             icon={<ShieldCheck className="w-5 h-5 text-amber-600" />}
             iconBg="bg-amber-50"
             loading={loading}
+            href="/verifications"
+          />
+          <StatCard
+            label="Pending Listings"
+            value={stats.pendingListingVerifications.toString()}
+            sub="Awaiting approval"
+            trend={stats.pendingListingVerifications > 0 ? 'warn' : 'neutral'}
+            icon={<Clock className="w-5 h-5 text-rose-600" />}
+            iconBg="bg-rose-50"
+            loading={loading}
+            href="/listings?status=FLAGGED"
           />
         </div>
 
@@ -264,7 +291,7 @@ export default function DashboardPage() {
 }
 
 function StatCard({
-  label, value, sub, trend, icon, iconBg, loading
+  label, value, sub, trend, icon, iconBg, loading, href
 }: {
   label: string;
   value: string;
@@ -273,35 +300,46 @@ function StatCard({
   icon: React.ReactNode;
   iconBg: string;
   loading: boolean;
+  href?: string;
 }) {
+  const content = loading ? (
+    <div className="flex items-center gap-4 w-full h-full">
+      <div className="h-10 w-10 rounded-xl bg-surface-100 animate-pulse shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 w-16 bg-surface-100 rounded animate-pulse" />
+        <div className="h-6 w-24 bg-surface-100 rounded animate-pulse" />
+        <div className="h-3 w-28 bg-surface-100 rounded animate-pulse" />
+      </div>
+    </div>
+  ) : (
+    <>
+      <div className={`stat-icon ${iconBg}`}>{icon}</div>
+      <div className="min-w-0">
+        <div className="text-xs text-surface-500 font-medium mb-0.5">{label}</div>
+        <div className="text-2xl font-bold text-surface-900">{value}</div>
+        <div className={clsx(
+          'flex items-center gap-1 text-xs font-medium mt-1',
+          trend === 'up' ? 'text-emerald-600' : trend === 'warn' ? 'text-amber-600' : 'text-surface-400'
+        )}>
+          {trend === 'up' && <ArrowUpRight className="w-3.5 h-3.5" />}
+          {trend === 'down' && <ArrowDownRight className="w-3.5 h-3.5" />}
+          {sub}
+        </div>
+      </div>
+    </>
+  );
+
+  if (href && !loading) {
+    return (
+      <Link href={href} className="stat-card relative overflow-hidden transition-all duration-300 hover:shadow-md hover:border-slate-300 cursor-pointer hover:bg-slate-50/25">
+        {content}
+      </Link>
+    );
+  }
+
   return (
     <div className="stat-card relative overflow-hidden transition-all duration-300">
-      {loading ? (
-        <div className="flex items-center gap-4 w-full h-full">
-          <div className="h-10 w-10 rounded-xl bg-surface-100 animate-pulse shrink-0" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3 w-16 bg-surface-100 rounded animate-pulse" />
-            <div className="h-6 w-24 bg-surface-100 rounded animate-pulse" />
-            <div className="h-3 w-28 bg-surface-100 rounded animate-pulse" />
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className={`stat-icon ${iconBg}`}>{icon}</div>
-          <div className="min-w-0">
-            <div className="text-xs text-surface-500 font-medium mb-0.5">{label}</div>
-            <div className="text-2xl font-bold text-surface-900">{value}</div>
-            <div className={clsx(
-              'flex items-center gap-1 text-xs font-medium mt-1',
-              trend === 'up' ? 'text-emerald-600' : trend === 'warn' ? 'text-amber-600' : 'text-surface-400'
-            )}>
-              {trend === 'up' && <ArrowUpRight className="w-3.5 h-3.5" />}
-              {trend === 'down' && <ArrowDownRight className="w-3.5 h-3.5" />}
-              {sub}
-            </div>
-          </div>
-        </>
-      )}
+      {content}
     </div>
   );
 }

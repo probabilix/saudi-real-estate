@@ -6,7 +6,7 @@ import { CloudinaryService } from '../../services/cloudinary.service';
 import { authenticateJWT, optionalAuthenticateJWT } from '../../middleware/auth.middleware';
 import { db } from '../../db';
 import { leads, buyerProfiles, listings, projects, projectUnits, users, listingReports, creditLedger, listingComparisonPairs } from '../../db/schema';
-import { eq, and, sql, desc, asc, inArray, or, gte, lte, isNull } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, inArray, or, gte, lte, isNull, ilike, count } from 'drizzle-orm';
 
 
 /**
@@ -247,6 +247,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
     const parsed = updateListingSchema.safeParse(request.body);
 
     if (!parsed.success) {
+      console.error('[ROUTE DEBUG] PUT /listings/:id validation error:', JSON.stringify(parsed.error.format(), null, 2));
       return reply.code(400).send({ success: false, errors: parsed.error.format() });
     }
 
@@ -395,7 +396,43 @@ export default async function listingsRoutes(app: FastifyInstance) {
    */
   app.get('/projects', { preHandler: [authenticateJWT] }, async (request, reply) => {
     try {
-      const allProjects = await db.select().from(projects).orderBy(desc(projects.createdAt));
+      const page = (request.query as any)?.page ? Number((request.query as any).page) : undefined;
+      const limit = (request.query as any)?.limit ? Number((request.query as any).limit) : 20;
+      const search = (request.query as any)?.search || '';
+      const status = (request.query as any)?.status || 'ALL';
+
+      const conditions = [];
+      if (search) {
+        conditions.push(or(
+          ilike(projects.nameEn, `%${search}%`),
+          ilike(projects.nameAr, `%${search}%`),
+          ilike(projects.city, `%${search}%`),
+          ilike(projects.district, `%${search}%`)
+        ));
+      }
+      if (status && status !== 'ALL') {
+        conditions.push(eq(projects.completionStatus, status as any));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      let allProjects;
+      let total = 0;
+
+      if (page) {
+        const totalResult = await db.select({ count: count(projects.id) }).from(projects).where(whereClause);
+        total = totalResult[0]?.count || 0;
+        const offset = (page - 1) * limit;
+        allProjects = await db.select().from(projects)
+          .where(whereClause)
+          .orderBy(desc(projects.createdAt))
+          .limit(limit)
+          .offset(offset);
+      } else {
+        allProjects = await db.select().from(projects)
+          .where(whereClause)
+          .orderBy(desc(projects.createdAt));
+      }
 
       const projectIds = allProjects.map(p => p.id);
       const layoutCounts: Record<string, number> = {};
@@ -436,13 +473,25 @@ export default async function listingsRoutes(app: FastifyInstance) {
         });
       }
 
-      const data = allProjects.map(p => ({
+      const projectsData = allProjects.map(p => ({
         ...p,
         layoutCount: layoutCounts[p.id] || 0,
         leadCount: leadCounts[p.id] || 0,
       }));
 
-      return reply.send({ success: true, data });
+      if (page) {
+        return reply.send({
+          success: true,
+          data: {
+            projects: projectsData,
+            total,
+            page,
+            limit
+          }
+        });
+      }
+
+      return reply.send({ success: true, data: projectsData });
     } catch (err: any) {
       console.error('List projects error:', err);
       return reply.status(500).send({ success: false, message: 'Failed to list projects', error: err.message });

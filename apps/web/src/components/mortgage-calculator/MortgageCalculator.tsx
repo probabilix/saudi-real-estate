@@ -40,6 +40,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/a
 
 interface MortgageCalculatorProps {
   price: number;
+  minPrice?: number;
+  maxPrice?: number;
   propertyExternalId: string;
   locale: string;
   maxPriceAllowed?: number;
@@ -146,6 +148,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 
 export default function MortgageCalculator({
   price: basePropertyPrice,
+  minPrice: projectMinPrice,
+  maxPrice: projectMaxPrice,
   propertyExternalId,
   locale = 'en',
   maxPriceAllowed: maxPriceAllowedProp,
@@ -170,7 +174,12 @@ export default function MortgageCalculator({
   const [loading, setLoading] = useState(true);
 
   // Form State
-  const [price, setPrice] = useState(basePropertyPrice);
+  const [price, setPrice] = useState(() => {
+    if (propertyType === 'project' && projectMaxPrice) {
+      return projectMaxPrice;
+    }
+    return basePropertyPrice;
+  });
   const [isCitizen, setIsCitizen] = useState(true);
   const [isFirstHome, setIsFirstHome] = useState(true);
   const [downPaymentAmount, setDownPaymentAmount] = useState(0);
@@ -435,6 +444,20 @@ export default function MortgageCalculator({
   const maxPriceAllowed = maxPriceAllowedProp !== undefined
     ? maxPriceAllowedProp
     : Math.round(basePropertyPrice * (1 + config.maxPriceBufferPct / 100));
+
+  let sliderMinPrice = basePropertyPrice;
+  let sliderMaxPrice = maxPriceAllowed;
+
+  if (propertyType === 'project' && projectMinPrice && projectMaxPrice) {
+    const projectMin = Math.max(50000, Math.round(projectMinPrice * 0.5));
+    sliderMinPrice = projectMin;
+    sliderMaxPrice = Math.round(projectMin + (projectMaxPrice - projectMin) / 0.85);
+  } else {
+    const listingMin = Math.max(50000, Math.round(basePropertyPrice * 0.5));
+    sliderMinPrice = listingMin;
+    sliderMaxPrice = Math.round(listingMin + (basePropertyPrice - listingMin) / 0.85);
+  }
+
   const minDownPaymentPct = (isCitizen && isFirstHome) ? config.minDownPaymentPctFirstHomeCitizen : config.minDownPaymentPctDefault;
   
   const minDownAllowed = price > 0
@@ -443,7 +466,7 @@ export default function MortgageCalculator({
 
   const maxDownAllowed = price > 0
     ? Math.round(price * (config.maxDownPaymentPct / 100))
-    : Math.round(maxPriceAllowed * (config.maxDownPaymentPct / 100));
+    : Math.round(sliderMaxPrice * (config.maxDownPaymentPct / 100));
 
   // Donut chart calculations
   const bankProfitPercentage = calculated?.bankProfitPercentage ?? 0;
@@ -624,9 +647,9 @@ export default function MortgageCalculator({
                       const val = e.target.value.replace(/\D/g, '');
                       const parsed = parseInt(val, 10);
                       if (!isNaN(parsed)) {
-                        if (parsed > maxPriceAllowed) {
-                          setPrice(maxPriceAllowed);
-                          setPriceInput(maxPriceAllowed.toString());
+                        if (parsed > sliderMaxPrice) {
+                          setPrice(sliderMaxPrice);
+                          setPriceInput(sliderMaxPrice.toString());
                         } else {
                           setPrice(parsed);
                           setPriceInput(val);
@@ -639,7 +662,7 @@ export default function MortgageCalculator({
                     }}
                     onBlur={() => {
                       setIsPriceFocused(false);
-                      const clamped = Math.min(Math.max(price, basePropertyPrice), maxPriceAllowed);
+                      const clamped = Math.min(Math.max(price, sliderMinPrice), sliderMaxPrice);
                       setPrice(clamped);
                       setPriceInput(clamped > 0 ? clamped.toLocaleString() : '');
                     }}
@@ -651,15 +674,15 @@ export default function MortgageCalculator({
               <div className="relative group/price">
                 <input
                   type="range"
-                  min={basePropertyPrice}
-                  max={maxPriceAllowed}
-                  step="5000"
+                  min={sliderMinPrice}
+                  max={sliderMaxPrice}
+                  step="100"
                   value={price}
                   onChange={(e) => {
                     setPrice(Number(e.target.value));
                     logInteraction();
                   }}
-                  style={{ background: getSliderBackground(price, basePropertyPrice, maxPriceAllowed) }}
+                  style={{ background: getSliderBackground(price, sliderMinPrice, sliderMaxPrice) }}
                   className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#006169]"
                 />
               </div>
@@ -716,15 +739,16 @@ export default function MortgageCalculator({
               <div className="relative group/down">
                 <input
                   type="range"
-                  min={minDownAllowed}
+                  min={0}
                   max={maxDownAllowed}
-                  step="5000"
+                  step="100"
                   value={downPaymentAmount}
                   onChange={(e) => {
-                    setDownPaymentAmount(Number(e.target.value));
+                    const val = Number(e.target.value);
+                    setDownPaymentAmount(Math.max(val, minDownAllowed));
                     logInteraction();
                   }}
-                  style={{ background: getSliderBackground(downPaymentAmount, minDownAllowed, maxDownAllowed) }}
+                  style={{ background: getSliderBackground(downPaymentAmount, 0, maxDownAllowed) }}
                   className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#006169]"
                 />
               </div>

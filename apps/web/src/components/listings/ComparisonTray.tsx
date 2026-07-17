@@ -228,10 +228,10 @@ export default function ComparisonTray() {
               <div className="absolute right-6 top-0 -translate-y-full z-[101]">
                 <button
                   onClick={() => setIsMinimized(true)}
-                  className="bg-slate-900 border-x border-t border-slate-700 text-primary-400 hover:text-white px-4 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer border-b-0"
+                  className="bg-slate-900 border-x border-t border-slate-700 text-white hover:text-primary-400 px-4 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer border-b-0"
                 >
                   <span>{isAr ? 'تصغير' : 'Minimize'}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-primary-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-current" />
                 </button>
               </div>
 

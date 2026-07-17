@@ -24,6 +24,7 @@ import BrochureModal from '@/components/listings/BrochureModal';
 import ChatWidget from '@/components/chat/ChatWidget';
 import MortgageCalculator from '@/components/mortgage-calculator/MortgageCalculator';
 import { useCompareStore } from '@/lib/store/useCompareStore';
+import { usePropertyView } from '@/hooks/use-property-view';
 
 const AMENITY_METADATA: Record<string, { labelEn: string; labelAr: string }> = {
   swimming_pool: { labelEn: 'Swimming Pool', labelAr: 'مسبح' },
@@ -64,6 +65,9 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Track unique property view (3-second dwell time, de-duplicated)
+  usePropertyView(id, 'listing');
 
   // Auto-open AI chat if ?ai=true is in the query params
   useEffect(() => {

@@ -8,6 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { WHITELISTED_USERS } from '@/lib/config';
+import { getViewSessionKey } from '@/hooks/use-property-view';
 
 import { Building2, ArrowLeft, Mail, ShieldCheck, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -85,6 +86,12 @@ function LoginContent({ locale }: { locale: string }) {
       setError(t('invalidCredentials'));
       setLoading(false);
     } else {
+      // Link any pre-login anonymous property views to this user (fire-and-forget)
+      const sessionKey = getViewSessionKey();
+      if (sessionKey) {
+        api.linkViewSession(sessionKey).catch(() => {});
+      }
+
       if (returnTo) {
         const userRes = await api.getMe();
         const loggedInUser = userRes.success ? userRes.data?.user : null;

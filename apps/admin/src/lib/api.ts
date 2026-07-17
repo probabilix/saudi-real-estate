@@ -223,7 +223,18 @@ export const adminApi = {
     }),
 
   // ── Projects & Inventory Units ──
-  getProjects: () => request<AdminProject[]>('/listings/projects'),
+  getProjects: (params?: { page?: number; limit?: number; search?: string; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    if (params?.status) q.set('status', params.status);
+    return request<any>(`/listings/projects?${q}`);
+  },
+
+  getPropertyViewStats: (propertyId: string, period: string) =>
+    request<Array<{ day: string; views: number }>>(`/views/stats/${propertyId}?period=${period}`),
+
   getProjectDetails: (id: string) =>
     request<{ project: AdminProject; layouts: AdminListing[] }>(`/listings/projects/${id}`),
   updateProject: (id: string, data: Partial<AdminProject>) =>
@@ -325,8 +336,13 @@ export const adminApi = {
       body: JSON.stringify({ status, notes }),
     }),
 
-  getCalculatorLeads: () =>
-    request<any[]>('/mortgage/calculator-leads'),
+  getCalculatorLeads: (params?: { page?: number; limit?: number; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    return request<any>(`/mortgage/calculator-leads?${q}`);
+  },
 
   updateCalculatorLeadStatus: (userId: string, status?: string, notes?: string) =>
     request<any>(`/mortgage/calculator-leads/${userId}`, {
@@ -335,8 +351,14 @@ export const adminApi = {
     }),
 
   // ── Reported Properties ──
-  getReportedProperties: () =>
-    request<AdminReportedProperty[]>('/admin/reported-properties'),
+  getReportedProperties: (params?: { page?: number; limit?: number; search?: string; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.search) q.set('search', params.search);
+    if (params?.status) q.set('status', params.status);
+    return request<any>(`/admin/reported-properties?${q}`);
+  },
 
   getListingReports: (listingId: string) =>
     request<AdminPropertyReport[]>(`/admin/reported-properties/${listingId}/reports`),
@@ -394,7 +416,11 @@ export interface AdminStats {
   totalUsers: number;
   totalListings: number;
   activeListings: number;
+  totalProjects: number;
+  activeProjects: number;
   pendingVerifications: number;
+  pendingBrokerVerifications: number;
+  pendingListingVerifications: number;
   totalRevenueSar: number;
   newUsersToday: number;
   newListingsToday: number;

@@ -24,6 +24,7 @@ import { Listing } from '@saudi-re/shared';
 import clsx from 'clsx';
 import MortgageCalculator from '@/components/mortgage-calculator/MortgageCalculator';
 import { useCompareStore } from '@/lib/store/useCompareStore';
+import { usePropertyView } from '@/hooks/use-property-view';
 
 interface ProjectUnit {
   id: string;
@@ -139,6 +140,9 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
+
+  // Track unique property view (3-second dwell time, de-duplicated)
+  usePropertyView(id, 'project');
 
   interface ProjectOwner {
     id: string;
@@ -1352,7 +1356,8 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
               <div className="scroll-mt-40 border-t border-surface-150 pt-10">
                 <MortgageCalculator
                   price={minPrice}
-                  maxPriceAllowed={Math.round(maxPrice * 1.15)}
+                  minPrice={minPrice}
+                  maxPrice={maxPrice}
                   propertyExternalId={project.id}
                   locale={locale}
                   propertyType="project"

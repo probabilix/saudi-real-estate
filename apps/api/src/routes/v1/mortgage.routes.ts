@@ -419,6 +419,10 @@ export default async function mortgageRoutes(app: FastifyInstance) {
    */
   app.get('/calculator-leads', { preHandler: [authenticateJWT] }, async (request, reply) => {
     try {
+      const page = (request.query as any)?.page ? Number((request.query as any).page) : undefined;
+      const limit = (request.query as any)?.limit ? Number((request.query as any).limit) : 20;
+      const search = (request.query as any)?.search || '';
+
       // 1. Fetch all calculator usage entries joined with user profiles
       const usages = await db.select({
         userId: users.id,
@@ -475,72 +479,112 @@ export default async function mortgageRoutes(app: FastifyInstance) {
           groupedLeads[userId].lastActiveAt = row.createdAt;
         }
 
-        // Fetch details of property / project
-        let titleEn = 'Unknown Property';
-        let titleAr = 'عقار غير معروف';
-        let city = 'Saudi Arabia';
-        let price: number | null = null;
-
-        if (row.propertyType === 'listing') {
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.propertyExternalId || '');
-          const [listing] = await db.select({
-            enTitle: listings.enTitle,
-            arTitle: listings.arTitle,
-            city: listings.city,
-            price: listings.price,
-          })
-            .from(listings)
-            .where(isUuid ? or(eq(listings.id, row.propertyExternalId), eq(listings.shortId, row.propertyExternalId)) : eq(listings.shortId, row.propertyExternalId))
-            .limit(1);
-
-          if (listing) {
-            titleEn = listing.enTitle || listing.arTitle || 'Untitled Property';
-            titleAr = listing.arTitle || 'عقار بدون عنوان';
-            city = listing.city || 'Saudi Arabia';
-            price = listing.price ? Number(listing.price) : null;
-          }
-        } else {
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.propertyExternalId || '');
-          if (isUuid) {
-            const [project] = await db.select({
-              nameEn: projects.nameEn,
-              nameAr: projects.nameAr,
-              city: projects.city,
-            })
-              .from(projects)
-              .where(eq(projects.id, row.propertyExternalId))
-              .limit(1);
-
-            if (project) {
-              titleEn = project.nameEn || project.nameAr || 'Untitled Project';
-              titleAr = project.nameAr || 'مشروع بدون عنوان';
-              city = project.city || 'Saudi Arabia';
-
-              // Query layouts/listings for minPrice
-              const layouts = await db.select({ price: listings.price })
-                .from(listings)
-                .where(and(eq(listings.projectId, row.propertyExternalId), eq(listings.status, 'ACTIVE')));
-              const prices = layouts.map(l => Number(l.price));
-              price = prices.length > 0 ? Math.min(...prices) : null;
-            }
-          }
-        }
-
         groupedLeads[userId].interactions.push({
           propertyExternalId: row.propertyExternalId,
           propertyType: row.propertyType,
           createdAt: row.createdAt,
-          titleEn,
-          titleAr,
-          city,
-          price,
+          titleEn: 'Unknown Property',
+          titleAr: 'عقار غير معروف',
+          city: 'Saudi Arabia',
+          price: null,
         });
       }
 
       // Convert to array and sort by lastActiveAt descending
-      const data = Object.values(groupedLeads).sort((a, b) => b.lastActiveAt.getTime() - a.lastActiveAt.getTime());
+      let data = Object.values(groupedLeads).sort((a, b) => b.lastActiveAt.getTime() - a.lastActiveAt.getTime());
 
-      return reply.send({ success: true, data });
+      // Filter by search term in memory
+      if (search) {
+        const q = search.toLowerCase();
+        data = data.filter(l =>
+          l.name.toLowerCase().includes(q) ||
+          l.email.toLowerCase().includes(q) ||
+          l.phone.toLowerCase().includes(q)
+        );
+      }
+
+      const total = data.length;
+
+      // Slice if page is provided
+      let pagedData = data;
+      if (page) {
+        const offset = (page - 1) * limit;
+        pagedData = data.slice(offset, offset + limit);
+      }
+
+      // 3. ONLY fetch details of property/project for the sliced/paged dataset
+      for (const lead of pagedData) {
+        for (const interaction of lead.interactions) {
+          let titleEn = 'Unknown Property';
+          let titleAr = 'عقار غير معروف';
+          let city = 'Saudi Arabia';
+          let price: number | null = null;
+
+          if (interaction.propertyType === 'listing') {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(interaction.propertyExternalId || '');
+            const [listing] = await db.select({
+              enTitle: listings.enTitle,
+              arTitle: listings.arTitle,
+              city: listings.city,
+              price: listings.price,
+            })
+              .from(listings)
+              .where(isUuid ? or(eq(listings.id, interaction.propertyExternalId), eq(listings.shortId, interaction.propertyExternalId)) : eq(listings.shortId, interaction.propertyExternalId))
+              .limit(1);
+
+            if (listing) {
+              titleEn = listing.enTitle || listing.arTitle || 'Untitled Property';
+              titleAr = listing.arTitle || 'عقار بدون عنوان';
+              city = listing.city || 'Saudi Arabia';
+              price = listing.price ? Number(listing.price) : null;
+            }
+          } else {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(interaction.propertyExternalId || '');
+            if (isUuid) {
+              const [project] = await db.select({
+                nameEn: projects.nameEn,
+                nameAr: projects.nameAr,
+                city: projects.city,
+              })
+                .from(projects)
+                .where(eq(projects.id, interaction.propertyExternalId))
+                .limit(1);
+
+              if (project) {
+                titleEn = project.nameEn || project.nameAr || 'Untitled Project';
+                titleAr = project.nameAr || 'مشروع بدون عنوان';
+                city = project.city || 'Saudi Arabia';
+
+                // Query layouts/listings for minPrice
+                const layouts = await db.select({ price: listings.price })
+                  .from(listings)
+                  .where(and(eq(listings.projectId, interaction.propertyExternalId), eq(listings.status, 'ACTIVE')));
+                const prices = layouts.map(l => Number(l.price));
+                price = prices.length > 0 ? Math.min(...prices) : null;
+              }
+            }
+          }
+
+          interaction.titleEn = titleEn;
+          interaction.titleAr = titleAr;
+          interaction.city = city;
+          interaction.price = price;
+        }
+      }
+
+      if (page) {
+        return reply.send({
+          success: true,
+          data: {
+            leads: pagedData,
+            total,
+            page,
+            limit
+          }
+        });
+      }
+
+      return reply.send({ success: true, data: pagedData });
     } catch (err: any) {
       request.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to fetch calculator leads.', error: err.message });

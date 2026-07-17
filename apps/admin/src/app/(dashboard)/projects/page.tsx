@@ -8,9 +8,10 @@ import {
   Layers, Plus, Search, MapPin, Loader2,
   ExternalLink, Download, Building2, ChevronDown, ChevronUp,
   CheckCircle, Clock, Construction, Edit, Trash2, Eye,
-  Bed, Square, DollarSign, Star, X, FileText
+  Bed, Square, DollarSign, Star, X, FileText, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
+import PropertyAnalyticsModal from '@/components/PropertyAnalyticsModal';
 
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 
@@ -27,6 +28,7 @@ interface ProjectListItem {
   regaFalLicense: string | null;
   layoutCount: number;
   leadCount: number;
+  viewsCount?: number;
   createdAt: string;
   isFeatured?: boolean;
   featuredOrder?: number;
@@ -48,12 +50,39 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [projectLayouts, setProjectLayouts] = useState<Record<string, LayoutItem[]>>({});
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [analyticsModal, setAnalyticsModal] = useState<{
+    isOpen: boolean;
+    propertyId: string;
+    propertyTitle: string;
+    shortId?: string;
+    totalViews: number;
+  }>({
+    isOpen: false,
+    propertyId: '',
+    propertyTitle: '',
+    totalViews: 0,
+  });
+
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  // Debounce search query
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearchQuery, statusFilter]);
 
   const handleDeleteProject = (id: string) => {
     setConfirmModal({
@@ -111,7 +140,9 @@ export default function ProjectsPage() {
     }
   };
 
-  useEffect(() => { loadProjects(); }, []);
+  useEffect(() => {
+    loadProjects();
+  }, [page, debouncedSearchQuery, statusFilter]);
 
   useEffect(() => {
     if (toast) {
@@ -122,9 +153,24 @@ export default function ProjectsPage() {
 
   async function loadProjects() {
     setLoading(true);
-    const result = await adminApi.getProjects();
-    if (result.success && result.data) {
-      setProjects(result.data as any);
+    try {
+      const result = await adminApi.getProjects({
+        page,
+        limit: 20,
+        search: debouncedSearchQuery || undefined,
+        status: statusFilter !== 'ALL' ? statusFilter : undefined,
+      });
+      if (result.success && result.data) {
+        if (Array.isArray(result.data)) {
+          setProjects(result.data);
+          setTotal(result.data.length);
+        } else {
+          setProjects(result.data.projects);
+          setTotal(result.data.total);
+        }
+      }
+    } catch (err) {
+      console.error(err);
     }
     setLoading(false);
   }
@@ -696,16 +742,7 @@ export default function ProjectsPage() {
     }
   };
 
-  const filteredProjects = projects.filter(p => {
-    const q = searchQuery.toLowerCase();
-    const matchSearch =
-      p.nameEn.toLowerCase().includes(q) ||
-      p.nameAr.includes(searchQuery) ||
-      p.city.toLowerCase().includes(q) ||
-      (p.district?.toLowerCase().includes(q) ?? false);
-    const matchStatus = statusFilter === 'ALL' || p.completionStatus === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const filteredProjects = projects;
 
   function StatusBadge({ status }: { status: ProjectListItem['completionStatus'] }) {
     if (!status) return <span className="badge badge-gray">Unknown</span>;
@@ -814,6 +851,21 @@ export default function ProjectsPage() {
                             <div className="min-w-0">
                               <div className="text-sm font-bold text-surface-900 truncate max-w-[200px]">{project.nameEn}</div>
                               <div className="text-xs text-surface-400 truncate max-w-[200px] font-arabic mt-0.5" dir="rtl">{project.nameAr}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <button
+                                  onClick={() => setAnalyticsModal({
+                                    isOpen: true,
+                                    propertyId: project.id,
+                                    propertyTitle: project.nameEn || project.nameAr || 'Project',
+                                    totalViews: project.viewsCount || 0
+                                  })}
+                                  className="inline-flex items-center gap-0.5 text-[9px] font-bold text-primary-700 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 px-1.5 py-0.5 rounded-full transition-all border border-primary-100"
+                                  title="Click to view traffic chart"
+                                >
+                                  <Eye className="w-2.5 h-2.5" />
+                                  <span>Views: {project.viewsCount || 0}</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -1054,10 +1106,29 @@ export default function ProjectsPage() {
             </table>
           </div>
 
-          {!loading && filteredProjects.length > 0 && (
-            <div className="p-4 bg-surface-50 border-t border-surface-200">
+          {!loading && projects.length > 0 && (
+            <div className="p-4 bg-surface-50 border-t border-surface-200 flex items-center justify-between">
               <div className="text-xs text-surface-500">
-                Showing <b>{filteredProjects.length}</b> of <b>{projects.length}</b> projects
+                Showing <b>{projects.length}</b> of <b>{total}</b> projects
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn-secondary p-1.5 disabled:opacity-50"
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="text-xs font-bold text-surface-700 px-3 bg-white border border-surface-200 py-1.5 rounded-lg">
+                  Page {page} of {Math.ceil(total / 20) || 1}
+                </div>
+                <button
+                  className="btn-secondary p-1.5 disabled:opacity-50"
+                  disabled={page * 20 >= total}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}
@@ -1376,6 +1447,15 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
+      {/* Analytics Graph Modal */}
+      <PropertyAnalyticsModal
+        isOpen={analyticsModal.isOpen}
+        onClose={() => setAnalyticsModal(prev => ({ ...prev, isOpen: false }))}
+        propertyId={analyticsModal.propertyId}
+        propertyTitle={analyticsModal.propertyTitle}
+        shortId={analyticsModal.shortId}
+        totalViews={analyticsModal.totalViews}
+      />
     </div>
   );
 }

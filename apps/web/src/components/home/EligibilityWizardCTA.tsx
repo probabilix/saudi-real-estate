@@ -115,9 +115,8 @@ export default function EligibilityWizardCTA() {
                 <div className="flex items-center justify-center gap-0 max-w-[220px] mx-auto">
                   {[1, 2, 3].map((n, i) => (
                     <div key={n} className="flex items-center">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
-                        n === 1 ? 'bg-[#1a1209] border-[#1a1209] text-white' : 'bg-white border-[#d4c5a9] text-[#a0887a]'
-                      }`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 ${n === 1 ? 'bg-[#1a1209] border-[#1a1209] text-white' : 'bg-white border-[#d4c5a9] text-[#a0887a]'
+                        }`}>
                         {n}
                       </div>
                       {i < 2 && <div className="h-0.5 w-14 sm:w-16 bg-[#d4c5a9]" />}
@@ -127,25 +126,71 @@ export default function EligibilityWizardCTA() {
                 <p className="text-center text-[10px] font-black uppercase tracking-[0.18em] text-[#8a6d4b] mt-3">YOUR DETAILS</p>
               </div>
 
-              {/* Fake form preview */}
-              <div className="px-8 py-6 space-y-4">
-                <p className="font-serif text-lg font-bold text-[#1a1209]"
+              {/* Process Flow Visual representation */}
+              <div className="px-8 py-6 space-y-5">
+                <p className="font-serif text-base font-bold text-[#1a1209]"
                   style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}>
-                  Let&apos;s start with your details
+                  {isRTL ? 'كيف يعمل تقييم الأهلية؟' : "How the check works"}
                 </p>
-                <div className="space-y-3">
-                  {['Full Name', 'Email Address', 'Phone / WhatsApp', 'Citizenship'].map(field => (
-                    <div key={field} className="h-10 rounded-xl border border-[#d4c5a9] bg-[#faf8f4] px-4 flex items-center">
-                      <span className="text-xs text-[#b0997e]">{field}</span>
+                
+                {/* Stepper Node list */}
+                <div className="space-y-4 relative">
+                  {/* Vertical connecting line */}
+                  <div className={`absolute top-2.5 bottom-2.5 w-0.5 bg-[#d4c5a9]/40 ${isRTL ? 'right-[15px]' : 'left-[15px]'}`} />
+
+                  {/* Node 1 */}
+                  <div className={`flex items-start gap-3 relative z-10 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+                    <div className="w-8 h-8 rounded-full bg-[#faf8f4] border border-[#b8975a]/30 flex items-center justify-center text-[#8a6d4b] shadow-sm shrink-0">
+                      <FileCheck className="w-4 h-4" />
                     </div>
-                  ))}
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <p className="text-[11px] font-black text-[#1a1209] uppercase tracking-wider">
+                        {isRTL ? '1. تفاصيل الملف الشخصي' : '1. Profile Details'}
+                      </p>
+                      <p className="text-[10px] text-[#6b5744] mt-0.5">
+                        {isRTL ? 'أدخل اسمك وجنسيتك لبدء الفحص.' : 'Specify your citizenship and basic contact details.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Node 2 */}
+                  <div className={`flex items-start gap-3 relative z-10 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+                    <div className="w-8 h-8 rounded-full bg-[#faf8f4] border border-[#b8975a]/30 flex items-center justify-center text-[#8a6d4b] shadow-sm shrink-0">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <p className="text-[11px] font-black text-[#1a1209] uppercase tracking-wider">
+                        {isRTL ? '2. موقع الإقامة الحالي' : '2. Residency Location'}
+                      </p>
+                      <p className="text-[10px] text-[#6b5744] mt-0.5">
+                        {isRTL ? 'فحص ما إذا كنت مقيماً داخل المملكة أو بالخارج.' : 'Determine identity verification paths based on location.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Node 3 */}
+                  <div className={`flex items-start gap-3 relative z-10 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+                    <div className="w-8 h-8 rounded-full bg-[#faf8f4] border border-[#b8975a]/30 flex items-center justify-center text-[#8a6d4b] shadow-sm shrink-0">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <p className="text-[11px] font-black text-[#1a1209] uppercase tracking-wider">
+                        {isRTL ? '3. خارطة الطريق الحكومية' : '3. Government Roadmap'}
+                      </p>
+                      <p className="text-[10px] text-[#6b5744] mt-0.5">
+                        {isRTL ? 'احصل على روابط نفاذ وأبشر وموافقة الهيئة العامة للعقار.' : 'Get official REGA, Absher & Nafath registration instructions.'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+
                 <Link
                   href={`/${locale}/buy-in-saudi`}
-                  className="h-11 rounded-xl bg-[#1a1209] flex items-center justify-center gap-2 hover:bg-[#2d1f10] transition-colors cursor-pointer"
+                  className="w-full h-11 rounded-xl bg-[#1a1209] flex items-center justify-center gap-2 hover:bg-[#2d1f10] transition-all duration-300 hover:-translate-y-0.5 shadow-md shadow-[#1a1209]/15 group cursor-pointer mt-2"
                 >
-                  <span className="text-white text-sm font-bold">Continue</span>
-                  <ArrowRight className="w-4 h-4 text-white" />
+                  <span className="text-white text-xs font-bold">
+                    {isRTL ? 'ابدأ تقييم الأهلية الآن ➔' : 'Start Eligibility Check ➔'}
+                  </span>
                 </Link>
               </div>
 

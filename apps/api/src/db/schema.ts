@@ -142,6 +142,8 @@ export const projects = pgTable('projects', {
   expectedDelivery: varchar('expected_delivery', { length: 50 }),
   totalUnits: integer('total_units'),
 
+  viewsCount: integer('views_count').default(0),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   isFeatured: boolean('is_featured').default(false),
@@ -401,6 +403,35 @@ export const projectFavorites = pgTable('project_favorites', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (table) => ({
   userProjectIdx: index('user_project_idx').on(table.userId, table.projectId),
+}));
+
+
+// ── Property View Tracking Enums ──
+export const propertyViewTypeEnum = pgEnum('property_view_type', ['listing', 'project']);
+export const propertyViewSourceEnum = pgEnum('property_view_source', ['web', 'app']);
+
+// ── Property Views Ledger Table ──
+// Tracks unique property page views per user/session per 24-hour window.
+// De-duplication is enforced at DB level via the unique composite index.
+export const propertyViews = pgTable('property_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  propertyType: propertyViewTypeEnum('property_type').notNull(),
+  propertyId: uuid('property_id').notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  // session_key: browser localStorage key (web) or stable device ID (app)
+  sessionKey: varchar('session_key', { length: 255 }),
+  ipAddress: varchar('ip_address', { length: 64 }),
+  source: propertyViewSourceEnum('source').default('web').notNull(),
+  viewedAt: timestamp('viewed_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Fast lookup for analytics charts
+  propertyDateIdx: index('pv_property_date_idx').on(table.propertyId, table.viewedAt),
+  // For user-based de-dup queries
+  userPropertyIdx: index('pv_user_property_idx').on(table.userId, table.propertyId),
+  // For session-key de-dup queries
+  sessionPropertyIdx: index('pv_session_property_idx').on(table.sessionKey, table.propertyId),
+  // For 90-day TTL cleanup cron job
+  viewedAtIdx: index('pv_viewed_at_idx').on(table.viewedAt),
 }));
 
 

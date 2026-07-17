@@ -7,7 +7,7 @@ import { AdminTopBar } from '@/components/AdminSidebar';
 import { adminApi } from '@/lib/api';
 import { CldUploadWidget } from 'next-cloudinary';
 import {
-  Layers, Plus, Trash2, Save, ArrowLeft, Loader2,
+  Layers, Plus, Trash2, Save, ArrowLeft, ArrowRight, Loader2,
   Upload, Image as ImageIcon, Check, AlertCircle, Building2,
   MapPin, FileText, ShieldCheck, Calendar, Hash, Star
 } from 'lucide-react';
@@ -80,6 +80,45 @@ export default function CreateProjectPage() {
   const [totalUnits, setTotalUnits] = useState('');
   const [mapEmbedUrl, setMapEmbedUrl] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isOverIndex, setIsOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex !== index) {
+      setIsOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    setDraggedIndex(null);
+    setIsOverIndex(null);
+    if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
+
+    setPhotos(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(sourceIndex, 1);
+      updated.splice(targetIndex, 0, moved);
+      return updated;
+    });
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setIsOverIndex(null);
+  };
   const [amenities, setAmenities] = useState<Record<string, boolean>>(initialAmenities);
   const [customAmenity, setCustomAmenity] = useState('');
   const [dynamicAmenities, setDynamicAmenities] = useState<string[]>([]);
@@ -504,25 +543,120 @@ export default function CreateProjectPage() {
 
               {/* Project Photos */}
               <div>
-                <label className="admin-label">Project Photos</label>
+                <label className="admin-label">
+                  Project Photos
+                  <span className="text-[10px] text-surface-400 font-normal normal-case ml-2">
+                    (Drag & drop to reorder, first image is cover)
+                  </span>
+                </label>
                 <div className="flex flex-wrap items-center gap-3 p-3 bg-surface-50 rounded-xl border border-surface-200">
                   {photos.map((url, i) => (
-                    <div key={i} className="relative w-24 h-20 rounded-lg overflow-hidden group">
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
-                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                      </button>
+                    <div
+                      key={i}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, i)}
+                      onDragOver={(e) => handleDragOver(e, i)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, i)}
+                      onDragEnd={handleDragEnd}
+                      className={clsx(
+                        "relative w-28 h-24 rounded-lg overflow-hidden group border transition-all duration-200 cursor-grab active:cursor-grabbing bg-white",
+                        draggedIndex === i ? "opacity-40 border-primary-500 scale-95" : "border-surface-200",
+                        isOverIndex === i ? "border-dashed border-2 border-primary-500 scale-105" : ""
+                      )}
+                    >
+                      <img src={url} alt="" className="w-full h-full object-cover select-none pointer-events-none" />
+                      
+                      {/* Cover/Main badge */}
+                      {i === 0 && (
+                        <div className="absolute top-1 left-1 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-0.5 z-10 select-none">
+                          <Star className="w-2.5 h-2.5 fill-white" />
+                          <span>Cover</span>
+                        </div>
+                      )}
+
+                      {/* Control Overlays */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5 z-20">
+                        {/* Top row: Set Main (Star) & Delete (Trash) */}
+                        <div className="flex items-center justify-between">
+                          {i > 0 ? (
+                            <button
+                              type="button"
+                              title="Set as cover image"
+                              onClick={() => {
+                                setPhotos(prev => {
+                                  const updated = [...prev];
+                                  const [item] = updated.splice(i, 1);
+                                  updated.unshift(item);
+                                  return updated;
+                                });
+                              }}
+                              className="p-1 rounded bg-white/20 hover:bg-white/40 text-amber-300 transition-colors"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-amber-300" />
+                            </button>
+                          ) : (
+                            <div className="w-5" />
+                          )}
+                          <button
+                            type="button"
+                            title="Delete photo"
+                            onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                            className="p-1 rounded bg-white/20 hover:bg-red-500/85 text-white transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-200" />
+                          </button>
+                        </div>
+
+                        {/* Bottom row: Move Left / Move Right shortcuts */}
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            disabled={i === 0}
+                            title="Move left"
+                            onClick={() => {
+                              setPhotos(prev => {
+                                const updated = [...prev];
+                                const [item] = updated.splice(i, 1);
+                                updated.splice(i - 1, 0, item);
+                                return updated;
+                              });
+                            }}
+                            className={clsx(
+                              "p-1 rounded bg-white/20 text-white transition-colors",
+                              i === 0 ? "opacity-30 cursor-not-allowed" : "hover:bg-white/40"
+                            )}
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={i === photos.length - 1}
+                            title="Move right"
+                            onClick={() => {
+                              setPhotos(prev => {
+                                const updated = [...prev];
+                                const [item] = updated.splice(i, 1);
+                                updated.splice(i + 1, 0, item);
+                                return updated;
+                              });
+                            }}
+                            className={clsx(
+                              "p-1 rounded bg-white/20 text-white transition-colors",
+                              i === photos.length - 1 ? "opacity-30 cursor-not-allowed" : "hover:bg-white/40"
+                            )}
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                   <CldUploadWidget uploadPreset="saudi_re_listing" onSuccess={(r: any) => {
                     if (r.event === 'success' && r.info?.secure_url) setPhotos(prev => [...prev, r.info.secure_url]);
                   }}>
                     {({ open }) => (
-                      <button type="button" onClick={() => open()} className="w-24 h-20 border-2 border-dashed border-surface-300 rounded-lg hover:bg-white flex flex-col items-center justify-center gap-1 text-surface-400 transition-colors">
+                      <button type="button" onClick={() => open()} className="w-28 h-24 border-2 border-dashed border-surface-300 rounded-lg hover:bg-white flex flex-col items-center justify-center gap-1 text-surface-400 transition-colors bg-white">
                         <Upload className="w-5 h-5" />
                         <span className="text-[10px] font-semibold">Add Photo</span>
                       </button>

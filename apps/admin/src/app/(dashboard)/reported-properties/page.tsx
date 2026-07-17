@@ -6,7 +6,7 @@ import { adminApi, AdminReportedProperty, AdminPropertyReport } from '@/lib/api'
 import {
   Flag, Search, AlertCircle, CheckCircle2,
   Clock, X, Loader2, Building2, ArrowUpRight,
-  Check, Trash2, EyeOff, Layers
+  Check, Trash2, EyeOff, Layers, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -24,7 +24,11 @@ export default function ReportedPropertiesPage() {
   const [properties, setProperties] = useState<AdminReportedProperty[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'RESOLVED_DISMISSED'>('PENDING');
+
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   // Drawer state
   const [selectedProperty, setSelectedProperty] = useState<AdminReportedProperty | null>(null);
@@ -32,16 +36,38 @@ export default function ReportedPropertiesPage() {
   const [loadingReports, setLoadingReports] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearchTerm, filterStatus]);
+
   useEffect(() => {
     loadReportedProperties();
-  }, []);
+  }, [page, debouncedSearchTerm, filterStatus]);
 
   async function loadReportedProperties() {
     setLoading(true);
     try {
-      const result = await adminApi.getReportedProperties();
+      const result = await adminApi.getReportedProperties({
+        page,
+        limit: 20,
+        search: debouncedSearchTerm || undefined,
+        status: filterStatus,
+      });
       if (result.success && result.data) {
-        setProperties(result.data);
+        if (Array.isArray(result.data)) {
+          setProperties(result.data);
+          setTotal(result.data.length);
+        } else {
+          setProperties(result.data.reported);
+          setTotal(result.data.total);
+        }
       }
     } catch (err) {
       console.error('Failed to load reported properties:', err);
@@ -105,23 +131,7 @@ export default function ReportedPropertiesPage() {
     return 'Resolved';
   };
 
-  // Client side filtering
-  const filteredProperties = properties.filter((prop) => {
-    const matchesSearch =
-      prop.enTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prop.arTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prop.shortId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prop.city.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const isPending = prop.pendingCount > 0;
-
-    if (filterStatus === 'PENDING') {
-      return matchesSearch && isPending;
-    } else if (filterStatus === 'RESOLVED_DISMISSED') {
-      return matchesSearch && !isPending;
-    }
-    return matchesSearch;
-  });
+  const filteredProperties = properties;
 
   const totalPendingReportsCount = properties.reduce((acc, curr) => acc + curr.pendingCount, 0);
 
@@ -359,6 +369,32 @@ export default function ReportedPropertiesPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination */}
+          {!loading && properties.length > 0 && (
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <div className="text-xs font-semibold text-slate-400">
+                Showing <b>{properties.length}</b> of <b>{total}</b> reported entries
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  className="btn-secondary p-1.5 disabled:opacity-50"
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="text-xs font-black text-slate-700 px-3 bg-white border border-slate-200 py-1.5 rounded-lg">Page {page} of {Math.ceil(total / 20) || 1}</div>
+                <button 
+                  className="btn-secondary p-1.5 disabled:opacity-50"
+                  disabled={page * 20 >= total}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -265,10 +265,10 @@ function DialCodePicker({
 
   const filtered = search
     ? ALL_DIAL_CODES.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.nameAr.includes(search) ||
-        c.dial.includes(search)
-      )
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.nameAr.includes(search) ||
+      c.dial.includes(search)
+    )
     : null;
 
   const selected = ALL_DIAL_CODES.find(c => c.dial === value) || ALL_DIAL_CODES[0];
@@ -393,11 +393,10 @@ function ProgressStepper({ currentStep, hasResult, isAr }: { currentStep: number
           const active = n === currentStep && !hasResult;
           return (
             <div key={n} className={`flex items-center ${isAr ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${
-                done ? 'bg-[#b8975a] border-[#b8975a] text-white' :
-                active ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white' :
-                'bg-white border-[#d4c5a9] text-[#a0887a]'
-              }`}>
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${done ? 'bg-[#b8975a] border-[#b8975a] text-white' :
+                  active ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white' :
+                    'bg-white border-[#d4c5a9] text-[#a0887a]'
+                }`}>
                 {done ? <CheckCircle className="w-4.5 h-4.5" /> : n}
               </div>
               {i < 2 && (
@@ -738,11 +737,10 @@ function ResidencyStep({
                 key={card.value}
                 type="button"
                 onClick={() => handleSelect(card.value)}
-                className={`group text-right p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus:outline-none ${isAr ? 'text-right' : 'text-left'} ${
-                  isSelected
+                className={`group text-right p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus:outline-none ${isAr ? 'text-right' : 'text-left'} ${isSelected
                     ? 'border-[#b8975a] bg-[#fdf6ec] shadow-lg shadow-[#b8975a]/10'
                     : 'border-[#d4c5a9] bg-[#faf8f4] hover:border-[#b8975a]/60 hover:bg-[#fdf8f2]'
-                }`}
+                  }`}
                 id={`wizard-residency-${card.value}`}
               >
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${isAr ? 'mr-0 ml-auto' : 'ml-0 mr-auto'} ${isSelected ? 'bg-[#b8975a]/20' : 'bg-white group-hover:bg-[#b8975a]/10'}`}>
@@ -803,11 +801,10 @@ function DigitalIdStep({
                 key={card.value}
                 type="button"
                 onClick={() => handleSelect(card.value)}
-                className={`group text-right p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus:outline-none ${isAr ? 'text-right' : 'text-left'} ${
-                  isSelected
+                className={`group text-right p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus:outline-none ${isAr ? 'text-right' : 'text-left'} ${isSelected
                     ? 'border-[#b8975a] bg-[#fdf6ec] shadow-lg shadow-[#b8975a]/10'
                     : 'border-[#d4c5a9] bg-[#faf8f4] hover:border-[#b8975a]/60 hover:bg-[#fdf8f2]'
-                }`}
+                  }`}
                 id={`wizard-digital-id-${card.value}`}
               >
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${isAr ? 'mr-0 ml-auto' : 'ml-0 mr-auto'} ${isSelected ? 'bg-[#b8975a]/20' : 'bg-white group-hover:bg-[#b8975a]/10'}`}>
@@ -1065,7 +1062,7 @@ export default function BuyInSaudiPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stepId, value }),
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   async function completeWizard(resultKey: ResultKey) {
@@ -1074,7 +1071,7 @@ export default function BuyInSaudiPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resultKey }),
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   function handleResidency(v: 'outside' | 'inside') {

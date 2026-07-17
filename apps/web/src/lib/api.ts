@@ -325,6 +325,31 @@ class ApiClient {
     });
   }
 
+  // ── Property View Tracking ──
+
+  async trackPropertyView(payload: {
+    propertyType: 'listing' | 'project';
+    propertyId: string;
+    sessionKey?: string;
+    source?: 'web' | 'app';
+  }) {
+    return this.fetcher<{ success: boolean; counted: boolean }>('/views/track', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async linkViewSession(sessionKey: string) {
+    return this.fetcher<{ success: boolean; linked: boolean }>('/views/link-session', {
+      method: 'POST',
+      body: JSON.stringify({ sessionKey }),
+    });
+  }
+
+  async getPropertyViewStats(propertyId: string, period: 'today' | 'yesterday' | '7d' | '30d' | '90d' = '7d') {
+    return this.fetcher<Array<{ day: string; views: number }>>(`/views/stats/${propertyId}?period=${period}`);
+  }
+
   async revealProjectContact(id: string) {
     return this.fetcher<{ phone: string; email: string }>(`/system/projects/${id}/reveal`, {
       method: 'POST',

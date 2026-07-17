@@ -30,7 +30,7 @@ const NAV_GROUPS = [
       { href: '/users', label: 'Users & Brokers', icon: Users },
       { href: '/verifications', label: 'Verifications', icon: ShieldCheck },
       { href: '/mortgage-leads', label: 'Mortgage Leads', icon: CreditCard },
-      // { href: '/calculator-leads', label: 'Calculator Leads', icon: Calculator },
+      { href: '/calculator-leads', label: 'Calculator Leads', icon: Calculator },
       { href: '/reported-properties', label: 'Reported Properties', icon: Flag },
     ],
   },

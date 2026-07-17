@@ -5,7 +5,8 @@ import { AdminTopBar } from '@/components/AdminSidebar';
 import { adminApi, AdminUser } from '@/lib/api';
 import {
   ShieldCheck, Clock, ShieldAlert, CheckCircle2, Search, Filter, Loader2,
-  ExternalLink, Mail, Phone, Calendar, X, AlertCircle, RefreshCw, XCircle, Globe
+  ExternalLink, Mail, Phone, Calendar, X, AlertCircle, RefreshCw, XCircle, Globe,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -270,11 +271,32 @@ export default function VerificationsPage() {
           </div>
 
           {/* Pagination */}
-          <div className="p-4 bg-surface-50 border-t border-surface-200 flex items-center justify-between">
-            <div className="text-xs text-surface-500">
-              Showing <b>{users.length}</b> applications
+          {!loading && users.length > 0 && (
+            <div className="p-4 bg-surface-50 border-t border-surface-200 flex items-center justify-between">
+              <div className="text-xs font-semibold text-slate-400">
+                Showing <b>{users.length}</b> of <b>{total}</b> applications
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  className="btn-secondary p-1.5 disabled:opacity-50"
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="text-xs font-black text-slate-700 px-3 bg-white border border-slate-200 py-1.5 rounded-lg">
+                  Page {page} of {Math.ceil(total / 20) || 1}
+                </div>
+                <button 
+                  className="btn-secondary p-1.5 disabled:opacity-50"
+                  disabled={page * 20 >= total}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
       </div>

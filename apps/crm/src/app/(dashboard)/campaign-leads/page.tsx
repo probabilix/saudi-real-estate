@@ -6,7 +6,7 @@ import { CrmTopBar } from '@/components/CrmSidebar';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
 import {
   Search, Plus, LayoutList, Columns, RefreshCw, Loader2,
-  Megaphone, Globe, Filter, X, ChevronDown, AlertTriangle,
+  Megaphone, Globe, Filter, X, ChevronDown, AlertTriangle, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import clsx from 'clsx';
 import Link from 'next/link';
@@ -36,18 +36,33 @@ export default function CampaignLeadsPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewMode>('kanban');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterSource, setFilterSource] = useState('');
   const [filterAssigned, setFilterAssigned] = useState('');
   const [showDrawer, setShowDrawer] = useState(false);
   const [dragging, setDragging] = useState<{ id: string; fromStatus: string } | null>(null);
   const dragOver = useRef<string | null>(null);
 
+  const [page, setPage] = useState(1);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filterSource, debouncedSearch, filterAssigned]);
+
   const load = useCallback(async () => {
     setLoading(true);
     const res = await crmApi.getCampaignLeads({
-      limit: 200,
+      page,
+      limit: 50,
       source: filterSource || undefined,
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       assigned: filterAssigned || undefined,
     });
     if (res.success && res.data) {
@@ -56,7 +71,7 @@ export default function CampaignLeadsPage() {
       setUnassigned(res.data.unassigned);
     }
     setLoading(false);
-  }, [filterSource, search, filterAssigned]);
+  }, [page, filterSource, debouncedSearch, filterAssigned]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -270,6 +285,34 @@ export default function CampaignLeadsPage() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Pagination controls */}
+      {!loading && allLeads.length > 0 && (
+        <div className="shrink-0 border-t border-surface-200 bg-white px-5 py-3 flex items-center justify-between">
+          <div className="text-xs text-surface-500 font-medium">
+            Showing <b>{allLeads.length}</b> of <b>{total}</b> campaign leads
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="btn-secondary p-1.5 disabled:opacity-50"
+              disabled={page === 1}
+              onClick={() => setPage(p => p - 1)}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="text-xs font-bold text-surface-700 px-3 bg-white border border-surface-200 py-1.5 rounded-lg">
+              Page {page} of {Math.ceil(total / 50) || 1}
+            </div>
+            <button
+              className="btn-secondary p-1.5 disabled:opacity-50"
+              disabled={page * 50 >= total}
+              onClick={() => setPage(p => p + 1)}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

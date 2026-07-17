@@ -20,7 +20,9 @@ export default async function adminRoutes(app: FastifyInstance) {
         totalUsersResult,
         totalListingsResult,
         activeListingsResult,
-        pendingVerifResult,
+        totalProjectsResult,
+        pendingBrokerVerifResult,
+        pendingListingVerifResult,
         newUsersTodayResult,
         newListingsTodayResult,
         usersByRoleResult,
@@ -28,20 +30,16 @@ export default async function adminRoutes(app: FastifyInstance) {
         listingsByCityResult,
       ] = await Promise.all([
         db.select({ count: count() }).from(users),
-        db.select({ count: count() }).from(listings),
-        db.select({ count: count() }).from(listings).where(eq(listings.status, 'ACTIVE')),
-        db.select({ count: count() }).from(users).where(
-          and(eq(users.verificationStatus, 'PENDING'), eq(users.isActive, false))
-        ),
-        db.select({ count: count() }).from(users).where(
-          sql`created_at >= NOW() - INTERVAL '1 day'`
-        ),
-        db.select({ count: count() }).from(listings).where(
-          sql`created_at >= NOW() - INTERVAL '1 day'`
-        ),
+        db.select({ count: count() }).from(listings).where(and(isNull(listings.projectId), isNull(listings.deletedAt))),
+        db.select({ count: count() }).from(listings).where(and(eq(listings.status, 'ACTIVE'), isNull(listings.projectId), isNull(listings.deletedAt))),
+        db.select({ count: count() }).from(projects),
+        db.select({ count: count() }).from(users).where(and(eq(users.verificationStatus, 'PENDING'), sql`rega_licence IS NOT NULL`)),
+        db.select({ count: count() }).from(listings).where(and(eq(listings.status, 'FLAGGED'), isNull(listings.projectId), isNull(listings.deletedAt))),
+        db.select({ count: count() }).from(users).where(sql`created_at >= NOW() - INTERVAL '1 day'`),
+        db.select({ count: count() }).from(listings).where(and(sql`created_at >= NOW() - INTERVAL '1 day'`, isNull(listings.projectId), isNull(listings.deletedAt))),
         db.select({ role: users.role, count: count() }).from(users).groupBy(users.role),
-        db.select({ status: listings.status, count: count() }).from(listings).groupBy(listings.status),
-        db.select({ city: listings.city, count: count() }).from(listings).groupBy(listings.city).orderBy(desc(count())).limit(7),
+        db.select({ status: listings.status, count: count() }).from(listings).where(and(isNull(listings.projectId), isNull(listings.deletedAt))).groupBy(listings.status),
+        db.select({ city: listings.city, count: count() }).from(listings).where(and(isNull(listings.projectId), isNull(listings.deletedAt))).groupBy(listings.city).orderBy(desc(count())).limit(7),
       ]);
 
       const usersByRole: Record<string, number> = {};
@@ -59,21 +57,29 @@ export default async function adminRoutes(app: FastifyInstance) {
         if (r.city) listingsByCity[r.city] = Number(r.count);
       });
 
+      const pendingBrokerVerifications = Number(pendingBrokerVerifResult[0]?.count ?? 0);
+      const pendingListingVerifications = Number(pendingListingVerifResult[0]?.count ?? 0);
+      const pendingVerifications = pendingBrokerVerifications + pendingListingVerifications;
+
       return reply.send({
         success: true,
         data: {
           totalUsers: Number(totalUsersResult[0]?.count ?? 0),
           totalListings: Number(totalListingsResult[0]?.count ?? 0),
           activeListings: Number(activeListingsResult[0]?.count ?? 0),
-          pendingVerifications: Number(pendingVerifResult[0]?.count ?? 0),
-          totalRevenueSar: 0, // Placeholder until payment is integrated
+          totalProjects: Number(totalProjectsResult[0]?.count ?? 0),
+          activeProjects: Number(totalProjectsResult[0]?.count ?? 0),
+          pendingVerifications,
+          pendingBrokerVerifications,
+          pendingListingVerifications,
+          totalRevenueSar: 0,
           newUsersToday: Number(newUsersTodayResult[0]?.count ?? 0),
           newListingsToday: Number(newListingsTodayResult[0]?.count ?? 0),
           platformHealth: 'healthy',
           usersByRole,
           listingsByStatus,
           listingsByCity,
-          revenueByMonth: [], // Placeholder
+          revenueByMonth: [],
         }
       });
     } catch (err) {
@@ -282,7 +288,10 @@ export default async function adminRoutes(app: FastifyInstance) {
     const offset = (page - 1) * limit;
 
     try {
-      const conditions: any[] = [isNull(listings.deletedAt)];
+      const conditions: any[] = [
+        isNull(listings.deletedAt),
+        isNull(listings.projectId) // Hide project layouts from inventory control table
+      ];
       if (query.status) conditions.push(eq(listings.status, query.status as any));
       if (query.isFeatured === 'true') conditions.push(eq(listings.isFeatured, true));
 
@@ -1428,8 +1437,13 @@ export default async function adminRoutes(app: FastifyInstance) {
    */
   app.get('/reported-properties', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     try {
+      const page = (request.query as any)?.page ? Number((request.query as any).page) : undefined;
+      const limit = (request.query as any)?.limit ? Number((request.query as any).limit) : 20;
+      const search = (request.query as any)?.search || '';
+      const filterStatus = (request.query as any)?.status || 'ALL';
+
       // 1. Group reports by listingId and projectId with counts by status
-      const grouped = await db.select({
+      let baseQuery = db.select({
         listingId: listingReports.listingId,
         projectId: listingReports.projectId,
         count: count(listingReports.id),
@@ -1438,16 +1452,44 @@ export default async function adminRoutes(app: FastifyInstance) {
         dismissedCount: sql<number>`SUM(CASE WHEN ${listingReports.status} = 'DISMISSED' THEN 1 ELSE 0 END)::int`,
       })
         .from(listingReports)
-        .groupBy(listingReports.listingId, listingReports.projectId);
+        .leftJoin(listings, eq(listingReports.listingId, listings.id))
+        .leftJoin(projects, eq(listingReports.projectId, projects.id));
 
-      if (grouped.length === 0) {
+      const conditions = [];
+      if (search) {
+        conditions.push(or(
+          ilike(listings.enTitle, `%${search}%`),
+          ilike(listings.arTitle, `%${search}%`),
+          ilike(listings.shortId, `%${search}%`),
+          ilike(listings.city, `%${search}%`),
+          ilike(projects.nameEn, `%${search}%`),
+          ilike(projects.nameAr, `%${search}%`),
+          ilike(projects.city, `%${search}%`)
+        ));
+      }
+
+      let query = baseQuery.where(conditions.length > 0 ? and(...conditions) : undefined)
+        .groupBy(listingReports.listingId, listingReports.projectId, listings.id, projects.id);
+
+      if (filterStatus === 'PENDING') {
+        query = query.having(sql`SUM(CASE WHEN ${listingReports.status} = 'PENDING' THEN 1 ELSE 0 END) > 0`) as any;
+      } else if (filterStatus === 'RESOLVED_DISMISSED') {
+        query = query.having(sql`SUM(CASE WHEN ${listingReports.status} = 'PENDING' THEN 1 ELSE 0 END) = 0`) as any;
+      }
+
+      const allGrouped = await query;
+
+      if (allGrouped.length === 0) {
+        if (page) {
+          return reply.send({ success: true, data: { reported: [], total: 0, page, limit } });
+        }
         return reply.send({ success: true, data: [] });
       }
 
-      const listingIds = grouped.map(g => g.listingId).filter(Boolean) as string[];
-      const projectIds = grouped.map(g => g.projectId).filter(Boolean) as string[];
+      // Enriching details
+      const listingIds = allGrouped.map(g => g.listingId).filter(Boolean) as string[];
+      const projectIds = allGrouped.map(g => g.projectId).filter(Boolean) as string[];
 
-      // 2. Fetch details in parallel
       const [matchedListings, matchedProjects] = await Promise.all([
         listingIds.length > 0
           ? db.select({
@@ -1479,8 +1521,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       const projectsMap = new Map<string, typeof matchedProjects[0]>();
       matchedProjects.forEach(p => projectsMap.set(p.id, p));
 
-      // 3. Enrich the grouped data
-      const data = grouped.map(g => {
+      let enrichedData = allGrouped.map(g => {
         if (g.listingId) {
           const listing = listingsMap.get(g.listingId);
           return {
@@ -1516,7 +1557,22 @@ export default async function adminRoutes(app: FastifyInstance) {
         }
       }).sort((a, b) => b.reportCount - a.reportCount);
 
-      return reply.send({ success: true, data });
+      if (page) {
+        const total = enrichedData.length;
+        const offset = (page - 1) * limit;
+        const sliced = enrichedData.slice(offset, offset + limit);
+        return reply.send({
+          success: true,
+          data: {
+            reported: sliced,
+            total,
+            page,
+            limit
+          }
+        });
+      }
+
+      return reply.send({ success: true, data: enrichedData });
     } catch (err: any) {
       app.log.error(err);
       return reply.code(500).send({ success: false, message: 'Failed to fetch reported properties.' });

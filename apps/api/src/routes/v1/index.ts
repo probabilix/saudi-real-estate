@@ -13,6 +13,7 @@ import crmRoutes from './crm.routes';
 import mortgageRoutes from './mortgage.routes';
 import wizardRoutes from './wizard.routes';
 import billingRoutes from './billing.routes';
+import viewsRoutes from './views.routes';
 
 /**
  * API v1 Route Registration
@@ -74,4 +75,7 @@ export default async function v1Routes(app: FastifyInstance) {
 
   // ── Billing & Credits Module ──
   await app.register(billingRoutes, { prefix: '/billing' });
+
+  // ── Property View Tracking Module ──
+  await app.register(viewsRoutes, { prefix: '/views' });
 }

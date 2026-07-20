@@ -452,6 +452,11 @@ export class ListingService {
         processedBrochureUrl = await this.processBrochureUrl(processedBrochureUrl);
       }
 
+      let processedBrochureUrlAr = data.brochureUrlAr;
+      if (processedBrochureUrlAr) {
+        processedBrochureUrlAr = await this.processBrochureUrl(processedBrochureUrlAr);
+      }
+
       // ── Auto-parse lat/lng from mapEmbedUrl if not explicitly provided ──
       let lat = data.lat != null ? data.lat : null;
       let lng = data.lng != null ? data.lng : null;
@@ -466,6 +471,7 @@ export class ListingService {
       const newListing = await db.insert(listings).values({
         ...data,
         brochureUrl: processedBrochureUrl,
+        brochureUrlAr: processedBrochureUrlAr,
         lat,
         lng,
         id: undefined,
@@ -542,6 +548,9 @@ export class ListingService {
     // Process brochure URL if updated
     if (updateData.brochureUrl !== undefined && updateData.brochureUrl !== current.brochureUrl) {
       updateData.brochureUrl = await this.processBrochureUrl(updateData.brochureUrl);
+    }
+    if (updateData.brochureUrlAr !== undefined && updateData.brochureUrlAr !== current.brochureUrlAr) {
+      updateData.brochureUrlAr = await this.processBrochureUrl(updateData.brochureUrlAr);
     }
 
     // ── Auto-parse lat/lng from mapEmbedUrl if it changed and no explicit coords given ──

@@ -129,6 +129,7 @@ export interface Listing {
   youtubeUrl: string | null;
   videoUrl: string | null;
   brochureUrl: string | null;
+  brochureUrlAr: string | null;
   mapEmbedUrl: string | null;
   viewsCount: number;
   isFavorited?: boolean;

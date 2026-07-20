@@ -54,8 +54,6 @@ const NAV_AGENT = [
     items: [
       { href: '/website-leads', label: 'Website Leads', icon: Globe },
       { href: '/campaign-leads', label: 'Campaign Leads', icon: Megaphone },
-      { href: '/calculator-leads', label: 'Calculator Leads', icon: Calculator },
-      { href: '/mortgage-leads', label: 'Mortgage Leads', icon: CreditCard },
       // { href: '/whatsapp-inbox',  label: 'WhatsApp Inbox',  icon: MessageCircle, badge: 'NEW' },
     ],
   },

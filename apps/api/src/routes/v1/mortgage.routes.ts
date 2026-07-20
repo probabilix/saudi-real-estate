@@ -417,7 +417,7 @@ export default async function mortgageRoutes(app: FastifyInstance) {
    * GET /api/v1/mortgage/calculator-leads
    * Returns a grouped view of users who used the calculator and the properties they calculated on.
    */
-  app.get('/calculator-leads', { preHandler: [authenticateJWT] }, async (request, reply) => {
+  app.get('/calculator-leads', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     try {
       const page = (request.query as any)?.page ? Number((request.query as any).page) : undefined;
       const limit = (request.query as any)?.limit ? Number((request.query as any).limit) : 20;
@@ -591,7 +591,7 @@ export default async function mortgageRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/calculator-leads/:userId', { preHandler: [authenticateJWT] }, async (request, reply) => {
+  app.patch('/calculator-leads/:userId', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { userId } = request.params as { userId: string };
     const { status, notes } = request.body as { status?: string; notes?: string };
 

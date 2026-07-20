@@ -63,6 +63,7 @@ interface ProjectData {
   city: string;
   district: string | null;
   brochureUrl: string | null;
+  brochureUrlAr?: string | null;
   regaFalLicense: string | null;
   amenities: Record<string, boolean> | null;
   photos: string[] | null;
@@ -628,7 +629,7 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
             )}
 
             <div className="absolute bottom-4 left-4 flex flex-wrap gap-2 z-10">
-              {project.brochureUrl && (
+              {(project.brochureUrl || project.brochureUrlAr) && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setBrochureModalOpen(true); }}
                   className="bg-primary-600/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full border border-primary-500 flex items-center gap-2 hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/20"
@@ -821,7 +822,7 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
 
             {/* MOBILE ONLY: Digital Brochure and Broker card */}
             <div className="lg:hidden space-y-6 pb-6 border-b border-surface-150">
-              {project.brochureUrl && (
+              {(project.brochureUrl || project.brochureUrlAr) && (
                 <div className="relative overflow-hidden rounded-2xl p-6 border border-primary-500/20 bg-gradient-to-br from-primary-500/5 via-surface-50 to-primary-500/10 shadow-md space-y-4 font-sans">
                   <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-5">
                     <BookOpen className="w-32 h-32 text-primary-500" />
@@ -1415,7 +1416,7 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
           <div className="hidden lg:block space-y-6">
 
             {/* Direct Brochure Card in Desktop Sidebar */}
-            {project.brochureUrl && (
+            {(project.brochureUrl || project.brochureUrlAr) && (
               <div className="relative overflow-hidden rounded-2xl p-6 border border-primary-500/20 bg-gradient-to-br from-primary-500/5 via-surface-50 to-primary-500/10 shadow-md space-y-4 font-sans">
                 <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-5">
                   <BookOpen className="w-32 h-32 text-primary-500" />
@@ -1564,11 +1565,12 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
         </div>
       </div>
 
-      {project.brochureUrl && (
+      {(project.brochureUrl || project.brochureUrlAr) && (
         <BrochureModal
           isOpen={brochureModalOpen}
           onClose={() => setBrochureModalOpen(false)}
           brochureUrl={project.brochureUrl}
+          brochureUrlAr={project.brochureUrlAr}
         />
       )}
 

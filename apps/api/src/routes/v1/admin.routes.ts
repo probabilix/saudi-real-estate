@@ -1018,7 +1018,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   // ── Mortgage Leads Management ──
 
-  app.get('/mortgage-leads', { preHandler: [authenticateJWT] }, async (request, reply) => {
+  app.get('/mortgage-leads', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const query = request.query as {
       page?: string;
       limit?: string;
@@ -1175,7 +1175,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/mortgage-leads/export', { preHandler: [authenticateJWT] }, async (request, reply) => {
+  app.get('/mortgage-leads/export', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const query = request.query as {
       search?: string;
       status?: string;
@@ -1338,7 +1338,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/mortgage-leads/:id', { preHandler: [authenticateJWT] }, async (request, reply) => {
+  app.get('/mortgage-leads/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
       const [lead] = await db.select().from(mortgageLeads).where(eq(mortgageLeads.id, id)).limit(1);
@@ -1393,7 +1393,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/mortgage-leads/:id/status', { preHandler: [authenticateJWT] }, async (request, reply) => {
+  app.patch('/mortgage-leads/:id/status', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { status, notes } = request.body as { status?: string; notes?: string };
 

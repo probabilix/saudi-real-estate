@@ -74,6 +74,7 @@ export default function CreateProjectPage() {
   const [descriptionEn, setDescriptionEn] = useState('');
   const [descriptionAr, setDescriptionAr] = useState('');
   const [brochureUrl, setBrochureUrl] = useState('');
+  const [brochureUrlAr, setBrochureUrlAr] = useState('');
   const [regaFalLicense, setRegaFalLicense] = useState('');
   const [completionStatus, setCompletionStatus] = useState<'READY' | 'OFF_PLAN' | 'UNDER_CONSTRUCTION'>('READY');
   const [expectedDelivery, setExpectedDelivery] = useState('');
@@ -156,7 +157,7 @@ export default function CreateProjectPage() {
     if (nameEn || nameAr || district || descriptionEn || layouts.length > 1 || layouts[0].price || photos.length > 0) {
       const draft = {
         nameEn, nameAr, city, district, descriptionEn, descriptionAr,
-        brochureUrl, regaFalLicense, completionStatus, expectedDelivery,
+        brochureUrl, brochureUrlAr, regaFalLicense, completionStatus, expectedDelivery,
         totalUnits, mapEmbedUrl, photos, amenities, isFeatured, featuredOrder,
         foreignerEligible, muslimOnly,
         layouts,
@@ -164,7 +165,7 @@ export default function CreateProjectPage() {
       };
       localStorage.setItem('tamleeq_project_create_draft', JSON.stringify(draft));
     }
-  }, [nameEn, nameAr, city, district, descriptionEn, descriptionAr, brochureUrl, regaFalLicense, completionStatus, expectedDelivery, totalUnits, mapEmbedUrl, photos, amenities, isFeatured, featuredOrder, foreignerEligible, muslimOnly, layouts]);
+  }, [nameEn, nameAr, city, district, descriptionEn, descriptionAr, brochureUrl, brochureUrlAr, regaFalLicense, completionStatus, expectedDelivery, totalUnits, mapEmbedUrl, photos, amenities, isFeatured, featuredOrder, foreignerEligible, muslimOnly, layouts]);
 
   const restoreDraft = () => {
     const saved = localStorage.getItem('tamleeq_project_create_draft');
@@ -178,6 +179,7 @@ export default function CreateProjectPage() {
         setDescriptionEn(parsed.descriptionEn || '');
         setDescriptionAr(parsed.descriptionAr || '');
         setBrochureUrl(parsed.brochureUrl || '');
+        setBrochureUrlAr(parsed.brochureUrlAr || '');
         setRegaFalLicense(parsed.regaFalLicense || '');
         setCompletionStatus(parsed.completionStatus || 'READY');
         setExpectedDelivery(parsed.expectedDelivery || '');
@@ -260,7 +262,7 @@ export default function CreateProjectPage() {
       const payload = {
         project: {
           nameEn, nameAr, city, district, descriptionEn, descriptionAr,
-          brochureUrl, regaFalLicense, completionStatus, expectedDelivery,
+          brochureUrl, brochureUrlAr, regaFalLicense, completionStatus, expectedDelivery,
           totalUnits: totalUnits ? Number(totalUnits) : undefined,
           mapEmbedUrl, photos, amenities: cleanAmenities,
           isFeatured,
@@ -403,14 +405,18 @@ export default function CreateProjectPage() {
                 </div>
               </div>
 
-              {/* REGA + Brochure */}
+              {/* REGA FAL License */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="admin-label flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> REGA FAL License</label>
                   <input type="text" className="admin-input" placeholder="e.g. 1234567890" value={regaFalLicense} onChange={e => setRegaFalLicense(e.target.value)} />
                 </div>
+              </div>
+
+              {/* Brochures (English & Arabic) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="admin-label flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Project Brochure PDF Document</label>
+                  <label className="admin-label flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Project Brochure (English)</label>
                   <div className="flex items-center gap-3">
                     <div className="flex-1 bg-surface-50 border border-surface-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-surface-600 truncate">
                       {brochureUrl || 'No brochure file uploaded'}
@@ -439,7 +445,44 @@ export default function CreateProjectPage() {
                           onClick={() => open()}
                           className="btn-secondary shrink-0 whitespace-nowrap py-2.5"
                         >
-                          <Upload className="w-4 h-4" /> Upload PDF
+                          <Upload className="w-4 h-4" /> Upload English PDF
+                        </button>
+                      )}
+                    </CldUploadWidget>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="admin-label flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Project Brochure (Arabic)</label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-surface-50 border border-surface-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-surface-600 truncate">
+                      {brochureUrlAr || 'No brochure file uploaded'}
+                    </div>
+                    {brochureUrlAr && (
+                      <button
+                        type="button"
+                        onClick={() => setBrochureUrlAr('')}
+                        className="p-2.5 text-red-500 hover:text-red-700 bg-red-50 border border-red-200 rounded-xl transition-colors shrink-0"
+                        title="Remove Brochure"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    <CldUploadWidget
+                      uploadPreset="saudi_re_listing"
+                      onSuccess={(result: any) => {
+                        if (result.event === 'success' && result.info?.secure_url) {
+                          setBrochureUrlAr(result.info.secure_url);
+                        }
+                      }}
+                    >
+                      {({ open }) => (
+                        <button
+                          type="button"
+                          onClick={() => open()}
+                          className="btn-secondary shrink-0 whitespace-nowrap py-2.5"
+                        >
+                          <Upload className="w-4 h-4" /> Upload Arabic PDF
                         </button>
                       )}
                     </CldUploadWidget>

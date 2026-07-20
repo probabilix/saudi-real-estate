@@ -279,6 +279,7 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
         youtubeUrl: typeof data.youtubeUrl === 'string' && data.youtubeUrl.trim() === '' ? undefined : data.youtubeUrl ?? undefined,
         videoUrl: typeof data.videoUrl === 'string' && data.videoUrl.trim() === '' ? undefined : data.videoUrl ?? undefined,
         brochureUrl: typeof data.brochureUrl === 'string' && data.brochureUrl.trim() === '' ? undefined : data.brochureUrl ?? undefined,
+        brochureUrlAr: typeof data.brochureUrlAr === 'string' && data.brochureUrlAr.trim() === '' ? undefined : data.brochureUrlAr ?? undefined,
         mapEmbedUrl: typeof data.mapEmbedUrl === 'string' && data.mapEmbedUrl.trim() === '' ? undefined : data.mapEmbedUrl ?? undefined,
         lat: data.lat === null || data.lat === '' ? undefined : data.lat,
         lng: data.lng === null || data.lng === '' ? undefined : data.lng,
@@ -337,6 +338,7 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       youtubeUrl: '',
       videoUrl: '',
       brochureUrl: '',
+      brochureUrlAr: '',
       mapEmbedUrl: ''
     }
   });
@@ -552,6 +554,7 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       youtubeUrl: initialData.youtubeUrl ?? undefined,
       videoUrl: initialData.videoUrl ?? undefined,
       brochureUrl: initialData.brochureUrl ?? undefined,
+      brochureUrlAr: initialData.brochureUrlAr ?? undefined,
       mapEmbedUrl: initialData.mapEmbedUrl ?? undefined,
     };
 
@@ -677,6 +680,7 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
       youtubeUrl: data.youtubeUrl ?? undefined,
       videoUrl: data.videoUrl ?? undefined,
       brochureUrl: data.brochureUrl && (data.brochureUrl as string).trim() !== '' ? (data.brochureUrl as string) : undefined,
+      brochureUrlAr: data.brochureUrlAr && (data.brochureUrlAr as string).trim() !== '' ? (data.brochureUrlAr as string) : undefined,
       mapEmbedUrl: data.mapEmbedUrl && (data.mapEmbedUrl as string).trim() !== '' ? (data.mapEmbedUrl as string) : undefined,
       lat: data.lat !== undefined && data.lat !== null ? Number(data.lat) : undefined,
       lng: data.lng !== undefined && data.lng !== null ? Number(data.lng) : undefined,
@@ -1580,95 +1584,175 @@ export const ListingForm: React.FC<ListingFormProps> = ({ initialData, isEdit, i
                         <input {...methods.register('videoUrl')} placeholder="https://..." className="w-full bg-transparent py-2 text-white font-bold outline-none placeholder:text-white/10" />
                       </div>
                     </InputField>
-                    {/* PDF Brochure Upload — Simplified Direct / Google Drive Link field with automatic booklet converter */}
+                    {/* PDF Brochure Upload — English & Arabic with automatic booklet converter */}
                     <div className="col-span-1 md:col-span-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-white/40 block mb-4">PDF Brochure</label>
-                      <div className="flex flex-col gap-4 p-6 rounded-2xl border border-white/10 bg-white/5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-white/40 block mb-4">Digital Brochure Booklets</label>
+                      <div className="flex flex-col gap-6 p-6 rounded-2xl border border-white/10 bg-white/5">
                         <div className="flex items-start gap-4">
                           <BookOpen className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
                           <div className="flex-1 min-w-0 space-y-1">
-                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Bilingual Digital Brochure Booklet</h4>
+                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Bilingual Digital Brochure Booklets</h4>
                             <p className="text-white/40 text-[10px] font-medium leading-relaxed">
-                              Paste your public **Google Drive share link**, Dropbox link, or direct PDF URL. Our backend will automatically synchronize the file and generate an immersive, interactive 3D booklet catalog on the public property page.
+                              Paste your public **Google Drive share link**, Dropbox link, or direct PDF URL. Our backend will automatically generate immersive, interactive 3D booklet catalogs on the public property page.
                             </p>
                           </div>
                         </div>
                         
                         <div className="h-px bg-white/10 w-full" />
                         
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[9px] font-black uppercase tracking-widest text-emerald-400/80 block">PDF File / Google Drive Link</label>
-                            {methods.watch('brochureUrl') && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                                  ✓ Booklet Configured
-                                </span>
-                                <a 
-                                  href={methods.watch('brochureUrl') as string} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className="text-[9px] font-black uppercase tracking-widest text-white/40 hover:text-white underline"
-                                >
-                                  Preview Link
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="flex-1">
-                              <input 
-                                type="text" 
-                                {...methods.register('brochureUrl')}
-                                placeholder="Paste link here or upload a file directly →" 
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs outline-none focus:border-primary-500 transition-all placeholder:text-white/10" 
-                              />
-                            </div>
-                            <CldUploadWidget
-                              uploadPreset="saudi_re_listing"
-                              onSuccess={(result: any) => {
-                                if (result.event === 'success' && result.info?.secure_url) {
-                                  methods.setValue('brochureUrl', result.info.secure_url);
-                                }
-                              }}
-                              options={{
-                                maxFiles: 1,
-                                clientAllowedFormats: ['pdf'],
-                                sources: ['local', 'google_drive', 'dropbox'],
-                                resourceType: 'image',
-                                styles: {
-                                  palette: {
-                                    window: '#0F172A',
-                                    sourceBg: '#1E293B',
-                                    windowBorder: '#334155',
-                                    tabIcon: '#10B981',
-                                    inactiveTabIcon: '#64748B',
-                                    menuIcons: '#F1F5F9',
-                                    link: '#10B981',
-                                    action: '#10B981',
-                                    inProgress: '#10B981',
-                                    complete: '#10B981',
-                                    error: '#F43F5E',
-                                    textDark: '#000000',
-                                    textLight: '#FFFFFF'
-                                  }
-                                }
-                              }}
-                            >
-                              {(widget) => (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (widget && typeof widget.open === 'function') {
-                                      widget.open();
-                                    }
-                                  }}
-                                  className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md transform hover:scale-105 active:scale-95 shrink-0"
-                                >
-                                  Upload PDF
-                                </button>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* English Brochure */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[9px] font-black uppercase tracking-widest text-emerald-400/80 block">English PDF / Google Drive Link</label>
+                              {methods.watch('brochureUrl') && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                                    ✓ Configured
+                                  </span>
+                                  <a 
+                                    href={methods.watch('brochureUrl') as string} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="text-[9px] font-black uppercase tracking-widest text-white/40 hover:text-white underline"
+                                  >
+                                    Preview
+                                  </a>
+                                </div>
                               )}
-                            </CldUploadWidget>
+                            </div>
+                            <div className="flex gap-3">
+                              <div className="flex-1">
+                                <input 
+                                  type="text" 
+                                  {...methods.register('brochureUrl')}
+                                  placeholder="Paste English link here →" 
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white font-bold text-xs outline-none focus:border-primary-500 transition-all placeholder:text-white/10" 
+                                />
+                              </div>
+                              <CldUploadWidget
+                                uploadPreset="saudi_re_listing"
+                                onSuccess={(result: any) => {
+                                  if (result.event === 'success' && result.info?.secure_url) {
+                                    methods.setValue('brochureUrl', result.info.secure_url);
+                                  }
+                                }}
+                                options={{
+                                  maxFiles: 1,
+                                  clientAllowedFormats: ['pdf'],
+                                  sources: ['local', 'google_drive', 'dropbox'],
+                                  resourceType: 'image',
+                                  styles: {
+                                    palette: {
+                                      window: '#0F172A',
+                                      sourceBg: '#1E293B',
+                                      windowBorder: '#334155',
+                                      tabIcon: '#10B981',
+                                      inactiveTabIcon: '#64748B',
+                                      menuIcons: '#F1F5F9',
+                                      link: '#10B981',
+                                      action: '#10B981',
+                                      inProgress: '#10B981',
+                                      complete: '#10B981',
+                                      error: '#F43F5E',
+                                      textDark: '#000000',
+                                      textLight: '#FFFFFF'
+                                    }
+                                  }
+                                }}
+                              >
+                                {(widget) => (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (widget && typeof widget.open === 'function') {
+                                        widget.open();
+                                      }
+                                    }}
+                                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md shrink-0"
+                                  >
+                                    Upload
+                                  </button>
+                                )}
+                              </CldUploadWidget>
+                            </div>
+                          </div>
+
+                          {/* Arabic Brochure */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[9px] font-black uppercase tracking-widest text-emerald-400/80 block">Arabic PDF / Google Drive Link</label>
+                              {methods.watch('brochureUrlAr') && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                                    ✓ Configured
+                                  </span>
+                                  <a 
+                                    href={methods.watch('brochureUrlAr') as string} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="text-[9px] font-black uppercase tracking-widest text-white/40 hover:text-white underline"
+                                  >
+                                    Preview
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex gap-3">
+                              <div className="flex-1">
+                                <input 
+                                  type="text" 
+                                  {...methods.register('brochureUrlAr')}
+                                  placeholder="Paste Arabic link here →" 
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white font-bold text-xs outline-none focus:border-primary-500 transition-all placeholder:text-white/10" 
+                                />
+                              </div>
+                              <CldUploadWidget
+                                uploadPreset="saudi_re_listing"
+                                onSuccess={(result: any) => {
+                                  if (result.event === 'success' && result.info?.secure_url) {
+                                    methods.setValue('brochureUrlAr', result.info.secure_url);
+                                  }
+                                }}
+                                options={{
+                                  maxFiles: 1,
+                                  clientAllowedFormats: ['pdf'],
+                                  sources: ['local', 'google_drive', 'dropbox'],
+                                  resourceType: 'image',
+                                  styles: {
+                                    palette: {
+                                      window: '#0F172A',
+                                      sourceBg: '#1E293B',
+                                      windowBorder: '#334155',
+                                      tabIcon: '#10B981',
+                                      inactiveTabIcon: '#64748B',
+                                      menuIcons: '#F1F5F9',
+                                      link: '#10B981',
+                                      action: '#10B981',
+                                      inProgress: '#10B981',
+                                      complete: '#10B981',
+                                      error: '#F43F5E',
+                                      textDark: '#000000',
+                                      textLight: '#FFFFFF'
+                                    }
+                                  }
+                                }}
+                              >
+                                {(widget) => (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (widget && typeof widget.open === 'function') {
+                                        widget.open();
+                                      }
+                                    }}
+                                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md shrink-0"
+                                  >
+                                    Upload
+                                  </button>
+                                )}
+                              </CldUploadWidget>
+                            </div>
                           </div>
                         </div>
                       </div>

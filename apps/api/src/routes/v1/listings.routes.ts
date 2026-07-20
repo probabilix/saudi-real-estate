@@ -937,6 +937,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
         descriptionEn?: string;
         descriptionAr?: string;
         brochureUrl?: string;
+        brochureUrlAr?: string;
         regaFalLicense?: string;
         amenities?: Record<string, boolean>;
         photos?: string[];
@@ -993,6 +994,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
         lat: projectCoords ? String(projectCoords.lat) : null,
         lng: projectCoords ? String(projectCoords.lng) : null,
         brochureUrl: project.brochureUrl,
+        brochureUrlAr: project.brochureUrlAr,
         regaFalLicense: project.regaFalLicense,
         amenities: project.amenities || {},
         photos: project.photos || [],
@@ -1040,6 +1042,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
           bathrooms: layout.bathrooms || null,
           photos: layout.photos && layout.photos.length > 0 ? layout.photos : (project.photos || []),
           brochureUrl: project.brochureUrl || null,
+          brochureUrlAr: project.brochureUrlAr || null,
           regaFalLicense: project.regaFalLicense || null,
           regaAdvertisingLicense: project.regaFalLicense || null, // inherits project license
           amenities: project.amenities || {},
@@ -1120,6 +1123,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
       district,
       mapEmbedUrl,
       brochureUrl,
+      brochureUrlAr,
       regaFalLicense,
       amenities,
       photos,
@@ -1161,6 +1165,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
           lat: latVal,
           lng: lngVal,
           brochureUrl: brochureUrl || null,
+          brochureUrlAr: brochureUrlAr || null,
           regaFalLicense: regaFalLicense || null,
           amenities: amenities || {},
           photos: photos || [],
@@ -1185,6 +1190,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
       await db.update(listings)
         .set({
           brochureUrl: brochureUrl || null,
+          brochureUrlAr: brochureUrlAr || null,
           regaFalLicense: regaFalLicense || null,
           city,
           district: district || null,
@@ -1245,6 +1251,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
                 photos: layout.photos || [],
                 completionStatus: layout.completionStatus || completionStatus,
                 brochureUrl: brochureUrl || null,
+                brochureUrlAr: brochureUrlAr || null,
                 regaFalLicense: regaFalLicense || null,
                 city,
                 district: district || null,
@@ -1274,6 +1281,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
               completionStatus: layout.completionStatus || completionStatus,
               regaFalLicense: regaFalLicense || null,
               brochureUrl: brochureUrl || null,
+              brochureUrlAr: brochureUrlAr || null,
               shortId,
               createdAt: new Date(),
               updatedAt: new Date()
@@ -1328,6 +1336,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
       if (body.lng !== undefined) updateData.lng = body.lng;
 
       if (body.brochureUrl !== undefined) updateData.brochureUrl = body.brochureUrl;
+      if (body.brochureUrlAr !== undefined) updateData.brochureUrlAr = body.brochureUrlAr;
       if (body.regaFalLicense !== undefined) updateData.regaFalLicense = body.regaFalLicense;
       if (body.amenities !== undefined) updateData.amenities = body.amenities;
       if (body.photos !== undefined) updateData.photos = body.photos;
@@ -1348,6 +1357,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
       if (body.district !== undefined) propagateData.district = body.district;
       if (body.regaFalLicense !== undefined) propagateData.regaFalLicense = body.regaFalLicense;
       if (body.brochureUrl !== undefined) propagateData.brochureUrl = body.brochureUrl;
+      if (body.brochureUrlAr !== undefined) propagateData.brochureUrlAr = body.brochureUrlAr;
 
       if (Object.keys(propagateData).length > 0) {
         propagateData.updatedAt = new Date();

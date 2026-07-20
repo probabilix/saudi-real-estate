@@ -6,20 +6,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, ChevronLeft, ChevronRight, BookOpen, Plus, Minus
 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 
 interface BrochureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  brochureUrl: string;
+  brochureUrl: string | null;
+  brochureUrlAr?: string | null;
 }
 
 export default function BrochureModal({ 
   isOpen, 
   onClose, 
-  brochureUrl 
+  brochureUrl,
+  brochureUrlAr
 }: BrochureModalProps) {
   const t = useTranslations('listing');
+  const locale = useLocale();
+  const [selectedLang, setSelectedLang] = useState<'en' | 'ar'>('en');
   const [brochurePage, setBrochurePage] = useState(1);
   const [brochureMaxPages, setBrochureMaxPages] = useState(50);
   const [cloudinaryError, setCloudinaryError] = useState(false);
@@ -41,8 +45,14 @@ export default function BrochureModal({
       setBrochureMaxPages(50);
       setCloudinaryError(false);
       setPhotoScale(1);
+
+      // Determine default language on modal open based on active locale & availability
+      const defaultLang = locale === 'ar'
+        ? (brochureUrlAr ? 'ar' : 'en')
+        : (brochureUrl ? 'en' : 'ar');
+      setSelectedLang(defaultLang);
     }
-  }, [isOpen]);
+  }, [isOpen, locale, brochureUrl, brochureUrlAr]);
 
   // Handle Keyboard Navigation
   useEffect(() => {
@@ -59,9 +69,13 @@ export default function BrochureModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, brochurePage, brochureMaxPages, isMobile, onClose]);
 
-  if (!isOpen || !brochureUrl) return null;
+  const currentBrochureUrl = selectedLang === 'ar'
+    ? (brochureUrlAr || brochureUrl)
+    : (brochureUrl || brochureUrlAr);
 
-  const isCloudinary = brochureUrl.includes('res.cloudinary.com');
+  if (!isOpen || !currentBrochureUrl) return null;
+
+  const isCloudinary = currentBrochureUrl.includes('res.cloudinary.com');
   const useCloudinaryBooklet = isCloudinary && !cloudinaryError;
 
   const getBrochureEmbedUrl = (url: string) => {
@@ -74,7 +88,7 @@ export default function BrochureModal({
     return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
   };
 
-  const embedSrc = getBrochureEmbedUrl(brochureUrl);
+  const embedSrc = getBrochureEmbedUrl(currentBrochureUrl);
 
   const getDownloadUrl = (url: string) => {
     if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
@@ -82,7 +96,7 @@ export default function BrochureModal({
     }
     return url;
   };
-  const downloadUrl = getDownloadUrl(brochureUrl);
+  const downloadUrl = getDownloadUrl(currentBrochureUrl);
 
   const getCloudinaryPageUrl = (url: string, pageNumber: number) => {
     if (!url.includes('res.cloudinary.com')) return url;
@@ -174,23 +188,59 @@ export default function BrochureModal({
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <a
-              href={brochureUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider transition-all text-white active:scale-95 inline-flex items-center justify-center"
-            >
-              Open Direct ↗
-            </a>
-            <a
-              href={downloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider transition-all text-white active:scale-95 inline-flex items-center justify-center"
-            >
-              Download PDF ↓
-            </a>
+          <div className="flex items-center gap-4">
+            {/* Bilingual Switch (only shown if both brochure options are present) */}
+            {brochureUrl && brochureUrlAr && (
+              <div className="flex bg-white/5 p-1 rounded-full border border-white/10">
+                <button
+                  onClick={() => {
+                    setSelectedLang('en');
+                    setBrochurePage(1);
+                    setPhotoScale(1);
+                  }}
+                  className={`px-3 py-1 rounded-full text-[9px] font-black tracking-widest transition-all ${
+                    selectedLang === 'en'
+                      ? 'bg-primary-500 text-white shadow-md'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  EN
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedLang('ar');
+                    setBrochurePage(1);
+                    setPhotoScale(1);
+                  }}
+                  className={`px-3 py-1 rounded-full text-[9px] font-black tracking-widest transition-all ${
+                    selectedLang === 'ar'
+                      ? 'bg-primary-500 text-white shadow-md'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  AR
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <a
+                href={currentBrochureUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider transition-all text-white active:scale-95 inline-flex items-center justify-center"
+              >
+                Open Direct ↗
+              </a>
+              <a
+                href={downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider transition-all text-white active:scale-95 inline-flex items-center justify-center"
+              >
+                Download PDF ↓
+              </a>
+            </div>
           </div>
         </div>
 
@@ -250,7 +300,7 @@ export default function BrochureModal({
                         {((!isMobile && brochurePage === 1) || isMobile) ? (
                           <div className="relative h-full aspect-[1/1.414] max-h-[90vh] rounded-2xl overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] border border-white/10 bg-white">
                             <Image
-                              src={getCloudinaryPageUrl(brochureUrl, brochurePage)}
+                              src={getCloudinaryPageUrl(currentBrochureUrl, brochurePage)}
                               alt={`Brochure Page ${brochurePage}`}
                               fill
                               sizes="(max-width: 768px) 100vw, 650px"
@@ -269,7 +319,7 @@ export default function BrochureModal({
                             {/* Left Page */}
                             <div className="w-1/2 h-full relative border-r border-black/25 bg-white">
                               <Image
-                                src={getCloudinaryPageUrl(brochureUrl, brochurePage)}
+                                src={getCloudinaryPageUrl(currentBrochureUrl, brochurePage)}
                                 alt={`Brochure Page ${brochurePage}`}
                                 fill
                                 sizes="600px"
@@ -286,7 +336,7 @@ export default function BrochureModal({
                               {brochurePage + 1 <= brochureMaxPages ? (
                                 <>
                                   <Image
-                                    src={getCloudinaryPageUrl(brochureUrl, brochurePage + 1)}
+                                    src={getCloudinaryPageUrl(currentBrochureUrl, brochurePage + 1)}
                                     alt={`Brochure Page ${brochurePage + 1}`}
                                     fill
                                     sizes="600px"

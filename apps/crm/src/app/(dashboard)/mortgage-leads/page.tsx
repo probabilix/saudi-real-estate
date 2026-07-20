@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { crmApi, CrmMortgageLead } from '@/lib/api';
 import { CrmTopBar } from '@/components/CrmSidebar';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
@@ -37,7 +38,15 @@ const BANKS_LIST = [
 ];
 
 export default function MortgageLeadsPage() {
-  const { user } = useCrmAuth();
+  const { user, isAdmin, loading: authLoading } = useCrmAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      router.replace('/');
+    }
+  }, [authLoading, isAdmin, router]);
+
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<CrmMortgageLead[]>([]);
   const [total, setTotal] = useState(0);
@@ -156,7 +165,7 @@ export default function MortgageLeadsPage() {
       if (filterDateEnd) q.set('dateEnd', filterDateEnd);
 
       const token = localStorage.getItem('crmToken');
-      const response = await fetch(`${API_BASE}/mortgage-leads/export?${q}`, {
+      const response = await fetch(`${API_BASE}/admin/mortgage-leads/export?${q}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -184,6 +193,18 @@ export default function MortgageLeadsPage() {
     const num = typeof val === 'string' ? parseFloat(val) : val;
     return `${Math.round(num).toLocaleString()} SAR`;
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8 bg-canvas">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col h-full bg-canvas/30">

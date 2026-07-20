@@ -586,6 +586,7 @@ export interface AdminProject {
   district: string | null;
   mapEmbedUrl: string | null;
   brochureUrl?: string | null;
+  brochureUrlAr?: string | null;
   regaFalLicense?: string | null;
   amenities?: Record<string, boolean> | null;
   photos?: string[] | null;

@@ -135,6 +135,7 @@ export const projects = pgTable('projects', {
 
   // ── Project-level shared fields (uploaded once, inherited by all layouts) ──
   brochureUrl: text('brochure_url'),
+  brochureUrlAr: text('brochure_url_ar'),
   regaFalLicense: varchar('rega_fal_license', { length: 100 }),
   amenities: jsonb('amenities').default({}),
   photos: text('photos').array().default(sql`'{}'::text[]`),
@@ -192,6 +193,7 @@ export const listings = pgTable('listings', {
   youtubeUrl: varchar('youtube_url', { length: 255 }),
   videoUrl: text('video_url'), // Cloudinary video link
   brochureUrl: text('brochure_url'), // Cloudinary PDF Brochure link
+  brochureUrlAr: text('brochure_url_ar'), // Cloudinary PDF Arabic Brochure link
   mapEmbedUrl: text('map_embed_url'), // Interactive Google Maps Embed link/HTML
   amenities: jsonb('amenities').default({}),
   history: jsonb('history').default([]),

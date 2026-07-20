@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { crmApi } from '@/lib/api';
 import { CrmTopBar } from '@/components/CrmSidebar';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
@@ -46,7 +47,15 @@ interface CalculatorLead {
 }
 
 export default function CalculatorLeadsPage() {
-  const { user } = useCrmAuth();
+  const { user, isAdmin, loading: authLoading } = useCrmAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      router.replace('/');
+    }
+  }, [authLoading, isAdmin, router]);
+
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<CalculatorLead[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -148,6 +157,18 @@ export default function CalculatorLeadsPage() {
     if (val === null || val === undefined) return 'Ask Price';
     return `${Math.round(val).toLocaleString()} SAR`;
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8 bg-surface-50">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-surface-50 overflow-y-auto">

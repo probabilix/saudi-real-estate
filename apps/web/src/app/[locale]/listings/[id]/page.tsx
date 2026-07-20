@@ -459,7 +459,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
               )}
             </div>
             <div className="absolute bottom-4 left-4 flex flex-wrap gap-2 z-10">
-              {l.brochureUrl && (
+              {(l.brochureUrl || l.brochureUrlAr) && (
                 <button onClick={(e) => { e.stopPropagation(); setBrochureModalOpen(true); }} className="bg-primary-600/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full border border-primary-500 flex items-center gap-2 hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/20">
                   <BookOpen className="w-3.5 h-3.5" />{t('brochure') || 'Brochure'}
                 </button>
@@ -667,7 +667,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
             {/* ── MOBILE ONLY: Agent Card after Property Info ── */}
             <div className="lg:hidden space-y-6">
-              {l.brochureUrl && (
+              {(l.brochureUrl || l.brochureUrlAr) && (
                 <div className="relative overflow-hidden rounded-2xl p-6 border border-primary-500/20 bg-gradient-to-br from-primary-500/5 via-surface-50 to-primary-500/10 shadow-md space-y-4">
                   <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-5">
                     <BookOpen className="w-32 h-32 text-primary-500" />
@@ -881,7 +881,7 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
 
           {/* ── RIGHT SIDEBAR (Desktop only) ── */}
           <div className="hidden lg:block space-y-6">
-            {l.brochureUrl && (
+            {(l.brochureUrl || l.brochureUrlAr) && (
               <div className="relative overflow-hidden rounded-2xl p-6 border border-primary-500/20 bg-gradient-to-br from-primary-500/5 via-surface-50 to-primary-500/10 shadow-md space-y-4">
                 <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-5">
                   <BookOpen className="w-32 h-32 text-primary-500" />
@@ -1038,11 +1038,12 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
       />
 
       {/* Dedicated Fullscreen Brochure Modal */}
-      {l.brochureUrl && (
+      {(l.brochureUrl || l.brochureUrlAr) && (
         <BrochureModal
           isOpen={brochureModalOpen}
           onClose={() => setBrochureModalOpen(false)}
           brochureUrl={l.brochureUrl}
+          brochureUrlAr={l.brochureUrlAr}
         />
       )}
 

@@ -55,6 +55,7 @@ interface ProjectFormState {
   descriptionEn: string;
   descriptionAr: string;
   brochureUrl: string;
+  brochureUrlAr: string;
   regaFalLicense: string;
   amenities: Record<string, boolean>;
   photos: string[];
@@ -127,6 +128,7 @@ export default function EditProjectPage() {
     descriptionEn: '',
     descriptionAr: '',
     brochureUrl: '',
+    brochureUrlAr: '',
     regaFalLicense: '',
     amenities: {},
     photos: [],
@@ -280,6 +282,7 @@ export default function EditProjectPage() {
           descriptionEn: p.descriptionEn || '',
           descriptionAr: p.descriptionAr || '',
           brochureUrl: p.brochureUrl || '',
+          brochureUrlAr: p.brochureUrlAr || '',
           regaFalLicense: p.regaFalLicense || '',
           amenities: amenitiesState,
           photos: p.photos || [],
@@ -627,10 +630,10 @@ export default function EditProjectPage() {
                 )}
               </div>
 
-              {/* Brochure PDF Upload */}
+              {/* Brochures (English & Arabic) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="admin-label">Project Brochure PDF Document</label>
+                  <label className="admin-label">Project Brochure (English)</label>
                   <div className="flex items-center gap-3">
                     <div className="flex-1 bg-surface-50 border border-surface-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-surface-600 truncate">
                       {projectData.brochureUrl || 'No brochure file uploaded'}
@@ -659,13 +662,53 @@ export default function EditProjectPage() {
                           onClick={() => open()}
                           className="btn-secondary shrink-0 whitespace-nowrap py-2.5"
                         >
-                          <Upload className="w-4 h-4" /> Upload PDF
+                          <Upload className="w-4 h-4" /> Upload English PDF
                         </button>
                       )}
                     </CldUploadWidget>
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="admin-label">Project Brochure (Arabic)</label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-surface-50 border border-surface-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-surface-600 truncate">
+                      {projectData.brochureUrlAr || 'No brochure file uploaded'}
+                    </div>
+                    {projectData.brochureUrlAr && (
+                      <button
+                        type="button"
+                        onClick={() => handleProjectChange('brochureUrlAr', '')}
+                        className="p-2.5 text-red-500 hover:text-red-700 bg-red-50 border border-red-200 rounded-xl transition-colors shrink-0"
+                        title="Remove Brochure"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    <CldUploadWidget
+                      uploadPreset="saudi_re_listing"
+                      onSuccess={(result: any) => {
+                        if (result.event === 'success' && result.info?.secure_url) {
+                          handleProjectChange('brochureUrlAr', result.info.secure_url);
+                        }
+                      }}
+                    >
+                      {({ open }) => (
+                        <button
+                          type="button"
+                          onClick={() => open()}
+                          className="btn-secondary shrink-0 whitespace-nowrap py-2.5"
+                        >
+                          <Upload className="w-4 h-4" /> Upload Arabic PDF
+                        </button>
+                      )}
+                    </CldUploadWidget>
+                  </div>
+                </div>
+              </div>
+
+              {/* Map Embed URL */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="admin-label">Google Maps Embed URL</label>
                   <input

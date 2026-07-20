@@ -74,6 +74,7 @@ export const createListingSchema = z.object({
   youtubeUrl: z.string().url().max(255).optional().nullable(),
   videoUrl: z.string().url().optional().nullable(),
   brochureUrl: z.string().url().optional().nullable(),
+  brochureUrlAr: z.string().url().optional().nullable(),
   mapEmbedUrl: z.string().optional().nullable(),
   shortId: z.string().max(20).optional(),
   addedOn: z.string().optional(),

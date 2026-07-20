@@ -7,6 +7,118 @@ import { motion } from 'framer-motion';
 import { Calendar, User, ArrowLeft, Share2, Facebook, Twitter, Linkedin, Loader2, Bookmark } from 'lucide-react';
 import { api, NewsPost } from '@/lib/api';
 
+function parseInlineMarkdown(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline font-bold">$1</a>');
+}
+
+function parseMarkdown(md: string): string {
+  if (!md) return '';
+
+  const lines = md.split('\n');
+  let html = '';
+  let inList = false;
+  let inTable = false;
+  let tableHeaderParsed = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const trimmed = line.trim();
+
+    // Handle tables
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      if (!inTable) {
+        inTable = true;
+        tableHeaderParsed = false;
+        html += '<div class="overflow-x-auto my-6"><table class="w-full text-sm border-collapse border border-gray-200">';
+      }
+      const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
+      const isSeparator = cells.every(c => /^:?-+:?$/g.test(c));
+      if (isSeparator) continue;
+
+      if (!tableHeaderParsed) {
+        html += '<thead><tr class="bg-gray-50 border-b border-gray-200">';
+        cells.forEach(c => {
+          html += `<th class="border border-gray-200 px-4 py-2.5 font-bold text-gray-700 text-left">${parseInlineMarkdown(c)}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+        tableHeaderParsed = true;
+      } else {
+        html += '<tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50/50">';
+        cells.forEach(c => {
+          html += `<td class="border border-gray-200 px-4 py-2 text-gray-600">${parseInlineMarkdown(c)}</td>`;
+        });
+        html += '</tr>';
+      }
+      continue;
+    } else {
+      if (inTable) {
+        html += '</tbody></table></div>';
+        inTable = false;
+      }
+    }
+
+    // Handle lists
+    const listMatch = line.match(/^(\s*)([\-\*])\s+(.*)$/);
+    if (listMatch) {
+      if (!inList) {
+        html += '<ul class="list-disc pl-6 my-4 space-y-2">';
+        inList = true;
+      }
+      html += `<li class="text-gray-600 leading-relaxed">${parseInlineMarkdown(listMatch[3])}</li>`;
+      continue;
+    } else {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+    }
+
+    // Handle headings
+    if (trimmed.startsWith('### ')) {
+      html += `<h4 class="text-lg font-bold text-gray-900 mt-6 mb-3">${parseInlineMarkdown(trimmed.substring(4))}</h4>`;
+      continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      html += `<h3 class="text-xl font-bold text-gray-900 mt-8 mb-4">${parseInlineMarkdown(trimmed.substring(3))}</h3>`;
+      continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      html += `<h2 class="text-2xl font-black text-gray-900 mt-10 mb-5">${parseInlineMarkdown(trimmed.substring(2))}</h2>`;
+      continue;
+    }
+
+    // Horizontal Rule
+    if (trimmed === '---') {
+      html += '<hr class="my-8 border-gray-100" />';
+      continue;
+    }
+
+    // Empty lines
+    if (!trimmed) {
+      continue;
+    }
+
+    // Regular Paragraph
+    html += `<p class="mb-6 text-gray-600 leading-relaxed text-lg">${parseInlineMarkdown(line)}</p>`;
+  }
+
+  // Close open tags
+  if (inTable) html += '</tbody></table></div>';
+  if (inList) html += '</ul>';
+
+  return html;
+}
+
 export default function NewsArticlePage({ params: { locale, slug } }: { params: { locale: string, slug: string } }) {
   const [post, setPost] = useState<NewsPost | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,14 +222,10 @@ export default function NewsArticlePage({ params: { locale, slug } }: { params: 
         <div className="flex flex-col md:flex-row gap-12">
           {/* Main Body */}
           <div className="flex-1">
-            <div className={`prose prose-lg prose-gray max-w-none ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}>
-              {/* For a real blog we'd use a markdown/rich text renderer here */}
-              {content.split('\n').map((para: string, i: number) => (
-                <p key={i} className="mb-6 text-gray-600 leading-relaxed text-lg">
-                  {para}
-                </p>
-              ))}
-            </div>
+            <div 
+              className={`prose prose-lg prose-gray max-w-none ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}
+              dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }}
+            />
 
             {/* Footer Actions */}
             <div className="mt-16 pt-10 border-t border-gray-100 flex flex-wrap items-center justify-between gap-6">

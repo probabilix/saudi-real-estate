@@ -485,6 +485,13 @@ export interface SystemSetting {
   updatedAt: string;
 }
 
+export interface ArticleFaq {
+  questionEn: string;
+  questionAr: string;
+  answerEn: string;
+  answerAr: string;
+}
+
 export interface NewsPost {
   id: string;
   titleEn: string;
@@ -497,6 +504,7 @@ export interface NewsPost {
   featuredImage: string | null;
   isPublished: boolean;
   publishedAt: string | null;
+  faqs?: ArticleFaq[];
   createdAt: string;
 }
 

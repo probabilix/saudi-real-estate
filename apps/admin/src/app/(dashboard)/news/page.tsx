@@ -7,10 +7,12 @@ import {
   Newspaper, Plus, Search, Filter,
   Calendar, User, Globe, Image as ImageIcon,
   Edit, Trash2, Eye, Loader2,
-  CheckCircle2, AlertCircle, Save, X
+  CheckCircle2, AlertCircle, Save, X, ArrowUpRight
 } from 'lucide-react';
 import { CldUploadWidget } from 'next-cloudinary';
 import clsx from 'clsx';
+
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 
 export default function NewsPage() {
   const [posts, setPosts] = useState<NewsPost[]>([]);
@@ -18,6 +20,7 @@ export default function NewsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentPost, setCurrentPost] = useState<Partial<NewsPost> | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadNews();
@@ -33,11 +36,21 @@ export default function NewsPage() {
   }
 
   const handleEdit = (post: NewsPost) => {
-    setCurrentPost(post);
+    setError(null);
+    setCurrentPost({
+      ...post,
+      faqs: post.faqs && post.faqs.length > 0 ? post.faqs : [
+        { questionEn: '', questionAr: '', answerEn: '', answerAr: '' },
+        { questionEn: '', questionAr: '', answerEn: '', answerAr: '' },
+        { questionEn: '', questionAr: '', answerEn: '', answerAr: '' },
+        { questionEn: '', questionAr: '', answerEn: '', answerAr: '' }
+      ]
+    });
     setIsEditing(true);
   };
 
   const handleCreate = () => {
+    setError(null);
     setCurrentPost({
       titleEn: '',
       titleAr: '',
@@ -48,6 +61,12 @@ export default function NewsPage() {
       excerptAr: '',
       isPublished: false,
       publishedAt: null,
+      faqs: [
+        { questionEn: '', questionAr: '', answerEn: '', answerAr: '' },
+        { questionEn: '', questionAr: '', answerEn: '', answerAr: '' },
+        { questionEn: '', questionAr: '', answerEn: '', answerAr: '' },
+        { questionEn: '', questionAr: '', answerEn: '', answerAr: '' }
+      ],
       createdAt: new Date().toISOString()
     });
     setIsEditing(true);
@@ -55,7 +74,16 @@ export default function NewsPage() {
 
   const handleSave = async () => {
     if (!currentPost) return;
+    setError(null);
     setSaving(true);
+
+    const faqs = currentPost.faqs || [];
+    if (faqs.length < 4 || faqs.length > 8) {
+      setError(`FAQ count must be between 4 and 8. (Currently: ${faqs.length})`);
+      setSaving(false);
+      return;
+    }
+
     let result;
     if (currentPost.id) {
       result = await adminApi.updateNews(currentPost.id, currentPost);
@@ -67,6 +95,9 @@ export default function NewsPage() {
       loadNews();
       setIsEditing(false);
       setCurrentPost(null);
+      setError(null);
+    } else {
+      setError(result.error || result.message || 'Failed to save article. Please check all required fields.');
     }
     setSaving(false);
   };
@@ -77,6 +108,40 @@ export default function NewsPage() {
     if (result.success) {
       setPosts(prev => prev.filter(p => p.id !== id));
     }
+  };
+
+  const handleAddFaq = () => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(15);
+    }
+    
+    const currentFaqs = currentPost?.faqs || [];
+    if (currentFaqs.length >= 8) return;
+    
+    setCurrentPost({
+      ...currentPost!,
+      faqs: [...currentFaqs, { questionEn: '', questionAr: '', answerEn: '', answerAr: '' }]
+    });
+
+    setTimeout(() => {
+      const faqElements = document.querySelectorAll('[data-faq-item]');
+      if (faqElements.length > 0) {
+        const lastFaq = faqElements[faqElements.length - 1];
+        lastFaq.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const firstInput = lastFaq.querySelector('input');
+        if (firstInput) firstInput.focus();
+      }
+    }, 100);
+  };
+
+  const handleRemoveFaq = (idx: number) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([15, 30, 15]);
+    }
+    
+    const currentFaqs = [...(currentPost?.faqs || [])];
+    currentFaqs.splice(idx, 1);
+    setCurrentPost({ ...currentPost!, faqs: currentFaqs });
   };
 
   return (
@@ -141,10 +206,19 @@ export default function NewsPage() {
                       </div>
                     </div>
                     <div className="pt-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEdit(post)} className="btn-secondary py-1.5 flex-1">
+                      <button onClick={() => handleEdit(post)} className="btn-secondary py-1.5 flex-1 flex items-center justify-center gap-1.5">
                         <Edit className="w-3.5 h-3.5" /> Edit
                       </button>
-                      <button onClick={() => handleDelete(post.id)} className="btn-secondary py-1.5 text-red-600 hover:bg-red-50">
+                      <a
+                        href={`${WEB_URL}/en/news/${post.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-secondary py-1.5 px-3 flex items-center justify-center text-surface-600 hover:text-primary-600"
+                        title="View Public Page"
+                      >
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </a>
+                      <button onClick={() => handleDelete(post.id)} className="btn-secondary py-1.5 px-3 text-red-600 hover:bg-red-50" title="Delete Article">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -170,6 +244,13 @@ export default function NewsPage() {
                 </button>
               </div>
             </div>
+
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-sm text-red-700">
+                <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+                <div className="flex-1 font-medium">{error}</div>
+              </div>
+            )}
 
             <div className="space-y-4">
               <label className="admin-label">Featured Image</label>
@@ -269,6 +350,122 @@ export default function NewsPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* FAQs Section */}
+            <div className="pt-6 border-t border-surface-100 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-surface-900">Article FAQs (Bilingual)</h3>
+                  <p className="text-xs text-surface-500">Provide between 4 and 8 frequently asked questions for this article.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddFaq}
+                  disabled={(currentPost?.faqs || []).length >= 8}
+                  className="btn-secondary py-1.5 text-xs flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add FAQ Item
+                </button>
+              </div>
+
+              {((currentPost?.faqs || []).length < 4 || (currentPost?.faqs || []).length > 8) && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl flex items-start gap-2.5 text-xs text-yellow-700">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-yellow-600 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">FAQ Requirement:</span> You must have between 4 and 8 FAQs. (Current: {(currentPost?.faqs || []).length})
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {(currentPost?.faqs || []).map((faq, idx) => (
+                  <div key={idx} data-faq-item className="p-4 rounded-xl border border-surface-100 bg-surface-50/50 space-y-3 relative">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-surface-400 uppercase tracking-wider">FAQ #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFaq(idx)}
+                        className="text-surface-400 hover:text-red-600 transition-colors p-1"
+                        title="Delete FAQ"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* English FAQ */}
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-[10px] font-semibold text-surface-500">English Question</label>
+                          <input
+                            className="admin-input py-1 text-xs"
+                            value={faq.questionEn || ''}
+                            onChange={(e) => {
+                              const currentFaqs = [...(currentPost?.faqs || [])];
+                              currentFaqs[idx] = { ...faq, questionEn: e.target.value };
+                              setCurrentPost({ ...currentPost!, faqs: currentFaqs });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-surface-500">English Answer</label>
+                          <textarea
+                            className="admin-input py-1 text-xs h-16"
+                            value={faq.answerEn || ''}
+                            onChange={(e) => {
+                              const currentFaqs = [...(currentPost?.faqs || [])];
+                              currentFaqs[idx] = { ...faq, answerEn: e.target.value };
+                              setCurrentPost({ ...currentPost!, faqs: currentFaqs });
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Arabic FAQ */}
+                      <div className="space-y-2">
+                        <div dir="rtl">
+                          <label className="text-[10px] font-semibold text-surface-500 block text-right font-arabic">السؤال (العربية)</label>
+                          <input
+                            className="admin-input py-1 text-xs text-right font-arabic"
+                            value={faq.questionAr || ''}
+                            onChange={(e) => {
+                              const currentFaqs = [...(currentPost?.faqs || [])];
+                              currentFaqs[idx] = { ...faq, questionAr: e.target.value };
+                              setCurrentPost({ ...currentPost!, faqs: currentFaqs });
+                            }}
+                          />
+                        </div>
+                        <div dir="rtl">
+                          <label className="text-[10px] font-semibold text-surface-500 block text-right font-arabic">الإجابة (العربية)</label>
+                          <textarea
+                            className="admin-input py-1 text-xs h-16 text-right font-arabic"
+                            value={faq.answerAr || ''}
+                            onChange={(e) => {
+                              const currentFaqs = [...(currentPost?.faqs || [])];
+                              currentFaqs[idx] = { ...faq, answerAr: e.target.value };
+                              setCurrentPost({ ...currentPost!, faqs: currentFaqs });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Bottom Add FAQ Button for Ergonomics */}
+              {(currentPost?.faqs || []).length > 0 && (currentPost?.faqs || []).length < 8 && (
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleAddFaq}
+                    className="btn-secondary py-2 px-4 text-xs flex items-center gap-1.5 hover:bg-surface-100 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add FAQ Item
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="pt-6 border-t border-surface-100 space-y-6">

@@ -5,6 +5,7 @@ import { authenticateJWT, requireRole } from '../../middleware/auth.middleware';
 import { AuthService } from '../../services/auth.service';
 import { EmailService } from '../../services/email.service';
 import { eq, desc, asc, count, sql, and, or, ilike, isNull, inArray, gte } from 'drizzle-orm';
+import { z } from 'zod';
 
 /**
  * Admin Routes — All protected by ADMIN role
@@ -623,6 +624,23 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   app.post('/news', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const body = request.body as any;
+    
+    const faqItemSchema = z.object({
+      questionEn: z.string().min(1, "English question is required"),
+      questionAr: z.string().min(1, "Arabic question is required"),
+      answerEn: z.string().min(1, "English answer is required"),
+      answerAr: z.string().min(1, "Arabic answer is required"),
+    });
+
+    let faqsData: any[] = [];
+    if (body.faqs !== undefined) {
+      const parsedFaqs = z.array(faqItemSchema).min(4, "Minimum 4 FAQs required").max(8, "Maximum 8 FAQs allowed").safeParse(body.faqs);
+      if (!parsedFaqs.success) {
+        return reply.code(400).send({ success: false, errors: parsedFaqs.error.format() });
+      }
+      faqsData = parsedFaqs.data;
+    }
+
     try {
       const insertData: any = {
         titleEn: body.titleEn || '',
@@ -636,7 +654,8 @@ export default async function adminRoutes(app: FastifyInstance) {
         isPublished: !!body.isPublished,
         authorId: (request.user as any).userId,
         publishedAt: body.publishedAt ? new Date(body.publishedAt) : (body.isPublished ? new Date() : null),
-        createdAt: body.createdAt ? new Date(body.createdAt) : new Date()
+        createdAt: body.createdAt ? new Date(body.createdAt) : new Date(),
+        faqs: faqsData
       };
 
       const result = await db.insert(news).values(insertData).returning();
@@ -650,6 +669,14 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.patch('/news/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as any;
+    
+    const faqItemSchema = z.object({
+      questionEn: z.string().min(1, "English question is required"),
+      questionAr: z.string().min(1, "Arabic question is required"),
+      answerEn: z.string().min(1, "English answer is required"),
+      answerAr: z.string().min(1, "Arabic answer is required"),
+    });
+
     try {
       const existing = await db.query.news.findFirst({
         where: eq(news.id, id)
@@ -687,6 +714,14 @@ export default async function adminRoutes(app: FastifyInstance) {
             updateData.publishedAt = null;
           }
         }
+      }
+
+      if (body.faqs !== undefined) {
+        const parsedFaqs = z.array(faqItemSchema).min(4, "Minimum 4 FAQs required").max(8, "Maximum 8 FAQs allowed").safeParse(body.faqs);
+        if (!parsedFaqs.success) {
+          return reply.code(400).send({ success: false, errors: parsedFaqs.error.format() });
+        }
+        updateData.faqs = parsedFaqs.data;
       }
 
       const result = await db.update(news)

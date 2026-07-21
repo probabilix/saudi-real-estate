@@ -34,6 +34,13 @@ export type ApiResponse<T> = {
   error?: string;
 };
 
+export interface ArticleFaq {
+  questionEn: string;
+  questionAr: string;
+  answerEn: string;
+  answerAr: string;
+}
+
 export interface NewsPost {
   id: string;
   slug: string;
@@ -47,6 +54,7 @@ export interface NewsPost {
   isPublished: boolean;
   authorId: string;
   publishedAt?: string;
+  faqs?: ArticleFaq[];
   updatedAt: string;
 }
 

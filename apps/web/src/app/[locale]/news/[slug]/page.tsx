@@ -123,6 +123,7 @@ export default function NewsArticlePage({ params: { locale, slug } }: { params: 
   const [post, setPost] = useState<NewsPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const isRTL = locale === 'ar';
 
   useEffect(() => {
@@ -319,6 +320,57 @@ export default function NewsArticlePage({ params: { locale, slug } }: { params: 
           </aside>
         </div>
       </article>
+
+      {/* ── FAQs Section ── */}
+      {post.faqs && post.faqs.length >= 4 && (
+        <section className="max-w-4xl mx-auto px-4 pb-24">
+          <div className="border-t border-gray-100 pt-16">
+            <h2 className={`text-2xl md:text-3xl font-black text-gray-900 mb-8 tracking-tight ${isRTL ? 'font-arabic text-right' : 'font-serif text-left'}`}>
+              {isRTL ? 'الأسئلة الشائعة' : 'Frequently Asked Questions'}
+            </h2>
+            
+            <div className="space-y-4">
+              {post.faqs.map((faq, index) => {
+                const isOpen = openFaqIndex === index;
+                const question = isRTL ? faq.questionAr : faq.questionEn;
+                const answer = isRTL ? faq.answerAr : faq.answerEn;
+                
+                if (!question || !answer) return null;
+
+                return (
+                  <div 
+                    key={index}
+                    className="border border-gray-100 rounded-[20px] overflow-hidden bg-gray-50/50 hover:bg-gray-50/80 transition-all duration-300"
+                  >
+                    <button
+                      onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                      className={`w-full px-6 py-5 flex items-center justify-between gap-4 text-left font-bold text-gray-900 text-base md:text-lg transition-colors ${isRTL ? 'text-right flex-row-reverse font-arabic' : ''}`}
+                    >
+                      <span>{question}</span>
+                      <span className={`transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''} text-primary-600 shrink-0`}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </span>
+                    </button>
+                    
+                    <motion.div
+                      initial={false}
+                      animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      className="overflow-hidden"
+                    >
+                      <div className={`px-6 pb-6 pt-1 text-gray-600 leading-relaxed text-sm md:text-base border-t border-gray-100/50 ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}>
+                        {answer}
+                      </div>
+                    </motion.div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Newsletter Section ── */}
       <section className="max-w-7xl mx-auto px-4 mb-24">

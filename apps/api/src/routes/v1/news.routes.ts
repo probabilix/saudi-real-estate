@@ -59,6 +59,13 @@ export default async function newsRoutes(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const user = (request as any).user;
     
+    const faqItemSchema = z.object({
+      questionEn: z.string().min(1, "English question is required"),
+      questionAr: z.string().min(1, "Arabic question is required"),
+      answerEn: z.string().min(1, "English answer is required"),
+      answerAr: z.string().min(1, "Arabic answer is required"),
+    });
+
     const schema = z.object({
       titleEn: z.string().min(1),
       titleAr: z.string().min(1),
@@ -69,6 +76,7 @@ export default async function newsRoutes(app: FastifyInstance) {
       excerptAr: z.string().optional(),
       featuredImage: z.string().optional(),
       isPublished: z.boolean().default(false),
+      faqs: z.array(faqItemSchema).min(4, "Minimum 4 FAQs required").max(8, "Maximum 8 FAQs allowed").optional(),
     });
 
     const parsed = schema.safeParse(request.body);
@@ -92,6 +100,13 @@ export default async function newsRoutes(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticateJWT, requireRole('ADMIN')] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     
+    const faqItemSchema = z.object({
+      questionEn: z.string().min(1, "English question is required"),
+      questionAr: z.string().min(1, "Arabic question is required"),
+      answerEn: z.string().min(1, "English answer is required"),
+      answerAr: z.string().min(1, "Arabic answer is required"),
+    });
+
     const schema = z.object({
       titleEn: z.string().optional(),
       titleAr: z.string().optional(),
@@ -102,6 +117,7 @@ export default async function newsRoutes(app: FastifyInstance) {
       excerptAr: z.string().optional(),
       featuredImage: z.string().optional(),
       isPublished: z.boolean().optional(),
+      faqs: z.array(faqItemSchema).min(4, "Minimum 4 FAQs required").max(8, "Maximum 8 FAQs allowed").optional(),
     });
 
     const parsed = schema.safeParse(request.body);

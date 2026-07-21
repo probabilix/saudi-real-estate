@@ -372,6 +372,7 @@ export const news = pgTable('news', {
   authorId: uuid('author_id').references(() => users.id),
   isPublished: boolean('is_published').default(false),
   publishedAt: timestamp('published_at', { withTimezone: true }),
+  faqs: jsonb('faqs').default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

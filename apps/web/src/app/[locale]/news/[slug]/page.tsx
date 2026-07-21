@@ -1,401 +1,143 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Calendar, User, ArrowLeft, Share2, Facebook, Twitter, Linkedin, Loader2, Bookmark } from 'lucide-react';
+import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import NewsArticleClient from './NewsArticleClient';
 import { api, NewsPost } from '@/lib/api';
 
-function parseInlineMarkdown(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline font-bold">$1</a>');
+export const dynamic = 'force-dynamic';
+
+interface Props {
+  params: {
+    locale: string;
+    slug: string;
+  };
 }
 
-function parseMarkdown(md: string): string {
-  if (!md) return '';
+// Fetch Article Helper
+async function getArticleData(slug: string): Promise<{ post: NewsPost | null; relatedPosts: NewsPost[] }> {
+  try {
+    const res = await api.getNewsBySlug(slug);
+    if (res.success && res.data) {
+      const post = res.data;
 
-  const lines = md.split('\n');
-  let html = '';
-  let inList = false;
-  let inTable = false;
-  let tableHeaderParsed = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-    const trimmed = line.trim();
-
-    // Handle tables
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      if (inList) {
-        html += '</ul>';
-        inList = false;
+      // Fetch related posts
+      let relatedPosts: NewsPost[] = [];
+      const newsRes = await api.getNews();
+      if (newsRes.success && newsRes.data) {
+        relatedPosts = newsRes.data
+          .filter((p: NewsPost) => p.slug !== slug)
+          .slice(0, 3);
       }
-      if (!inTable) {
-        inTable = true;
-        tableHeaderParsed = false;
-        html += '<div class="overflow-x-auto my-6"><table class="w-full text-sm border-collapse border border-gray-200">';
-      }
-      const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
-      const isSeparator = cells.every(c => /^:?-+:?$/g.test(c));
-      if (isSeparator) continue;
 
-      if (!tableHeaderParsed) {
-        html += '<thead><tr class="bg-gray-50 border-b border-gray-200">';
-        cells.forEach(c => {
-          html += `<th class="border border-gray-200 px-4 py-2.5 font-bold text-gray-700 text-left">${parseInlineMarkdown(c)}</th>`;
-        });
-        html += '</tr></thead><tbody>';
-        tableHeaderParsed = true;
-      } else {
-        html += '<tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50/50">';
-        cells.forEach(c => {
-          html += `<td class="border border-gray-200 px-4 py-2 text-gray-600">${parseInlineMarkdown(c)}</td>`;
-        });
-        html += '</tr>';
-      }
-      continue;
-    } else {
-      if (inTable) {
-        html += '</tbody></table></div>';
-        inTable = false;
-      }
+      return { post, relatedPosts };
     }
-
-    // Handle lists
-    const listMatch = line.match(/^(\s*)([\-\*])\s+(.*)$/);
-    if (listMatch) {
-      if (!inList) {
-        html += '<ul class="list-disc pl-6 my-4 space-y-2">';
-        inList = true;
-      }
-      html += `<li class="text-gray-600 leading-relaxed">${parseInlineMarkdown(listMatch[3])}</li>`;
-      continue;
-    } else {
-      if (inList) {
-        html += '</ul>';
-        inList = false;
-      }
-    }
-
-    // Handle headings
-    if (trimmed.startsWith('### ')) {
-      html += `<h4 class="text-lg font-bold text-gray-900 mt-6 mb-3">${parseInlineMarkdown(trimmed.substring(4))}</h4>`;
-      continue;
-    }
-    if (trimmed.startsWith('## ')) {
-      html += `<h3 class="text-xl font-bold text-gray-900 mt-8 mb-4">${parseInlineMarkdown(trimmed.substring(3))}</h3>`;
-      continue;
-    }
-    if (trimmed.startsWith('# ')) {
-      html += `<h2 class="text-2xl font-black text-gray-900 mt-10 mb-5">${parseInlineMarkdown(trimmed.substring(2))}</h2>`;
-      continue;
-    }
-
-    // Horizontal Rule
-    if (trimmed === '---') {
-      html += '<hr class="my-8 border-gray-100" />';
-      continue;
-    }
-
-    // Empty lines
-    if (!trimmed) {
-      continue;
-    }
-
-    // Regular Paragraph
-    html += `<p class="mb-6 text-gray-600 leading-relaxed text-lg">${parseInlineMarkdown(line)}</p>`;
+  } catch (err) {
+    console.error('Error fetching article data on server:', err);
   }
-
-  // Close open tags
-  if (inTable) html += '</tbody></table></div>';
-  if (inList) html += '</ul>';
-
-  return html;
+  return { post: null, relatedPosts: [] };
 }
 
-export default function NewsArticlePage({ params: { locale, slug } }: { params: { locale: string, slug: string } }) {
-  const [post, setPost] = useState<NewsPost | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isSaved, setIsSaved] = useState(false);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
-  const isRTL = locale === 'ar';
-
-  useEffect(() => {
-    const fetchPost = async () => {
-      try {
-        const res = await api.getNewsBySlug(slug);
-        if (res.success && res.data) {
-          setPost(res.data);
-          setIsSaved(!!(res.data as any).isFavorited);
-        }
-      } catch (err) {
-        console.error('Failed to fetch post', err);
-      } finally {
-        setLoading(false);
-      }
+// Dynamic SEO Metadata Generation
+export async function generateMetadata({ params: { locale, slug } }: Props): Promise<Metadata> {
+  const { post } = await getArticleData(slug);
+  if (!post) {
+    return {
+      title: 'Article Not Found',
     };
-
-    fetchPost();
-  }, [slug]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 animate-pulse">Opening Article</p>
-      </div>
-    );
   }
+
+  const isRTL = locale === 'ar';
+  const title = isRTL ? post.titleAr : post.titleEn;
+  const description = isRTL ? post.excerptAr : post.excerptEn;
+  const imageUrl = post.featuredImage || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1200';
+  const pageUrl = `${process.env.NEXT_PUBLIC_WEB_URL || 'https://saudi-re.com'}/${locale}/news/${slug}`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: pageUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      url: pageUrl,
+      siteName: 'Tamleeq',
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+      locale: locale === 'ar' ? 'ar_SA' : 'en_US',
+      type: 'article',
+      publishedTime: post.publishedAt,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [imageUrl],
+    },
+  };
+}
+
+// Server Page Component
+export default async function NewsArticlePage({ params: { locale, slug } }: Props) {
+  const { post, relatedPosts } = await getArticleData(slug);
 
   if (!post) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <h1 className="text-4xl font-black text-gray-900 mb-4">Article Not Found</h1>
-        <Link href={`/${locale}/news`} className="text-primary-600 font-bold hover:underline">Return to News</Link>
-      </div>
-    );
+    notFound();
   }
 
+  const isRTL = locale === 'ar';
   const title = isRTL ? post.titleAr : post.titleEn;
-  const content = isRTL ? post.contentAr : post.contentEn;
-  const date = post.publishedAt ? new Date(post.publishedAt).toLocaleDateString(locale, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }) : '';
+  const description = isRTL ? post.excerptAr : post.excerptEn;
+  const imageUrl = post.featuredImage || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1200';
+  const pageUrl = `${process.env.NEXT_PUBLIC_WEB_URL || 'https://saudi-re.com'}/${locale}/news/${slug}`;
+
+  // Structured Data (JSON-LD) for Schema.org NewsArticle
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    'headline': title,
+    'description': description || title,
+    'image': [imageUrl],
+    'datePublished': post.publishedAt || post.updatedAt,
+    'dateModified': post.updatedAt || post.publishedAt,
+    'author': {
+      '@type': 'Organization',
+      'name': isRTL ? 'فريق تمليك' : 'Tamleeq Team',
+      'url': `${process.env.NEXT_PUBLIC_WEB_URL || 'https://saudi-re.com'}/${locale}`,
+    },
+    'publisher': {
+      '@type': 'Organization',
+      'name': 'Tamleeq',
+      'logo': {
+        '@type': 'ImageObject',
+        'url': `${process.env.NEXT_PUBLIC_WEB_URL || 'https://saudi-re.com'}/logo.png`,
+      },
+    },
+    'mainEntityOfPage': {
+      '@type': 'WebPage',
+      '@id': pageUrl,
+    },
+  };
 
   return (
-    <div className="bg-white min-h-screen">
-      {/* ── Article Header ── */}
-      <header className="relative h-[60vh] md:h-[70vh] min-h-[500px] flex items-end pb-20">
-        <div className="absolute inset-0">
-          <Image
-            src={post.featuredImage || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1200'}
-            alt={title}
-            fill
-            priority
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/40 to-transparent" />
-        </div>
-
-        <div className="max-w-4xl mx-auto px-4 relative z-10 w-full">
-          <Link
-            href={`/${locale}/news`}
-            className="inline-flex items-center gap-2 text-white/70 hover:text-white mb-8 transition-colors text-sm font-bold group"
-          >
-            <ArrowLeft className={`w-4 h-4 transition-transform group-hover:-translate-x-1 ${isRTL ? 'rotate-180 group-hover:translate-x-1' : ''}`} />
-            {isRTL ? 'العودة إلى الأخبار' : 'Back to News'}
-          </Link>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-6"
-          >
-            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-primary-400">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                {date}
-              </span>
-              <span className="w-1 h-1 bg-white/20 rounded-full" />
-              <span className="flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" />
-                Admin
-              </span>
-            </div>
-
-            <h1 className={`text-4xl md:text-6xl font-black text-white tracking-tight leading-tight ${isRTL ? 'font-arabic' : 'font-serif'}`}>
-              {title}
-            </h1>
-          </motion.div>
-        </div>
-      </header>
-
-      {/* ── Article Content ── */}
-      <article className="max-w-4xl mx-auto px-4 py-20">
-        <div className="flex flex-col md:flex-row gap-12">
-          {/* Main Body */}
-          <div className="flex-1">
-            <div 
-              className={`prose prose-lg prose-gray max-w-none ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}
-              dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }}
-            />
-
-            {/* Footer Actions */}
-            <div className="mt-16 pt-10 border-t border-gray-100 flex flex-wrap items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-black uppercase tracking-widest text-gray-400">
-                  {isRTL ? 'مشاركة:' : 'Share:'}
-                </span>
-                <div className="flex gap-2">
-                  {[
-                    { Icon: Facebook, url: `https://www.facebook.com/sharer/sharer.php?u=${typeof window !== 'undefined' ? window.location.href : ''}` },
-                    { Icon: Twitter, url: `https://twitter.com/intent/tweet?url=${typeof window !== 'undefined' ? window.location.href : ''}&text=${encodeURIComponent(title)}` },
-                    { Icon: Linkedin, url: `https://www.linkedin.com/sharing/share-offsite/?url=${typeof window !== 'undefined' ? window.location.href : ''}` },
-                  ].map((item, i) => (
-                    <button
-                      key={i}
-                      onClick={() => window.open(item.url, '_blank', 'width=600,height=400')}
-                      className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all"
-                    >
-                      <item.Icon className="w-4 h-4" />
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => {
-                      if (navigator.share) {
-                        navigator.share({ title, url: window.location.href });
-                      } else {
-                        navigator.clipboard.writeText(window.location.href);
-                        alert(isRTL ? 'تم نسخ الرابط!' : 'Link copied to clipboard!');
-                      }
-                    }}
-                    className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-primary-600 hover:text-white transition-all"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              <button
-                onClick={async () => {
-                  if (!post) return;
-                  const res = await api.toggleNewsFavorite(post.id);
-                  if (res.success) {
-                    setIsSaved(!!res.data?.isFavorited);
-                  } else if (res.error?.includes('Unauthorised')) {
-                    alert(isRTL ? 'يرجى تسجيل الدخول لحفظ المقالات' : 'Please login to save articles');
-                  }
-                }}
-                className={`flex items-center gap-2 px-6 py-3 border rounded-2xl text-sm font-bold transition-all ${isSaved ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-100 text-gray-900 hover:bg-gray-50'} ${isRTL ? 'font-arabic' : ''}`}
-              >
-                <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
-                {isSaved
-                  ? (isRTL ? 'تم الحفظ' : 'Saved')
-                  : (isRTL ? 'احفظ المقال' : 'Save Article')
-                }
-              </button>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <aside className="w-full md:w-64 space-y-12">
-            <div>
-              <h4 className={`text-xs font-black uppercase tracking-widest text-gray-900 mb-6 pb-2 border-b-2 border-primary-600 w-fit ${isRTL ? 'font-arabic' : ''}`}>
-                {isRTL ? 'الكاتب' : 'Author'}
-              </h4>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600 font-black">
-                  {isRTL ? 'س' : 'A'}
-                </div>
-                <div>
-                  <p className={`font-bold text-gray-900 ${isRTL ? 'font-arabic' : ''}`}>
-                    {isRTL ? 'فريق تمليك' : 'Tamleeq Team'}
-                  </p>
-                  <p className={`text-xs text-gray-400 ${isRTL ? 'font-arabic' : ''}`}>
-                    {isRTL ? 'قسم التحرير' : 'Editorial Department'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className={`text-xs font-black uppercase tracking-widest text-gray-900 mb-6 pb-2 border-b-2 border-primary-600 w-fit ${isRTL ? 'font-arabic' : ''}`}>
-                {isRTL ? 'الوسوم' : 'Tags'}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {(isRTL ? ['اتجاهات السوق', 'الاستثمار', 'اللوائح', 'سعودية 2030'] : ['Market Trends', 'Investment', 'Regulations', 'Saudi 2030']).map(tag => (
-                  <span key={tag} className={`px-3 py-1.5 bg-gray-50 rounded-lg text-xs font-bold text-gray-500 hover:bg-primary-50 hover:text-primary-600 cursor-pointer transition-all ${isRTL ? 'font-arabic' : ''}`}>
-                    #{tag.replace(' ', '')}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </aside>
-        </div>
-      </article>
-
-      {/* ── FAQs Section ── */}
-      {post.faqs && post.faqs.length >= 4 && (
-        <section className="max-w-4xl mx-auto px-4 pb-24">
-          <div className="border-t border-gray-100 pt-16">
-            <h2 className={`text-2xl md:text-3xl font-black text-gray-900 mb-8 tracking-tight ${isRTL ? 'font-arabic text-right' : 'font-serif text-left'}`}>
-              {isRTL ? 'الأسئلة الشائعة' : 'Frequently Asked Questions'}
-            </h2>
-            
-            <div className="space-y-4">
-              {post.faqs.map((faq, index) => {
-                const isOpen = openFaqIndex === index;
-                const question = isRTL ? faq.questionAr : faq.questionEn;
-                const answer = isRTL ? faq.answerAr : faq.answerEn;
-                
-                if (!question || !answer) return null;
-
-                return (
-                  <div 
-                    key={index}
-                    className="border border-gray-100 rounded-[20px] overflow-hidden bg-gray-50/50 hover:bg-gray-50/80 transition-all duration-300"
-                  >
-                    <button
-                      onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                      className={`w-full px-6 py-5 flex items-center justify-between gap-4 text-left font-bold text-gray-900 text-base md:text-lg transition-colors ${isRTL ? 'text-right flex-row-reverse font-arabic' : ''}`}
-                    >
-                      <span>{question}</span>
-                      <span className={`transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''} text-primary-600 shrink-0`}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </span>
-                    </button>
-                    
-                    <motion.div
-                      initial={false}
-                      animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }}
-                      transition={{ duration: 0.25, ease: 'easeInOut' }}
-                      className="overflow-hidden"
-                    >
-                      <div className={`px-6 pb-6 pt-1 text-gray-600 leading-relaxed text-sm md:text-base border-t border-gray-100/50 ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}>
-                        {answer}
-                      </div>
-                    </motion.div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── Newsletter Section ── */}
-      <section className="max-w-7xl mx-auto px-4 mb-24">
-        <div className="bg-gray-900 rounded-[48px] p-12 md:p-20 text-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-[40%] h-full bg-primary-600/10 blur-[100px] pointer-events-none" />
-          <div className="relative z-10">
-            <h2 className={`text-3xl md:text-5xl font-black text-white mb-6 tracking-tight ${isRTL ? 'font-arabic' : 'font-serif'}`}>
-              {isRTL ? 'ابقَ على اطلاع دائم بالسوق.' : 'Stay ahead of the market.'}
-            </h2>
-            <p className={`text-gray-400 text-lg mb-12 max-w-xl mx-auto font-medium ${isRTL ? 'font-arabic' : ''}`}>
-              {isRTL ? 'اشترك في نشرتنا الإخبارية الأسبوعية للحصول على رؤى وبيانات عقارية حصرية.' : 'Subscribe to our weekly newsletter for exclusive real estate insights and data.'}
-            </p>
-            <div className={`max-w-md mx-auto flex flex-col sm:flex-row gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <input
-                type="email"
-                placeholder={isRTL ? 'أدخل بريدك الإلكتروني' : 'Enter your email'}
-                className={`flex-1 px-8 py-4 bg-white/5 border border-white/10 rounded-[20px] text-white focus:outline-none focus:border-primary-500 transition-all ${isRTL ? 'text-right' : ''}`}
-              />
-              <button className={`px-10 py-4 bg-primary-600 text-white rounded-[20px] font-black hover:bg-primary-500 transition-all whitespace-nowrap shadow-xl shadow-primary-600/20 ${isRTL ? 'font-arabic' : ''}`}>
-                {isRTL ? 'انضم الآن' : 'Join Now'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
+    <>
+      {/* Inject JSON-LD Schema.org Metadata */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <NewsArticleClient
+        post={post}
+        relatedPosts={relatedPosts}
+        locale={locale}
+        initialIsSaved={false}
+      />
+    </>
   );
 }

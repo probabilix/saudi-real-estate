@@ -18,7 +18,7 @@ import MediaModal from '@/components/listings/MediaModal';
 import ChatWidget from '@/components/chat/ChatWidget';
 import ListingCard from '@/components/listings/ListingCard';
 import { formatPriceCompact } from '@saudi-re/shared';
-import { api, API_BASE_URL } from '@/lib/api';
+import { api, API_BASE_URL, NewsPost } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { Listing } from '@saudi-re/shared';
 import clsx from 'clsx';
@@ -185,6 +185,22 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
   // Favorites States
   const [projectFavorited, setProjectFavorited] = useState(false);
   const [narrativeExpanded, setNarrativeExpanded] = useState(false);
+  const [newsPosts, setNewsPosts] = useState<NewsPost[]>([]);
+
+  useEffect(() => {
+    async function fetchInsights() {
+      try {
+        const res = await api.getNews();
+        if (res.success && res.data) {
+          const shuffled = [...res.data].sort(() => 0.5 - Math.random());
+          setNewsPosts(shuffled.slice(0, 4));
+        }
+      } catch (err) {
+        console.error('Failed to fetch news insights:', err);
+      }
+    }
+    fetchInsights();
+  }, []);
 
   const { comparedProjects, addProject, removeProject } = useCompareStore();
   const isCompared = comparedProjects.includes(id);
@@ -1530,17 +1546,29 @@ export default function ProjectDetailPage({ params: { id, locale } }: { params: 
                 {tListing('investmentInsights') || 'Investment Insights'}
               </h4>
               <div className="grid gap-3">
-                {[
-                  { label: tListing('marketGuide') || 'Market Valuation Guide', slug: 'market-valuation-guide' },
-                  { label: tListing('roiProjections') || 'ROI Projections 2026', slug: 'roi-projections-2026' },
-                  { label: tListing('legalChecklist') || 'Legal Handover Checklist', slug: 'legal-handover-checklist' },
-                  { label: tListing('taxExplained') || 'Ownership Taxes Explained', slug: 'ownership-taxes-explained' }
-                ].map((item, idx) => (
-                  <Link key={idx} href={`/${locale}/news/${item.slug}`} className="flex items-center justify-between group">
-                    <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item.label}</span>
-                    <ChevronRight className={`w-4 h-4 text-surface-300 transition-all ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-2' : 'group-hover:translate-x-2'}`} />
-                  </Link>
-                ))}
+                {newsPosts.length > 0 ? (
+                  newsPosts.map((post) => {
+                    const postTitle = locale === 'ar' ? post.titleAr : post.titleEn;
+                    return (
+                      <Link key={post.id} href={`/${locale}/news/${post.slug}`} className="flex items-center justify-between group">
+                        <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors line-clamp-1">{postTitle}</span>
+                        <ChevronRight className={`w-4 h-4 text-surface-300 transition-all shrink-0 ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-2' : 'group-hover:translate-x-2'}`} />
+                      </Link>
+                    );
+                  })
+                ) : (
+                  [
+                    { label: tListing('marketGuide') || 'Market Valuation Guide', slug: 'market-valuation-guide' },
+                    { label: tListing('roiProjections') || 'ROI Projections 2026', slug: 'roi-projections-2026' },
+                    { label: tListing('legalChecklist') || 'Legal Handover Checklist', slug: 'legal-handover-checklist' },
+                    { label: tListing('taxExplained') || 'Ownership Taxes Explained', slug: 'ownership-taxes-explained' }
+                  ].map((item, idx) => (
+                    <Link key={idx} href={`/${locale}/news/${item.slug}`} className="flex items-center justify-between group">
+                      <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item.label}</span>
+                      <ChevronRight className={`w-4 h-4 text-surface-300 transition-all ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-2' : 'group-hover:translate-x-2'}`} />
+                    </Link>
+                  ))
+                )}
               </div>
               <div className="border-t border-surface-100 pt-3.5 mt-2" />
               <button

@@ -17,7 +17,7 @@ import {
   Mail, Loader2, BookOpen, Flag, AlertTriangle, ArrowRightLeft
 } from 'lucide-react';
 import { formatPrice, formatPriceCompact, ListingWithOwner, Listing, PropertyHistoryEvent } from '@saudi-re/shared';
-import { api, API_BASE_URL } from '@/lib/api';
+import { api, API_BASE_URL, NewsPost } from '@/lib/api';
 import ListingCard from '@/components/listings/ListingCard';
 import MediaModal from '@/components/listings/MediaModal';
 import BrochureModal from '@/components/listings/BrochureModal';
@@ -108,6 +108,22 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
   const [sidebarAdImage, setSidebarAdImage] = useState<string>('');
   const [sidebarAdLink, setSidebarAdLink] = useState<string>('');
   const [sidebarAdAspectRatio, setSidebarAdAspectRatio] = useState<string>('auto');
+  const [newsPosts, setNewsPosts] = useState<NewsPost[]>([]);
+
+  useEffect(() => {
+    async function fetchInsights() {
+      try {
+        const res = await api.getNews();
+        if (res.success && res.data) {
+          const shuffled = [...res.data].sort(() => 0.5 - Math.random());
+          setNewsPosts(shuffled.slice(0, 4));
+        }
+      } catch (err) {
+        console.error('Failed to fetch news insights:', err);
+      }
+    }
+    fetchInsights();
+  }, []);
 
   // Property reporting modal states
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -957,17 +973,29 @@ export default function ListingDetailPage({ params: { id, locale } }: { params: 
             <div className="bg-white border border-surface-200 p-6 space-y-4 shadow-sm rounded-2xl">
               <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-charcoal-muted">{t('investmentInsights')}</h4>
               <div className="grid gap-3">
-                {[
-                  { label: t('marketGuide'), slug: 'market-valuation-guide' },
-                  { label: t('roiProjections'), slug: 'roi-projections-2026' },
-                  { label: t('legalChecklist'), slug: 'legal-handover-checklist' },
-                  { label: t('taxExplained'), slug: 'ownership-taxes-explained' }
-                ].map((item, idx) => (
-                  <Link key={idx} href={`/${locale}/news/${item.slug}`} className="flex items-center justify-between group">
-                    <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item.label}</span>
-                    <ChevronRight className={`w-4 h-4 text-surface-300 transition-all ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-2' : 'group-hover:translate-x-2'}`} />
-                  </Link>
-                ))}
+                {newsPosts.length > 0 ? (
+                  newsPosts.map((post) => {
+                    const postTitle = locale === 'ar' ? post.titleAr : post.titleEn;
+                    return (
+                      <Link key={post.id} href={`/${locale}/news/${post.slug}`} className="flex items-center justify-between group">
+                        <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors line-clamp-1">{postTitle}</span>
+                        <ChevronRight className={`w-4 h-4 text-surface-300 transition-all shrink-0 ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-2' : 'group-hover:translate-x-2'}`} />
+                      </Link>
+                    );
+                  })
+                ) : (
+                  [
+                    { label: t('marketGuide'), slug: 'market-valuation-guide' },
+                    { label: t('roiProjections'), slug: 'roi-projections-2026' },
+                    { label: t('legalChecklist'), slug: 'legal-handover-checklist' },
+                    { label: t('taxExplained'), slug: 'ownership-taxes-explained' }
+                  ].map((item, idx) => (
+                    <Link key={idx} href={`/${locale}/news/${item.slug}`} className="flex items-center justify-between group">
+                      <span className="text-sm font-bold text-charcoal-muted group-hover:text-primary-600 transition-colors">{item.label}</span>
+                      <ChevronRight className={`w-4 h-4 text-surface-300 transition-all ${locale === 'ar' ? 'rotate-180 group-hover:-translate-x-2' : 'group-hover:translate-x-2'}`} />
+                    </Link>
+                  ))
+                )}
               </div>
               <div className="border-t border-surface-100 pt-3.5 mt-2" />
               <button

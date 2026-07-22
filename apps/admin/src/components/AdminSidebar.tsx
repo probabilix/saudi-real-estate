@@ -49,6 +49,7 @@ const NAV_GROUPS = [
       { href: '/faqs', label: 'FAQs Management', icon: HelpCircle },
       { href: '/legal', label: 'Legal Pages', icon: FileText },
       { href: '/announcements', label: 'Announcements', icon: Megaphone },
+      { href: '/newsletter', label: 'Newsletter Subs', icon: Mail },
     ],
   },
   {

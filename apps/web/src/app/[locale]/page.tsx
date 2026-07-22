@@ -103,10 +103,10 @@ export default async function HomePage({ params: { locale } }: { params: { local
         const filtered = allNews.filter((post: any) => featuredSlugs.includes(post.slug));
         recentArticles = filtered
           .sort((a: any, b: any) => featuredSlugs.indexOf(a.slug) - featuredSlugs.indexOf(b.slug))
-          .slice(0, 4);
-        if (recentArticles.length === 0) recentArticles = allNews.slice(0, 4);
+          .slice(0, 5);
+        if (recentArticles.length === 0) recentArticles = allNews.slice(0, 5);
       } else {
-        recentArticles = allNews.slice(0, 4);
+        recentArticles = allNews.slice(0, 5);
       }
     }
 

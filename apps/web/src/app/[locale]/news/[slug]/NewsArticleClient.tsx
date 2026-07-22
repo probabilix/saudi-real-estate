@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Calendar, User, ArrowLeft, Share2, Facebook, Twitter, Linkedin, Bookmark } from 'lucide-react';
-import { api, NewsPost } from '@/lib/api';
+import { Calendar, User, ArrowLeft, Share2, Facebook, Twitter, Linkedin, Bookmark, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { api, NewsPost, getApiBaseUrl } from '@/lib/api';
+import { useAuth } from '@/hooks/use-auth';
 
 function parseInlineMarkdown(text: string): string {
   return text
@@ -127,9 +128,60 @@ interface NewsArticleClientProps {
 }
 
 export default function NewsArticleClient({ post, relatedPosts, locale, initialIsSaved }: NewsArticleClientProps) {
+  const { user, isAuthenticated } = useAuth();
   const [isSaved, setIsSaved] = useState(initialIsSaved);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterName, setNewsletterName] = useState('');
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
+  const [isNewsletterSubmitting, setIsNewsletterSubmitting] = useState(false);
+  const [newsletterError, setNewsletterError] = useState('');
   const isRTL = locale === 'ar';
+
+  useEffect(() => {
+    if (isAuthenticated && user?.email) {
+      setNewsletterEmail(user.email);
+      if (user.name) {
+        setNewsletterName(user.name);
+      }
+
+      // Check if user is already actively subscribed
+      fetch(`${getApiBaseUrl()}/newsletter/check-status?email=${encodeURIComponent(user.email)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.isSubscribed) {
+            setNewsletterSubscribed(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAuthenticated, user]);
+
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail) return;
+
+    setIsNewsletterSubmitting(true);
+    setNewsletterError('');
+
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/newsletter/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newsletterEmail, name: newsletterName }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNewsletterSubscribed(true);
+      } else {
+        setNewsletterError(data.message || (isRTL ? 'فشل الاشتراك. يرجى المحاولة مرة أخرى.' : 'Failed to subscribe. Please try again.'));
+      }
+    } catch {
+      setNewsletterError(isRTL ? 'خطأ في الاتصال بالشبكة.' : 'Network connection error.');
+    } finally {
+      setIsNewsletterSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     async function checkSavedStatus() {
@@ -157,17 +209,6 @@ export default function NewsArticleClient({ post, relatedPosts, locale, initialI
     <div className="bg-white min-h-screen">
       {/* ── Main Layout Container ── */}
       <div className="max-w-7xl mx-auto px-4 pt-8 pb-16">
-        
-        {/* Breadcrumb link */}
-        <div className="mb-6">
-          <Link
-            href={`/${locale}/news`}
-            className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-primary-600 transition-colors group"
-          >
-            <ArrowLeft className={`w-3.5 h-3.5 transition-transform group-hover:-translate-x-1 ${isRTL ? 'rotate-180 group-hover:translate-x-1' : ''}`} />
-            {isRTL ? 'العودة إلى الأخبار' : 'Back to News'}
-          </Link>
-        </div>
 
         {/* Top Section: Main Featured Image & Related News Widgets */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
@@ -388,7 +429,7 @@ export default function NewsArticleClient({ post, relatedPosts, locale, initialI
                   >
                     <button
                       onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                      className={`w-full px-6 py-5 flex items-center justify-between gap-4 text-left font-bold text-gray-900 text-base md:text-lg transition-colors ${isRTL ? 'text-right flex-row-reverse font-arabic' : ''}`}
+                      className={`w-full px-6 py-4 flex items-center justify-between gap-4 text-left font-bold text-gray-900 text-sm sm:text-base transition-colors ${isRTL ? 'text-right flex-row-reverse font-arabic' : ''}`}
                     >
                       <span>{question}</span>
                       <span className={`transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''} text-primary-600 shrink-0`}>
@@ -404,7 +445,7 @@ export default function NewsArticleClient({ post, relatedPosts, locale, initialI
                       transition={{ duration: 0.25, ease: 'easeInOut' }}
                       className="overflow-hidden"
                     >
-                      <div className={`px-6 pb-6 pt-1 text-gray-600 leading-relaxed text-sm md:text-base border-t border-gray-100/50 ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}>
+                      <div className={`px-6 pb-5 pt-1 text-gray-650 leading-relaxed text-[13px] sm:text-sm border-t border-gray-100/50 ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}>
                         {answer}
                       </div>
                     </motion.div>
@@ -415,6 +456,139 @@ export default function NewsArticleClient({ post, relatedPosts, locale, initialI
           </div>
         </section>
       )}
+
+      {/* ── Newsletter CTA Section ── */}
+      <section className="max-w-7xl mx-auto px-4 pb-20 pt-8">
+        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-charcoal via-slate-900 to-[#0c1f24] p-8 sm:p-12 lg:p-16 text-white shadow-xl border border-white/10">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-primary-600/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative max-w-3xl mx-auto text-center space-y-6">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 text-primary-300 text-xs font-bold uppercase tracking-widest backdrop-blur-sm border border-white/10">
+              {isRTL ? 'نشرتنا العقارية' : 'Property Insights Newsletter'}
+            </div>
+            
+            <h2 className={`text-2xl sm:text-4xl font-black text-white tracking-tight ${isRTL ? 'font-arabic' : 'font-serif'}`}>
+              {isRTL ? 'اشترك في نشرتنا للحصول على أحدث المقالات والتحديثات' : 'Stay Ahead of the Saudi Real Estate Market'}
+            </h2>
+            
+            <p className={`text-sm sm:text-base text-gray-300 leading-relaxed max-w-2xl mx-auto ${isRTL ? 'font-arabic' : 'font-sans'}`}>
+              {isRTL 
+                ? 'انضم إلى آلاف المستثمرين والمشترين للحصول على التحليلات الشهرية، والتغيرات التنظيمية، والفرص العقارية المباشرة.'
+                : 'Join thousands of investors and homebuyers receiving monthly market analytics, regulatory updates, and exclusive property insights.'
+              }
+            </p>
+
+            {newsletterSubscribed ? (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-6 sm:p-8 rounded-3xl bg-emerald-500/15 border border-emerald-500/30 text-center space-y-3 max-w-lg mx-auto backdrop-blur-md">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-base sm:text-lg font-bold text-white">
+                    {isRTL ? 'أنت مشترك بالفعل في النشرة الإخبارية!' : 'You are subscribed to our newsletter!'}
+                  </h4>
+                  <p className="text-xs sm:text-sm text-gray-300 mt-1">
+                    {isRTL ? 'تصلك أحدث التحليلات والتحديثات العقارية الشهرية بانتظام.' : 'You are receiving our monthly market analytics and exclusive property updates.'}
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Link
+                    href={`/${locale}/unsubscribe`}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline transition-colors"
+                  >
+                    {isRTL ? 'إدارة الاشتراك أو إلغاء الاشتراك' : 'Manage subscription or unsubscribe'}
+                  </Link>
+                </div>
+              </motion.div>
+            ) : (
+              <div className="space-y-4">
+                <form 
+                  onSubmit={handleNewsletterSubmit}
+                  className="flex flex-col gap-3 max-w-lg mx-auto pt-2"
+                >
+                  <div className="flex flex-col sm:flex-row gap-3 w-full">
+                    {!isAuthenticated ? (
+                      <>
+                        <input
+                          type="text"
+                          required
+                          disabled={isNewsletterSubmitting}
+                          placeholder={isRTL ? 'أدخل اسمك الكامل...' : 'Enter your full name...'}
+                          value={newsletterName}
+                          onChange={(e) => setNewsletterName(e.target.value)}
+                          className={`flex-1 px-5 py-4 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm backdrop-blur-sm ${isRTL ? 'font-arabic text-right' : 'font-sans'} disabled:opacity-50`}
+                        />
+                        <input
+                          type="email"
+                          required
+                          disabled={isNewsletterSubmitting}
+                          placeholder={isRTL ? 'أدخل بريدك الإلكتروني...' : 'Enter your email address...'}
+                          value={newsletterEmail}
+                          onChange={(e) => setNewsletterEmail(e.target.value)}
+                          className={`flex-1 px-5 py-4 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm backdrop-blur-sm ${isRTL ? 'font-arabic text-right' : 'font-sans'} disabled:opacity-50`}
+                        />
+                      </>
+                    ) : (
+                      <div className="w-full">
+                        <input
+                          type="email"
+                          required
+                          disabled={true}
+                          value={newsletterEmail}
+                          className={`w-full px-5 py-4 rounded-2xl bg-white/10 border border-white/20 text-white/80 placeholder-gray-400 focus:outline-none text-sm backdrop-blur-sm cursor-not-allowed ${isRTL ? 'font-arabic text-right' : 'font-sans'}`}
+                        />
+                        <p className={`text-[11px] text-primary-300 mt-1.5 ${isRTL ? 'font-arabic text-right' : ''}`}>
+                          {isRTL ? `سيتم الاشتراك ببيانات حسابك النشط (${user?.name || user?.email})` : `Subscribing with your active account (${user?.name || user?.email})`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isNewsletterSubmitting}
+                    className={`w-full py-4 bg-primary-600 hover:bg-primary-500 text-white font-bold text-sm rounded-2xl transition-all shadow-lg shadow-primary-600/30 hover:scale-102 active:scale-98 flex items-center justify-center gap-2 ${isRTL ? 'font-arabic' : ''} disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {isNewsletterSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {isRTL ? 'اشترك الآن' : 'Subscribe Now'}
+                  </button>
+                </form>
+
+                {newsletterError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-red-500/20 border border-red-500/30 rounded-2xl text-red-200 text-xs flex items-center gap-2 max-w-lg mx-auto"
+                  >
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>{newsletterError}</span>
+                  </motion.div>
+                )}
+              </div>
+            )}
+
+            <p className="text-[11px] text-gray-400">
+              {isRTL ? (
+                <>
+                  نحن نحترم خصوصيتك. يمكنك{' '}
+                  <Link href={`/${locale}/unsubscribe`} className="underline hover:text-white transition-colors">
+                    إلغاء الاشتراك
+                  </Link>{' '}
+                  في أي وقت.
+                </>
+              ) : (
+                <>
+                  We respect your privacy.{' '}
+                  <Link href={`/${locale}/unsubscribe`} className="underline hover:text-white transition-colors">
+                    Unsubscribe
+                  </Link>{' '}
+                  at any time.
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -20,7 +20,8 @@ export default function NavWrapper({ children, locale }: NavWrapperProps) {
     pathname.includes('/verify') ||
     pathname.includes('/post-property') ||
     pathname.includes('/edit-property') ||
-    pathname.includes('/compare');
+    pathname.includes('/compare') ||
+    pathname.includes('/unsubscribe');
 
   if (isMinimalPage) {
     return <main className="flex-1">{children}</main>;

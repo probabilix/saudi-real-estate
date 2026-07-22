@@ -117,7 +117,7 @@ export default function RecentArticlesSection({ articles = [] }: RecentArticlesP
           </Link>
         </div>
 
-        {/* Magazine layout: 1 large + 2 stacked */}
+        {/* Magazine layout: 1 large + 3 stacked */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
           {/* Featured (large) article */}
@@ -129,51 +129,53 @@ export default function RecentArticlesSection({ articles = [] }: RecentArticlesP
               transition={{ duration: 0.7 }}
               className="lg:col-span-3 group"
             >
-              <Link href={`/${locale}/news/${featured.slug}`} className="block h-full">
-                <div className="relative aspect-[4/3] sm:aspect-[16/9] lg:aspect-[4/3] rounded-2xl sm:rounded-3xl overflow-hidden bg-gray-100 mb-5">
-                  <Image
-                    src={featuredImage as string}
-                    alt={featuredTitle}
-                    fill
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    sizes="(max-width: 1024px) 100vw, 60vw"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-charcoal/70 via-charcoal/10 to-transparent" />
-                  {/* Featured badge */}
-                  <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-gold/90 backdrop-blur text-[10px] font-black text-white uppercase tracking-widest">
-                    {isRTL ? 'مقال مميز' : 'Featured'}
+              <Link href={`/${locale}/news/${featured.slug}`} className="flex flex-col justify-between h-full bg-white rounded-3xl p-5 sm:p-6 border border-gray-100 hover:border-primary-100 hover:shadow-lg transition-all duration-300">
+                <div>
+                  <div className="relative aspect-[16/8.5] rounded-2xl overflow-hidden bg-gray-100 mb-4 shrink-0">
+                    <Image
+                      src={featuredImage as string}
+                      alt={featuredTitle}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 1024px) 100vw, 60vw"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-charcoal/60 via-transparent to-transparent" />
+                    {/* Featured badge */}
+                    <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-gold/90 backdrop-blur text-[10px] font-black text-white uppercase tracking-widest shadow-sm">
+                      {isRTL ? 'مقال مميز' : 'Featured'}
+                    </div>
                   </div>
+
+                  <div className="flex items-center gap-4 text-[10px] font-bold text-charcoal-muted uppercase tracking-wider mb-2">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {formatDate(featured.publishedAt || featured.createdAt)}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      {readingTime(featuredExcerpt)} {isRTL ? 'د قراءة' : 'min read'}
+                    </span>
+                  </div>
+
+                  <h3 className={`text-lg sm:text-xl font-bold text-charcoal group-hover:text-primary-600 transition-colors line-clamp-2 leading-snug mb-2 ${isRTL ? 'font-arabic' : 'font-serif'}`}>
+                    {featuredTitle}
+                  </h3>
+                  <p className={`text-xs text-charcoal-muted leading-relaxed line-clamp-2 ${isRTL ? 'font-arabic' : ''}`}>
+                    {featuredExcerpt}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-4 text-[11px] font-bold text-charcoal-muted uppercase tracking-wider mb-3">
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {formatDate(featured.publishedAt || featured.createdAt)}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
-                    {readingTime(featuredExcerpt)} {isRTL ? 'د قراءة' : 'min read'}
-                  </span>
-                </div>
-
-                <h3 className={`text-xl sm:text-2xl font-bold text-charcoal group-hover:text-primary-600 transition-colors leading-snug mb-3 ${isRTL ? 'font-arabic' : 'font-serif'}`}>
-                  {featuredTitle}
-                </h3>
-                <p className={`text-sm text-charcoal-muted leading-relaxed line-clamp-3 ${isRTL ? 'font-arabic' : ''}`}>
-                  {featuredExcerpt}
-                </p>
-
-                <div className="mt-4 inline-flex items-center gap-2 text-primary-600 font-bold text-xs sm:text-sm uppercase tracking-wider group/btn">
-                  {isRTL ? 'اقرأ المقال' : 'Read Article'}
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-primary-600 font-bold text-xs uppercase tracking-wider group/btn">
+                  <span>{isRTL ? 'اقرأ المقال الكامل' : 'Read Full Article'}</span>
                   <ArrowRight className={`w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-1 ${isRTL ? 'rotate-180 group-hover/btn:-translate-x-1' : ''}`} />
                 </div>
               </Link>
             </motion.article>
           )}
 
-          {/* Three stacked secondary articles */}
-          <div className="lg:col-span-2 flex flex-col gap-5">
-            {rest.slice(0, 3).map((article, i) => {
+          {/* Four stacked secondary articles */}
+          <div className="lg:col-span-2 flex flex-col gap-4">
+            {rest.slice(0, 4).map((article, i) => {
               const title = isRTL ? article.titleAr : article.titleEn;
               const excerpt = isRTL ? article.excerptAr : article.excerptEn;
               const image = article.featuredImage || fallbackArticles[(i + 1) % fallbackArticles.length]?.featuredImage;
@@ -185,36 +187,41 @@ export default function RecentArticlesSection({ articles = [] }: RecentArticlesP
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: '-40px' }}
                   transition={{ duration: 0.6, delay: i * 0.1 }}
-                  className="group flex gap-4 bg-white rounded-2xl p-4 border border-gray-100 hover:border-primary-100 hover:shadow-lg transition-all duration-300"
+                  className="group flex gap-4 bg-white rounded-2xl p-4 sm:p-4.5 border border-gray-100 hover:border-primary-100 hover:shadow-md transition-all duration-300"
                 >
-                  <Link href={`/${locale}/news/${article.slug}`} className="flex gap-4 w-full">
+                  <Link href={`/${locale}/news/${article.slug}`} className="flex gap-4 w-full items-center">
                     {image && (
-                      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                      <div className="relative w-22 h-22 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                         <Image
                           src={image}
                           alt={title}
                           fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-110"
-                          sizes="112px"
+                          className="object-cover"
+                          sizes="96px"
                         />
                       </div>
                     )}
                     <div className="flex flex-col justify-between min-w-0 flex-1">
                       <div>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-charcoal-muted uppercase tracking-wider mb-2">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-charcoal-muted uppercase tracking-wider mb-1.5">
                           <Calendar className="w-3 h-3 flex-shrink-0" />
                           {formatDate(article.publishedAt || article.createdAt)}
                           <span className="w-px h-3 bg-gray-200" />
                           <Clock className="w-3 h-3 flex-shrink-0" />
                           {readingTime(excerpt)}m
                         </div>
-                        <h3 className={`text-sm sm:text-base font-bold text-charcoal group-hover:text-primary-600 transition-colors line-clamp-2 leading-snug ${isRTL ? 'font-arabic' : 'font-serif'}`}>
+                        <h3 className={`text-xs sm:text-sm font-bold text-charcoal group-hover:text-primary-600 transition-colors line-clamp-2 leading-snug ${isRTL ? 'font-arabic' : 'font-serif'}`}>
                           {title}
                         </h3>
+                        {excerpt && (
+                          <p className={`text-[11px] text-charcoal-muted line-clamp-1 mt-1 leading-normal ${isRTL ? 'font-arabic' : ''}`}>
+                            {excerpt}
+                          </p>
+                        )}
                       </div>
-                      <div className="mt-2 text-primary-600 font-bold text-[11px] uppercase tracking-wider inline-flex items-center gap-1">
+                      <div className="mt-2 text-primary-600 font-bold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
                         {isRTL ? 'اقرأ' : 'Read'}
-                        <ArrowRight className={`w-3 h-3 ${isRTL ? 'rotate-180' : ''}`} />
+                        <ArrowRight className={`w-3.5 h-3.5 ${isRTL ? 'rotate-180' : ''}`} />
                       </div>
                     </div>
                   </Link>

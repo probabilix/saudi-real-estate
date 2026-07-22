@@ -8,7 +8,7 @@ import {
   Info, Loader2, CheckCircle2, AlertCircle,
   Twitter, Instagram, Linkedin, MessageSquare,
   Youtube, Facebook, Newspaper, Mail, Phone, MapPin,
-  Image as ImageIcon, Check, ChevronDown
+  Image as ImageIcon, Check, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { CldUploadWidget } from 'next-cloudinary';
 import clsx from 'clsx';
@@ -405,7 +405,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-surface-900">Homepage Featured Articles</h2>
-              <p className="text-xs text-surface-500">Select exactly up to 3 published news posts to feature on the homepage blog grid</p>
+              <p className="text-xs text-surface-500">Select up to 5 published news posts to feature on the homepage blog grid (1 main + 4 secondary)</p>
             </div>
           </div>
           
@@ -948,7 +948,6 @@ function FeaturedArticlesEditor({ value, onSave, isSaving }: { value: string, on
       try {
         const res = await adminApi.getAllNews();
         if (res.success && res.data) {
-          // Filter only published ones
           setPosts(res.data.filter((p: any) => p.isPublished));
         }
       } catch (err) {
@@ -963,29 +962,85 @@ function FeaturedArticlesEditor({ value, onSave, isSaving }: { value: string, on
   useEffect(() => {
     try {
       if (value) {
-        setSelectedSlugs(JSON.parse(value));
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          setSelectedSlugs(parsed);
+        }
       }
     } catch (e) {
       console.error('Failed to parse featured slugs', e);
     }
   }, [value]);
 
-  const handleToggle = (slug: string) => {
-    setSelectedSlugs(prev => {
-      if (prev.includes(slug)) {
-        return prev.filter(s => s !== slug);
-      } else {
-        if (prev.length >= 4) {
-          alert('You can select a maximum of 4 featured articles for the homepage.');
-          return prev;
-        }
-        return [...prev, slug];
+  // Compute active selected slugs that match existing published posts
+  const activeSelectedSlugs = selectedSlugs.filter(s =>
+    posts.some(p => p.slug === s || p.id === s)
+  );
+
+  const handleToggle = (post: any) => {
+    const isCurrentlyChecked = activeSelectedSlugs.includes(post.slug) || activeSelectedSlugs.includes(post.id);
+
+    if (isCurrentlyChecked) {
+      setSelectedSlugs(prev => prev.filter(s => s !== post.slug && s !== post.id));
+    } else {
+      if (activeSelectedSlugs.length >= 5) {
+        alert('You can select a maximum of 5 featured articles for the homepage.');
+        return;
       }
+      setSelectedSlugs(prev => [...prev.filter(s => posts.some(p => p.slug === s || p.id === s)), post.slug]);
+    }
+  };
+
+  const handleMoveUp = (post: any) => {
+    setSelectedSlugs(prev => {
+      const targetSlug = prev.find(s => s === post.slug || s === post.id) || post.slug;
+      const idx = prev.indexOf(targetSlug);
+      if (idx <= 0) return prev;
+      const copy = [...prev];
+      const temp = copy[idx - 1];
+      copy[idx - 1] = copy[idx];
+      copy[idx] = temp;
+      return copy;
     });
+  };
+
+  const handleMoveDown = (post: any) => {
+    setSelectedSlugs(prev => {
+      const targetSlug = prev.find(s => s === post.slug || s === post.id) || post.slug;
+      const idx = prev.indexOf(targetSlug);
+      if (idx === -1 || idx >= prev.length - 1) return prev;
+      const copy = [...prev];
+      const temp = copy[idx + 1];
+      copy[idx + 1] = copy[idx];
+      copy[idx] = temp;
+      return copy;
+    });
+  };
+
+  const handleClearAll = () => {
+    setSelectedSlugs([]);
   };
 
   return (
     <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between text-xs font-bold text-surface-700 pb-2 border-b border-surface-100">
+        <div className="flex items-center gap-3">
+          <span>Selected Featured Articles</span>
+          {selectedSlugs.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-[10px] text-red-600 hover:underline font-normal"
+            >
+              Clear selections
+            </button>
+          )}
+        </div>
+        <span className="bg-primary-50 text-primary-700 px-2.5 py-0.5 rounded-full font-mono text-[11px]">
+          {activeSelectedSlugs.length} / 5
+        </span>
+      </div>
+
       {loading ? (
         <div className="text-center py-4">
           <Loader2 className="w-5 h-5 animate-spin text-primary-600 mx-auto" />
@@ -995,27 +1050,60 @@ function FeaturedArticlesEditor({ value, onSave, isSaving }: { value: string, on
       ) : (
         <div className="space-y-3">
           {posts.map((post) => {
-            const isChecked = selectedSlugs.includes(post.slug);
+            const orderIndex = activeSelectedSlugs.findIndex(s => s === post.slug || s === post.id);
+            const isChecked = orderIndex !== -1;
             return (
-              <label key={post.id} className="flex items-start gap-3 p-3 hover:bg-surface-50 rounded-xl cursor-pointer transition-colors border border-surface-100">
-                <input 
-                  type="checkbox" 
-                  className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 mt-0.5" 
-                  checked={isChecked}
-                  onChange={() => handleToggle(post.slug)}
-                />
-                <div>
-                  <span className="text-xs font-bold text-surface-900 block">{post.titleEn}</span>
-                  <span className="text-[10px] text-surface-400 font-mono block mt-0.5">{post.slug}</span>
-                </div>
-              </label>
+              <div key={post.id} className={`flex items-center justify-between gap-3 p-3 rounded-xl transition-colors border ${isChecked ? 'bg-primary-50/40 border-primary-300' : 'hover:bg-surface-50 border-surface-100'}`}>
+                <label className="flex items-start gap-3 cursor-pointer flex-1 min-w-0">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 mt-0.5" 
+                    checked={isChecked}
+                    onChange={() => handleToggle(post)}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-surface-900 block truncate">{post.titleEn}</span>
+                      {isChecked && (
+                        <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-primary-600 text-white shrink-0">
+                          #{orderIndex + 1}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-surface-400 font-mono block mt-0.5 truncate">{post.slug}</span>
+                  </div>
+                </label>
+
+                {isChecked && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      disabled={orderIndex === 0}
+                      onClick={() => handleMoveUp(post)}
+                      className="p-1 rounded-lg hover:bg-white border border-surface-200 text-surface-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      title="Move Up in Display Order"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={orderIndex === activeSelectedSlugs.length - 1}
+                      onClick={() => handleMoveDown(post)}
+                      className="p-1 rounded-lg hover:bg-white border border-surface-200 text-surface-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      title="Move Down in Display Order"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       )}
       <div className="flex justify-end pt-4 border-t border-surface-100">
         <button 
-          onClick={() => onSave(JSON.stringify(selectedSlugs))}
+          onClick={() => onSave(JSON.stringify(activeSelectedSlugs))}
           disabled={isSaving}
           className="btn-primary"
         >

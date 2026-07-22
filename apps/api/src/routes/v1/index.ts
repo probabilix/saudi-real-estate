@@ -14,6 +14,7 @@ import mortgageRoutes from './mortgage.routes';
 import wizardRoutes from './wizard.routes';
 import billingRoutes from './billing.routes';
 import viewsRoutes from './views.routes';
+import newsletterRoutes from './newsletter.routes';
 
 /**
  * API v1 Route Registration
@@ -78,4 +79,7 @@ export default async function v1Routes(app: FastifyInstance) {
 
   // ── Property View Tracking Module ──
   await app.register(viewsRoutes, { prefix: '/views' });
+
+  // ── Newsletter Module ──
+  await app.register(newsletterRoutes, { prefix: '/newsletter' });
 }

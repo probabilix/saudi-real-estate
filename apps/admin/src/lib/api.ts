@@ -168,6 +168,19 @@ export const adminApi = {
       body: JSON.stringify({ value }),
     }),
 
+  // ── Newsletter ──
+  getNewsletterSubscribers: () => request<{
+    subscribers: { id: string; email: string; name: string | null; status: string; createdAt: string; updatedAt: string }[];
+    stats: { active: number; requested: number; unsubscribed: number }
+  }>('/newsletter/admin/list'),
+  updateNewsletterStatus: (id: string, status: string) =>
+    request(`/newsletter/admin/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    }),
+  deleteNewsletterSubscriber: (id: string) =>
+    request(`/newsletter/admin/${id}`, { method: 'DELETE' }),
+
   // ── News ──
   getAllNews: () => request<NewsPost[]>('/admin/news'),
   createNews: (data: Partial<NewsPost>) =>

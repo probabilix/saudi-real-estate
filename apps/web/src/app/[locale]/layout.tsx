@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, DM_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
-import { unstable_setRequestLocale } from 'next-intl/server';
+import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { locales } from '@/i18n';
 import { AuthProvider } from '@/hooks/use-auth';
@@ -34,12 +34,49 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  const t = await getTranslations({ locale, namespace: 'metadata' });
+  const base = process.env.NEXT_PUBLIC_WEB_URL || 'https://tamleeq.sa';
+  const isAr = locale === 'ar';
+
   return {
+    metadataBase: new URL(base),
+    title: {
+      default: t('title'),
+      template: `%s | ${t('brandName')}`,
+    },
+    description: t('description'),
+    keywords: isAr
+      ? ['عقارات السعودية', 'شقق للبيع الرياض', 'فلل للبيع جدة', 'هيئة العقار', 'تمليك']
+      : ['Saudi real estate', 'properties for sale Riyadh', 'villas Jeddah', 'apartments Saudi Arabia', 'REGA licensed brokers', 'Tamleeq'],
+    openGraph: {
+      type: 'website',
+      locale: isAr ? 'ar_SA' : 'en_US',
+      siteName: t('brandName'),
+      url: `${base}/${locale}`,
+      images: [
+        {
+          url: '/og-image.jpg',
+          width: 1200,
+          height: 630,
+          alt: t('title'),
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: t('title'),
+      description: t('description'),
+    },
     alternates: {
+      canonical: `${base}/${locale}`,
       languages: {
-        en: '/en',
-        ar: '/ar',
+        en: `${base}/en`,
+        ar: `${base}/ar`,
       },
     },
   };

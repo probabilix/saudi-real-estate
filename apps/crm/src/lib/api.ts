@@ -198,10 +198,21 @@ export const crmApi = {
   // ── Project Inventory Units ──
   getListingUnits: (listingId: string) =>
     request<CrmProjectUnit[]>(`/listings/${listingId}/units`),
-  updateListingUnit: (listingId: string, unitId: string, data: { status: string }) =>
+  getPropertyViewStats: (propertyId: string, period: string) =>
+    request<Array<{ day: string; views: number }>>(`/views/stats/${propertyId}?period=${period}`),
+  addListingUnits: (listingId: string, units: Array<{ unitNumber: string; floor: number; type: string; status?: string; price?: number }>) =>
+    request<CrmProjectUnit[]>(`/listings/${listingId}/units`, {
+      method: 'POST',
+      body: JSON.stringify({ units }),
+    }),
+  updateListingUnit: (listingId: string, unitId: string, data: { unitNumber?: string; floor?: number; type?: string; status?: string; price?: number | null }) =>
     request<CrmProjectUnit>(`/listings/${listingId}/units/${unitId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+  deleteListingUnit: (listingId: string, unitId: string) =>
+    request(`/listings/${listingId}/units/${unitId}`, {
+      method: 'DELETE',
     }),
 
   // ── Listings Management (Broker Cockpit) ──
@@ -234,6 +245,15 @@ export const crmApi = {
       body: JSON.stringify(data),
     }),
 
+  getProjectDetails: (id: string) =>
+    request<{ project: any; layouts: any[] }>(`/listings/projects/${id}`),
+
+  updateProject: (id: string, data: any) =>
+    request<{ success: boolean; data: any }>(`/listings/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   publishListing: (id: string) =>
     request(`/listings/${id}/publish`, {
       method: 'POST',
@@ -241,6 +261,11 @@ export const crmApi = {
 
   featureListing: (id: string, days: number) =>
     request(`/listings/${id}/feature`, {
+      method: 'POST',
+      body: JSON.stringify({ days }),
+    }),
+  featureProject: (id: string, days: number) =>
+    request(`/listings/projects/${id}/feature`, {
       method: 'POST',
       body: JSON.stringify({ days }),
     }),
@@ -252,21 +277,7 @@ export const crmApi = {
     }),
 
   getProjects: () => request<CrmProject[]>('/listings/projects'),
-
-  getPropertyViewStats: (propertyId: string, period: string) =>
-    request<Array<{ day: string; views: number }>>(`/views/stats/${propertyId}?period=${period}`),
-
-
-  addListingUnits: (listingId: string, units: Array<{ unitNumber: string; floor: number; type: string; status?: string; price?: number }>) =>
-    request<CrmProjectUnit[]>(`/listings/${listingId}/units`, {
-      method: 'POST',
-      body: JSON.stringify({ units }),
-    }),
-
-  deleteListingUnit: (listingId: string, unitId: string) =>
-    request(`/listings/${listingId}/units/${unitId}`, {
-      method: 'DELETE',
-    }),
+  getMyProjects: () => request<CrmProject[]>('/listings/projects/my-projects'),
 
   // ── Billing / Credits ──
   getBillingPackages: () => request<CreditPackage[]>('/billing/packages'),

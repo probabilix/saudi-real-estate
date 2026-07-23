@@ -2,7 +2,7 @@
 // Platform-wide constants
 // ──────────────────────────────────────────────
 
-export const USER_ROLES = ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER', 'SALES_AGENT'] as const;
+export const USER_ROLES = ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER', 'SALES_AGENT', 'DEVELOPER'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export const LISTING_CATEGORIES = ['RESIDENTIAL', 'COMMERCIAL'] as const;

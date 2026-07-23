@@ -96,7 +96,7 @@ export default function UsersPage() {
       setEditRole(selectedUser.role || '');
       setCreditInput(selectedUser.creditsBalance || 0);
 
-      if (['SOLO_BROKER', 'AGENT', 'FIRM'].includes(selectedUser.role)) {
+      if (['SOLO_BROKER', 'AGENT', 'FIRM', 'DEVELOPER'].includes(selectedUser.role)) {
         setLoadingCredits(true);
         setBrokerCredits(null);
         adminApi.getBrokerCredits(selectedUser.id)
@@ -329,6 +329,7 @@ export default function UsersPage() {
               <option value="AGENT">Agents</option>
               <option value="SOLO_BROKER">Solo Brokers</option>
               <option value="SALES_AGENT">Sales Agents</option>
+              <option value="DEVELOPER">Developers / Project Owners</option>
               <option value="OWNER">Property Owners</option>
               <option value="BUYER">Buyers</option>
             </select>
@@ -572,6 +573,7 @@ export default function UsersPage() {
                       <option value="SOLO_BROKER">Solo Broker</option>
                       <option value="FIRM">Firm</option>
                       <option value="SALES_AGENT">Sales Agent</option>
+                      <option value="DEVELOPER">Developer / Project Owner</option>
                       <option value="ADMIN">Admin</option>
                     </select>
                   </div>
@@ -636,6 +638,7 @@ export default function UsersPage() {
                       <option value="AGENT">Agent</option>
                       <option value="SOLO_BROKER">Solo Broker</option>
                       <option value="SALES_AGENT">Sales Agent</option>
+                      <option value="DEVELOPER">Developer / Project Owner</option>
                       <option value="OWNER">Property Owner</option>
                       <option value="BUYER">Buyer</option>
                     </select>
@@ -837,7 +840,7 @@ export default function UsersPage() {
                                       setCreditInput(newBalance);
                                       setToast({ message: 'Credits granted successfully!', type: 'success' });
                                       // reload credit history
-                                      if (['SOLO_BROKER', 'AGENT', 'FIRM'].includes(selectedUser.role)) {
+                                      if (['SOLO_BROKER', 'AGENT', 'FIRM', 'DEVELOPER'].includes(selectedUser.role)) {
                                         adminApi.getBrokerCredits(selectedUser.id).then(res => {
                                           if (res.success && res.data) setBrokerCredits(res.data);
                                         });
@@ -875,7 +878,7 @@ export default function UsersPage() {
                   </div>
 
                   {/* Broker Credit History (Orders & Ledger) */}
-                  {['SOLO_BROKER', 'AGENT', 'FIRM'].includes(selectedUser.role) && (
+                  {['SOLO_BROKER', 'AGENT', 'FIRM', 'DEVELOPER'].includes(selectedUser.role) && (
                     <div className="space-y-4">
                       <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider">Credit Transactions & History</h3>
                       
@@ -1119,6 +1122,7 @@ export default function UsersPage() {
                   <option value="SOLO_BROKER">Solo Broker</option>
                   <option value="FIRM">Firm</option>
                   <option value="SALES_AGENT">Sales Agent</option>
+                  <option value="DEVELOPER">Developer / Project Owner</option>
                   <option value="ADMIN">Admin</option>
                 </select>
               </div>

@@ -411,7 +411,11 @@ export default async function listingsRoutes(app: FastifyInstance) {
         ));
       }
       if (status && status !== 'ALL') {
-        conditions.push(eq(projects.completionStatus, status as any));
+        if (['ACTIVE', 'DRAFT', 'FLAGGED', 'REMOVED'].includes(status)) {
+          conditions.push(eq(projects.status, status as any));
+        } else if (['READY', 'OFF_PLAN', 'UNDER_CONSTRUCTION'].includes(status)) {
+          conditions.push(eq(projects.completionStatus, status as any));
+        }
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -978,12 +982,44 @@ export default async function listingsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ success: false, message: 'At least one layout must be specified' });
     }
 
+    const userRole = request.user?.role;
+    const isAdmin = userRole === 'ADMIN';
+    const currentUserId = request.user?.userId;
+
+    if (!currentUserId) {
+      return reply.code(401).send({ success: false, message: 'Unauthorized' });
+    }
+
+    // Check credit balance if non-admin developer
+    let projectCost = 0;
+    let userRecord: any = null;
+    if (!isAdmin) {
+      projectCost = await SystemService.getProjectCost();
+      const [u] = await db.select({ creditsBalance: users.creditsBalance })
+        .from(users)
+        .where(eq(users.id, currentUserId))
+        .limit(1);
+      userRecord = u;
+      const currentBalance = userRecord?.creditsBalance ?? 0;
+      if (currentBalance < projectCost) {
+        return reply.code(400).send({
+          success: false,
+          message: `Insufficient credits. You need ${projectCost} credits to publish a project.`
+        });
+      }
+    }
+
+    const projectInitialStatus = isAdmin ? 'ACTIVE' : 'FLAGGED';
+    const layoutInitialStatus = isAdmin ? 'ACTIVE' : 'FLAGGED';
+
     try {
       // Auto-parse lat/lng from project mapEmbedUrl
       const projectCoords = project.mapEmbedUrl ? extractLatLng(project.mapEmbedUrl) : null;
 
       // Create project record
       const [newProject] = await db.insert(projects).values({
+        ownerId: finalOwnerId,
+        status: projectInitialStatus as any,
         nameEn: project.nameEn,
         nameAr: project.nameAr,
         descriptionEn: project.descriptionEn,
@@ -1001,7 +1037,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
         completionStatus: project.completionStatus,
         expectedDelivery: project.expectedDelivery,
         totalUnits: project.totalUnits,
-        isFeatured: project.isFeatured !== undefined ? !!project.isFeatured : false,
+        isFeatured: isAdmin ? (project.isFeatured !== undefined ? !!project.isFeatured : false) : false,
         featuredOrder: project.featuredOrder !== undefined ? (project.featuredOrder === null ? 0 : Number(project.featuredOrder)) : 0,
         foreignerEligible: project.foreignerEligible !== undefined ? !!project.foreignerEligible : false,
         muslimOnly: project.muslimOnly !== undefined ? !!project.muslimOnly : false,
@@ -1009,6 +1045,25 @@ export default async function listingsRoutes(app: FastifyInstance) {
         updatedAt: new Date(),
       }).returning();
 
+      // Deduct credits if non-admin
+      if (!isAdmin && projectCost > 0 && userRecord) {
+        const currentBalance = userRecord.creditsBalance ?? 0;
+        const newBalance = currentBalance - projectCost;
+        await db.update(users)
+          .set({ creditsBalance: newBalance })
+          .where(eq(users.id, currentUserId));
+
+        await db.insert(creditLedger).values({
+          brokerId: currentUserId,
+          type: 'PROJECT_PUBLISH',
+          amount: -projectCost,
+          balanceAfter: newBalance,
+          refProjectId: newProject.id,
+          description: `Published project: ${newProject.nameEn}`,
+          performedById: currentUserId,
+          createdAt: new Date(),
+        });
+      }
 
       // Helper to generate SRE short id
       const generateLocalShortId = () => {
@@ -1029,7 +1084,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
           projectId: newProject.id,
           type: 'APARTMENT', // Default layout type
           purpose: 'SALE', // Default layout purpose
-          status: 'ACTIVE', // Default bulk layouts to ACTIVE so they show on public frontend
+          status: layoutInitialStatus as any,
           city: project.city,
           district: project.district || null,
           arTitle: `${project.nameAr} - ${layout.labelAr}`,
@@ -1073,6 +1128,199 @@ export default async function listingsRoutes(app: FastifyInstance) {
       });
     }
   });
+
+  /**
+   * GET /api/v1/listings/projects/my-projects
+   * Fetch developer's owned projects
+   */
+  app.get('/projects/my-projects', { preHandler: [authenticateJWT] }, async (request, reply) => {
+    try {
+      const userId = request.user?.userId;
+      if (!userId) {
+        return reply.code(401).send({ success: false, message: 'Unauthorized' });
+      }
+
+      const myProjects = await db.select()
+        .from(projects)
+        .where(eq(projects.ownerId, userId))
+        .orderBy(desc(projects.createdAt));
+
+      const projectIds = myProjects.map(p => p.id);
+      const layoutCounts: Record<string, number> = {};
+
+      if (projectIds.length > 0) {
+        const layouts = await db.select({ id: listings.id, projectId: listings.projectId })
+          .from(listings)
+          .where(and(inArray(listings.projectId, projectIds), isNull(listings.deletedAt)));
+
+        layouts.forEach(l => {
+          if (l.projectId) {
+            layoutCounts[l.projectId] = (layoutCounts[l.projectId] || 0) + 1;
+          }
+        });
+      }
+
+      const data = myProjects.map(p => ({
+        ...p,
+        layoutCount: layoutCounts[p.id] || 0,
+      }));
+
+      return reply.send({ success: true, data });
+    } catch (err: any) {
+      console.error('Fetch my-projects error:', err);
+      return reply.status(500).send({ success: false, message: 'Failed to fetch developer projects', error: err.message });
+    }
+  });
+
+  /**
+   * PATCH /api/v1/listings/projects/:id/status
+   * Toggle or update project status (Admin or Project Owner)
+   */
+  app.patch('/projects/:id/status', { preHandler: [authenticateJWT] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { status } = request.body as { status: 'ACTIVE' | 'DRAFT' | 'FLAGGED' | 'REMOVED' };
+
+    if (!['ACTIVE', 'DRAFT', 'FLAGGED', 'REMOVED'].includes(status)) {
+      return reply.code(400).send({ success: false, message: 'Invalid status value' });
+    }
+
+    try {
+      const [existing] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+      if (!existing) {
+        return reply.code(404).send({ success: false, message: 'Project not found' });
+      }
+
+      const isAdmin = request.user?.role === 'ADMIN';
+      const isOwner = existing.ownerId === request.user?.userId;
+
+      if (!isAdmin && !isOwner) {
+        return reply.code(403).send({ success: false, message: 'Forbidden: You do not own this project' });
+      }
+
+      // Update project status
+      const [updatedProject] = await db.update(projects)
+        .set({ status: status as any, updatedAt: new Date() })
+        .where(eq(projects.id, id))
+        .returning();
+
+      // Cascade status update to layout listings
+      await db.update(listings)
+        .set({ status: status as any, updatedAt: new Date() })
+        .where(eq(listings.projectId, id));
+
+      return reply.send({ success: true, data: updatedProject });
+    } catch (err: any) {
+      console.error('Update project status error:', err);
+      return reply.status(500).send({ success: false, message: 'Failed to update project status', error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/v1/listings/projects/:id/feature
+   * Feature a project (Deducts credits for non-admin developers)
+   */
+  app.post('/projects/:id/feature', { preHandler: [authenticateJWT] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { days } = request.body as { days: number };
+
+    if (![7, 30].includes(days)) {
+      return reply.code(400).send({ success: false, message: 'Invalid duration. Only 7 or 30 days are supported.' });
+    }
+
+    try {
+      const [existing] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+      if (!existing) {
+        return reply.code(404).send({ success: false, message: 'Project not found' });
+      }
+
+      const isAdmin = request.user?.role === 'ADMIN';
+      const isOwner = existing.ownerId === request.user?.userId;
+
+      if (!isAdmin && !isOwner) {
+        return reply.code(403).send({ success: false, message: 'Forbidden: You do not own this project' });
+      }
+
+      let featureCost = 0;
+      let newBalance = 0;
+      const currentUserId = request.user?.userId;
+
+      if (!isAdmin) {
+        if (!currentUserId) {
+          return reply.code(401).send({ success: false, message: 'Unauthorized' });
+        }
+
+        const cost7 = parseInt(await SystemService.getSetting('project_feature_cost_7_days', '15'), 10);
+        const cost30 = parseInt(await SystemService.getSetting('project_feature_cost_credits', '40'), 10);
+        featureCost = days === 7 ? cost7 : cost30;
+
+        const [u] = await db.select({ creditsBalance: users.creditsBalance })
+          .from(users)
+          .where(eq(users.id, currentUserId))
+          .limit(1);
+        const currentBalance = u?.creditsBalance ?? 0;
+
+        if (currentBalance < featureCost) {
+          return reply.code(400).send({
+            success: false,
+            message: `Insufficient credits. You need ${featureCost} credits to feature this project.`
+          });
+        }
+
+        newBalance = currentBalance - featureCost;
+      }
+
+      // Calculate featuredUntil date
+      const now = new Date();
+      let baseDate = now;
+      if (existing.isFeatured && existing.featuredUntil && new Date(existing.featuredUntil) > now) {
+        baseDate = new Date(existing.featuredUntil);
+      }
+      const featuredUntilDate = new Date(baseDate.getTime());
+      featuredUntilDate.setDate(featuredUntilDate.getDate() + days);
+
+      // Auto-assign featuredOrder if not featured or order is 0
+      let featuredOrder = existing.featuredOrder;
+      if (!existing.isFeatured || !featuredOrder || featuredOrder === 0) {
+        const maxOrderResult = await db.select({ maxOrder: sql<number>`COALESCE(MAX(${projects.featuredOrder}), 0)` })
+          .from(projects).where(and(eq(projects.isFeatured, true), sql`${projects.featuredUntil} IS NULL OR ${projects.featuredUntil} >= NOW()`));
+        featuredOrder = (Number(maxOrderResult[0]?.maxOrder) || 0) + 1;
+      }
+
+      // Perform updates
+      if (!isAdmin && currentUserId) {
+        await db.update(users)
+          .set({ creditsBalance: newBalance })
+          .where(eq(users.id, currentUserId));
+
+        await db.insert(creditLedger).values({
+          brokerId: currentUserId,
+          type: 'PROJECT_FEATURE',
+          amount: -featureCost,
+          balanceAfter: newBalance,
+          refProjectId: id,
+          description: `Featured project: ${existing.nameEn} for ${days} days`,
+          performedById: currentUserId,
+          createdAt: new Date(),
+        });
+      }
+
+      const [updatedProject] = await db.update(projects)
+        .set({
+          isFeatured: true,
+          featuredUntil: featuredUntilDate,
+          featuredOrder,
+          updatedAt: new Date()
+        })
+        .where(eq(projects.id, id))
+        .returning();
+
+      return reply.send({ success: true, data: updatedProject });
+    } catch (err: any) {
+      console.error('Feature project error:', err);
+      return reply.status(500).send({ success: false, message: 'Failed to feature project', error: err.message });
+    }
+  });
+
 
   /**
    * GET /api/v1/listings/projects/:id
@@ -1232,7 +1480,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
           return `SRE-${result}`;
         };
 
-        const finalOwnerId = request.user?.userId;
+        const finalOwnerId = updatedProject.ownerId || request.user?.userId;
 
         // 2. Update existing & insert new layouts
         for (const layout of layouts) {
@@ -1266,7 +1514,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
               projectId: id,
               type: 'APARTMENT',
               purpose: 'SALE',
-              status: 'ACTIVE',
+              status: updatedProject.status || 'ACTIVE',
               city,
               district: district || null,
               arTitle: `${nameAr} - ${layout.labelAr}`,
@@ -1345,6 +1593,10 @@ export default async function listingsRoutes(app: FastifyInstance) {
       if (body.totalUnits !== undefined) updateData.totalUnits = body.totalUnits !== null && body.totalUnits !== '' ? Number(body.totalUnits) : null;
       if (body.isFeatured !== undefined) updateData.isFeatured = !!body.isFeatured;
       if (body.featuredOrder !== undefined) updateData.featuredOrder = body.featuredOrder !== null && body.featuredOrder !== '' ? Number(body.featuredOrder) : 0;
+      if (body.featuredUntil !== undefined) {
+        updateData.featuredUntil = body.featuredUntil ? new Date(body.featuredUntil) : null;
+      }
+      if (body.status !== undefined) updateData.status = body.status;
 
       const [updatedProject] = await db.update(projects)
         .set(updateData)
@@ -1358,6 +1610,7 @@ export default async function listingsRoutes(app: FastifyInstance) {
       if (body.regaFalLicense !== undefined) propagateData.regaFalLicense = body.regaFalLicense;
       if (body.brochureUrl !== undefined) propagateData.brochureUrl = body.brochureUrl;
       if (body.brochureUrlAr !== undefined) propagateData.brochureUrlAr = body.brochureUrlAr;
+      if (body.status !== undefined) propagateData.status = body.status;
 
       if (Object.keys(propagateData).length > 0) {
         propagateData.updatedAt = new Date();

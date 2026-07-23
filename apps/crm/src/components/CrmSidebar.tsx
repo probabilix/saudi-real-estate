@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
 import {
   LayoutDashboard, Globe, Megaphone, Settings,
-  LogOut, ChevronRight, ChevronLeft, Building2,
+  LogOut, ChevronRight, ChevronLeft, Building2, Layers,
   X, Menu, AlertCircle, CreditCard, MessageCircle, Wand2, Scale, Calculator
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -33,6 +33,36 @@ const NAV_ADMIN = [
     label: 'System',
     items: [{ href: '/settings', label: 'Integrations', icon: Settings }],
   },
+];
+
+const NAV_DEVELOPER = [
+  {
+    label: 'Overview',
+    items: [
+      { href: '/', label: 'My Dashboard', icon: LayoutDashboard },
+      { href: '/comparison-insights', label: 'Comparison Insights', icon: Scale },
+    ],
+  },
+  {
+    label: 'Projects',
+    items: [
+      { href: '/my-projects', label: 'My Projects', icon: Layers }
+    ]
+  },
+  {
+    label: 'My Leads',
+    items: [
+      { href: '/website-leads', label: 'Website Leads', icon: Globe },
+      { href: '/campaign-leads', label: 'Campaign Leads', icon: Megaphone },
+    ],
+  },
+  {
+    label: 'Billing & Account',
+    items: [
+      { href: '/billing', label: 'Billing & Credits', icon: CreditCard },
+      { href: '/settings', label: 'Profile Settings', icon: Settings }
+    ]
+  }
 ];
 
 const NAV_AGENT = [
@@ -96,12 +126,13 @@ export function CrmSidebar({ unassigned = 0 }: CrmSidebarProps) {
     fetchLogo();
   }, []);
 
-  const nav = isAdmin ? NAV_ADMIN : NAV_AGENT;
+  const isDeveloper = user?.role === 'DEVELOPER';
   const isSoloBroker = user?.role === 'SOLO_BROKER';
+  const nav = isAdmin ? NAV_ADMIN : (isDeveloper ? NAV_DEVELOPER : NAV_AGENT);
   const filteredNav = nav.map(section => ({
     ...section,
     items: section.items.filter(item => {
-      if (isSoloBroker && item.href === '/campaign-leads') {
+      if ((isSoloBroker || isDeveloper) && item.href === '/campaign-leads') {
         return false;
       }
       return true;

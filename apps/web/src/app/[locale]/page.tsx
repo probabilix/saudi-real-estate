@@ -18,7 +18,9 @@ import { Listing } from '@saudi-re/shared';
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'metadata' });
   return {
-    title: t('title'),
+    title: {
+      absolute: t('title'),
+    },
     description: t('description'),
   };
 }

@@ -31,6 +31,8 @@ const LEDGER_TYPE_CFG = {
   LISTING_BUMP:    { label: 'Listing Bumped', icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
   ADMIN_GRANT:     { label: 'Admin Grant', icon: ArrowUpRight, color: 'text-indigo-600', bg: 'bg-indigo-50' },
   FIRM_GRANT:      { label: 'Firm Allocation', icon: Zap, color: 'text-purple-600', bg: 'bg-purple-50' },
+  PROJECT_PUBLISH: { label: 'Project Published', icon: ArrowDownLeft, color: 'text-red-500', bg: 'bg-red-50' },
+  PROJECT_FEATURE: { label: 'Project Featured', icon: Sparkles, color: 'text-amber-600', bg: 'bg-amber-50' },
 } as const;
 
 type Tab = 'store' | 'promote' | 'orders' | 'ledger';
@@ -247,6 +249,9 @@ export default function BillingPage() {
 
   // Promote Property States
   const [listings, setListings] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [promoteType, setPromoteType] = useState<'listing' | 'project'>('project');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   const [loadingListings, setLoadingListings] = useState(false);
   const [selectedListingId, setSelectedListingId] = useState('');
   const [selectedUpgradeDays, setSelectedUpgradeDays] = useState<number>(7);
@@ -258,7 +263,7 @@ export default function BillingPage() {
     setLoading(true);
     setLoadingListings(true);
     try {
-      const [pkgRes, balRes, ordRes, ledRes, listRes] = await Promise.all([
+      const [pkgRes, balRes, ordRes, ledRes, listRes, projRes] = await Promise.all([
         crmApi.getBillingPackages(),
         crmApi.getCreditBalance(),
         crmApi.getCreditOrders(),
@@ -267,6 +272,7 @@ export default function BillingPage() {
           limit: 100,
           ownerId: user?.role !== 'ADMIN' ? user?.id : undefined
         }),
+        crmApi.getMyProjects(),
       ]);
       if (pkgRes.success && pkgRes.data) setPackages(pkgRes.data as CreditPackage[]);
       if (balRes.success && balRes.data) setBalance((balRes.data as any).balance ?? 0);
@@ -275,6 +281,9 @@ export default function BillingPage() {
       if (listRes.success && listRes.data) {
         const items = (listRes.data as any).items || [];
         setListings(items.filter((l: any) => l.status === 'ACTIVE' || l.status === 'DRAFT'));
+      }
+      if (projRes.success && projRes.data) {
+        setProjects(projRes.data.filter((p: any) => p.status === 'ACTIVE' || p.status === 'DRAFT'));
       }
     } finally {
       setLoading(false);
@@ -328,35 +337,69 @@ export default function BillingPage() {
 
   const handleUpgradeListing = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedListingId) {
-      setUpgradeError('Please select a property to promote.');
-      return;
-    }
-
-    const cost = selectedUpgradeDays === 30 ? 40 : 15;
-    if (balance !== null && balance < cost) {
-      setUpgradeError(`Insufficient credits. You need ${cost} credits but have only ${balance}.`);
-      return;
-    }
-
-    setSubmittingUpgrade(true);
-    setUpgradeError(null);
-    setUpgradeSuccess(null);
-
-    try {
-      const res = await crmApi.featureListing(selectedListingId, selectedUpgradeDays);
-      if (res.success) {
-        setUpgradeSuccess(`Successfully upgraded listing to FEATURED for ${selectedUpgradeDays} days!`);
-        if (balance !== null) setBalance(balance - cost);
-        setSelectedListingId('');
-        loadAll();
-      } else {
-        setUpgradeError(res.message || 'Failed to apply upgrade.');
+    
+    if (promoteType === 'project') {
+      if (!selectedProjectId) {
+        setUpgradeError('Please select a project to promote.');
+        return;
       }
-    } catch (err: any) {
-      setUpgradeError(err.message || 'An error occurred during upgrade.');
-    } finally {
-      setSubmittingUpgrade(false);
+      
+      const cost = selectedUpgradeDays === 30 ? 40 : 15;
+      if (balance !== null && balance < cost) {
+        setUpgradeError(`Insufficient credits. You need ${cost} credits but have only ${balance}.`);
+        return;
+      }
+
+      setSubmittingUpgrade(true);
+      setUpgradeError(null);
+      setUpgradeSuccess(null);
+
+      try {
+        const res = await crmApi.featureProject(selectedProjectId, selectedUpgradeDays);
+        if (res.success) {
+          setUpgradeSuccess(`Successfully upgraded project to FEATURED for ${selectedUpgradeDays} days!`);
+          if (balance !== null) setBalance(balance - cost);
+          setSelectedProjectId('');
+          loadAll();
+        } else {
+          setUpgradeError(res.message || 'Failed to apply upgrade.');
+        }
+      } catch (err: any) {
+        setUpgradeError(err.message || 'An error occurred during upgrade.');
+      } finally {
+        setSubmittingUpgrade(false);
+      }
+    } else {
+      if (!selectedListingId) {
+        setUpgradeError('Please select a property to promote.');
+        return;
+      }
+
+      const cost = selectedUpgradeDays === 30 ? 40 : 15;
+      if (balance !== null && balance < cost) {
+        setUpgradeError(`Insufficient credits. You need ${cost} credits but have only ${balance}.`);
+        return;
+      }
+
+      setSubmittingUpgrade(true);
+      setUpgradeError(null);
+      setUpgradeSuccess(null);
+
+      try {
+        const res = await crmApi.featureListing(selectedListingId, selectedUpgradeDays);
+        if (res.success) {
+          setUpgradeSuccess(`Successfully upgraded listing to FEATURED for ${selectedUpgradeDays} days!`);
+          if (balance !== null) setBalance(balance - cost);
+          setSelectedListingId('');
+          loadAll();
+        } else {
+          setUpgradeError(res.message || 'Failed to apply upgrade.');
+        }
+      } catch (err: any) {
+        setUpgradeError(err.message || 'An error occurred during upgrade.');
+      } finally {
+        setSubmittingUpgrade(false);
+      }
     }
   };
 
@@ -546,9 +589,41 @@ export default function BillingPage() {
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Promote Property</h3>
-                  <p className="text-xs text-slate-500">Feature your properties to place them at the top of search results</p>
+                  <h3 className="text-base font-bold text-slate-800">Promote Property or Project</h3>
+                  <p className="text-xs text-slate-500">Feature your listings or development projects to place them at the top of search results</p>
                 </div>
+              </div>
+
+              {/* Segmented control: Listing vs Project */}
+              <div className="flex bg-slate-100 p-1 rounded-xl mb-5 gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromoteType('listing');
+                    setUpgradeError(null);
+                    setUpgradeSuccess(null);
+                  }}
+                  className={clsx(
+                    'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all',
+                    promoteType === 'listing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  )}
+                >
+                  Promote Listing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromoteType('project');
+                    setUpgradeError(null);
+                    setUpgradeSuccess(null);
+                  }}
+                  className={clsx(
+                    'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all',
+                    promoteType === 'project' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  )}
+                >
+                  Promote Project
+                </button>
               </div>
 
               <form onSubmit={handleUpgradeListing} className="space-y-5">
@@ -563,71 +638,138 @@ export default function BillingPage() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Select Listing</label>
-                  {loadingListings ? (
-                    <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-[#064e4b]" />
-                      <span>Loading active properties…</span>
+                {promoteType === 'listing' ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Select Listing</label>
+                      {loadingListings ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#064e4b]" />
+                          <span>Loading active properties…</span>
+                        </div>
+                      ) : listings.length === 0 ? (
+                        <div className="text-sm text-slate-400 italic py-2">
+                          No active listings found to promote. Create or publish a listing first.
+                        </div>
+                      ) : (
+                        <select
+                          value={selectedListingId}
+                          onChange={e => setSelectedListingId(e.target.value)}
+                          className="w-full h-11 px-3 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:border-[#064e4b] text-slate-700"
+                        >
+                          <option value="">-- Choose one of your listings --</option>
+                          {listings.map((l: any) => {
+                            const isFeatured = l.isFeatured && l.featuredUntil && new Date(l.featuredUntil) > new Date();
+                            const featuredLabel = isFeatured 
+                              ? ` [FEATURED until ${new Date(l.featuredUntil).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}]` 
+                              : '';
+                            return (
+                              <option key={l.id} value={l.id}>
+                                {l.enTitle || l.arTitle} ({l.city} - {l.price.toLocaleString()} SAR){featuredLabel}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
                     </div>
-                  ) : listings.length === 0 ? (
-                    <div className="text-sm text-slate-400 italic py-2">
-                      No active listings found to promote. Create or publish a listing first.
-                    </div>
-                  ) : (
-                    <select
-                      value={selectedListingId}
-                      onChange={e => setSelectedListingId(e.target.value)}
-                      className="w-full h-11 px-3 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:border-[#064e4b] text-slate-700"
-                    >
-                      <option value="">-- Choose one of your listings --</option>
-                      {listings.map((l: any) => {
-                        const isFeatured = l.isFeatured && l.featuredUntil && new Date(l.featuredUntil) > new Date();
-                        const featuredLabel = isFeatured 
-                          ? ` [FEATURED until ${new Date(l.featuredUntil).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}]` 
-                          : '';
-                        return (
-                          <option key={l.id} value={l.id}>
-                            {l.enTitle || l.arTitle} ({l.city} - {l.price.toLocaleString()} SAR){featuredLabel}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  )}
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Promotion Plan</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { days: 7, cost: 15, desc: 'Weekly Boost' },
-                      { days: 30, cost: 40, desc: 'Monthly Dominance' },
-                    ].map(plan => (
-                      <button
-                        type="button"
-                        key={plan.days}
-                        onClick={() => setSelectedUpgradeDays(plan.days)}
-                        className={clsx(
-                          'p-4 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5',
-                          selectedUpgradeDays === plan.days
-                            ? 'border-[#064e4b] bg-[#064e4b]/5 text-[#064e4b] ring-1 ring-[#064e4b]/20 font-bold'
-                            : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                        )}
-                      >
-                        <span className="text-xs uppercase tracking-wider font-bold opacity-60">{plan.desc}</span>
-                        <span className="text-xl font-black">{plan.days} Days</span>
-                        <span className="text-xs bg-[#064e4b]/10 text-[#064e4b] px-2.5 py-0.5 rounded-full font-black">
-                          {plan.cost} credits
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Promotion Plan</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { days: 7, cost: 15, desc: 'Weekly Boost' },
+                          { days: 30, cost: 40, desc: 'Monthly Dominance' },
+                        ].map(plan => (
+                          <button
+                            type="button"
+                            key={plan.days}
+                            onClick={() => setSelectedUpgradeDays(plan.days)}
+                            className={clsx(
+                              'p-4 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5',
+                              selectedUpgradeDays === plan.days
+                                ? 'border-[#064e4b] bg-[#064e4b]/5 text-[#064e4b] ring-1 ring-[#064e4b]/20 font-bold'
+                                : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                            )}
+                          >
+                            <span className="text-xs uppercase tracking-wider font-bold opacity-60">{plan.desc}</span>
+                            <span className="text-xl font-black">{plan.days} Days</span>
+                            <span className="text-xs bg-[#064e4b]/10 text-[#064e4b] px-2.5 py-0.5 rounded-full font-black">
+                              {plan.cost} credits
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Select Project</label>
+                      {loadingListings ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#064e4b]" />
+                          <span>Loading projects…</span>
+                        </div>
+                      ) : projects.length === 0 ? (
+                        <div className="text-sm text-slate-400 italic py-2">
+                          No active projects found to promote. Create a project listing first.
+                        </div>
+                      ) : (
+                        <select
+                          value={selectedProjectId}
+                          onChange={e => setSelectedProjectId(e.target.value)}
+                          className="w-full h-11 px-3 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:border-[#064e4b] text-slate-700"
+                        >
+                          <option value="">-- Choose one of your projects --</option>
+                          {projects.map((p: any) => {
+                            const featuredLabel = p.isFeatured ? ' [FEATURED]' : '';
+                            return (
+                              <option key={p.id} value={p.id}>
+                                {p.nameEn || p.nameAr} ({p.city}){featuredLabel}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Promotion Plan</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { days: 7, cost: 15, desc: 'Weekly Boost' },
+                          { days: 30, cost: 40, desc: 'Monthly Dominance' },
+                        ].map(plan => (
+                          <button
+                            type="button"
+                            key={plan.days}
+                            onClick={() => setSelectedUpgradeDays(plan.days)}
+                            className={clsx(
+                              'p-4 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5',
+                              selectedUpgradeDays === plan.days
+                                ? 'border-[#064e4b] bg-[#064e4b]/5 text-[#064e4b] ring-1 ring-[#064e4b]/20 font-bold'
+                                : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                            )}
+                          >
+                            <span className="text-xs uppercase tracking-wider font-bold opacity-60">{plan.desc}</span>
+                            <span className="text-xl font-black">{plan.days} Days</span>
+                            <span className="text-xs bg-[#064e4b]/10 text-[#064e4b] px-2.5 py-0.5 rounded-full font-black">
+                              {plan.cost} credits
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={submittingUpgrade || listings.length === 0 || !selectedListingId}
+                    disabled={
+                      submittingUpgrade || 
+                      (promoteType === 'listing' ? (listings.length === 0 || !selectedListingId) : (projects.length === 0 || !selectedProjectId))
+                    }
                     className="w-full h-11 rounded-2xl bg-[#064e4b] hover:bg-[#0a3d35] disabled:opacity-40 text-white text-sm font-black flex items-center justify-center gap-2 transition-all shadow-sm"
                   >
                     {submittingUpgrade ? (
@@ -635,7 +777,7 @@ export default function BillingPage() {
                     ) : (
                       <Sparkles className="w-4 h-4" />
                     )}
-                    Promote Listing
+                    {promoteType === 'listing' ? 'Promote Listing' : 'Promote Project'}
                   </button>
                 </div>
               </form>

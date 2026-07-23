@@ -46,6 +46,22 @@ export class SystemService {
     return parseInt(cost, 10);
   }
 
+  /**
+   * Get the current cost to publish a project in credits (Default: 50)
+   */
+  static async getProjectCost(): Promise<number> {
+    const cost = await this.getSetting('project_cost_credits', '50');
+    return parseInt(cost, 10);
+  }
+
+  /**
+   * Get the current cost to feature a project in credits (Default: 40)
+   */
+  static async getProjectFeatureCost(): Promise<number> {
+    const cost = await this.getSetting('project_feature_cost_credits', '40');
+    return parseInt(cost, 10);
+  }
+
   static async getQualificationWebhook(): Promise<string> {
     return this.getSetting('ai_qualification_webhook', '');
   }
@@ -54,3 +70,4 @@ export class SystemService {
     return this.getSetting('ai_general_assistant_webhook', '');
   }
 }
+

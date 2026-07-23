@@ -599,6 +599,8 @@ export interface AdminChatMessage {
 
 export interface AdminProject {
   id: string;
+  ownerId?: string | null;
+  status?: 'ACTIVE' | 'DRAFT' | 'FLAGGED' | 'REMOVED' | null;
   nameEn: string;
   nameAr: string;
   descriptionEn: string | null;
@@ -616,6 +618,7 @@ export interface AdminProject {
   totalUnits?: number | null;
   isFeatured?: boolean;
   featuredOrder?: number;
+  featuredUntil?: string | null;
   foreignerEligible?: boolean;
   muslimOnly?: boolean;
   createdAt: string;

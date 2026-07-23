@@ -56,6 +56,9 @@ export default function SettingsPage() {
         n8n_webhook_secret: 'Webhook Secret Key',
         n8n_api_key: 'N8N API Key',
         listing_cost_credits: 'Listing Cost Credits',
+        project_cost_credits: 'Project Listing Cost Credits',
+        project_feature_cost_7_days: 'Project Featuring Cost - 7 Days (Credits)',
+        project_feature_cost_credits: 'Project Featuring Cost - 30 Days (Credits)',
         free_postings_limit: 'Free Postings Limit',
         contact_phone: 'Contact Phone Number',
         contact_email: 'Contact Email Address',
@@ -361,6 +364,72 @@ export default function SettingsPage() {
                 </div>
                 <p className="text-[10px] text-surface-400 mt-2">Permits the backend to communicate programmatically with the self-hosted n8n API.</p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Developer Project Credit Pricing */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <CreditCard className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-surface-900">Developer Project Credit Pricing</h2>
+              <p className="text-xs text-surface-500">Configure credit costs for project listings and featuring for developers</p>
+            </div>
+          </div>
+          
+          <div className="admin-card p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="admin-label">Project Listing Cost (Credits)</label>
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  className="admin-input" 
+                  placeholder="50"
+                  defaultValue={getSettingValue('project_cost_credits') || '50'}
+                  onBlur={(e) => handleUpdateSetting('project_cost_credits', e.target.value)}
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'project_cost_credits' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">Deducted from developer credit balance when listing/publishing a project.</p>
+            </div>
+
+            <div>
+              <label className="admin-label">Project Featuring Cost - 7 Days (Credits)</label>
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  className="admin-input" 
+                  placeholder="15"
+                  defaultValue={getSettingValue('project_feature_cost_7_days') || '15'}
+                  onBlur={(e) => handleUpdateSetting('project_feature_cost_7_days', e.target.value)}
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'project_feature_cost_7_days' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">Deducted from developer credit balance when featuring a project for 7 days.</p>
+            </div>
+
+            <div>
+              <label className="admin-label">Project Featuring Cost - 30 Days (Credits)</label>
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  className="admin-input" 
+                  placeholder="40"
+                  defaultValue={getSettingValue('project_feature_cost_credits') || '40'}
+                  onBlur={(e) => handleUpdateSetting('project_feature_cost_credits', e.target.value)}
+                />
+                <button className="btn-secondary px-3">
+                  {saving === 'project_feature_cost_credits' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-surface-400 mt-2">Deducted from developer credit balance when featuring a project for 30 days.</p>
             </div>
           </div>
         </section>

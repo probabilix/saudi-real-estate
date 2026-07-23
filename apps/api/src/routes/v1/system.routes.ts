@@ -1041,17 +1041,31 @@ ${historyText}
         return reply.code(404).send({ success: false, message: 'Project not found.' });
       }
 
+      const isAdmin = request.user?.role === 'ADMIN';
+      const isOwner = request.user?.userId && project.ownerId === request.user.userId;
+
+      // If project is not active, restrict view to only Admin and Project Owner
+      if (project.status !== 'ACTIVE' && !isAdmin && !isOwner) {
+        return reply.code(403).send({ success: false, message: 'This project is currently pending approval or is hidden.' });
+      }
+
+      const layoutConditions = [
+        eq(listings.projectId, id),
+        sql`${listings.deletedAt} IS NULL`
+      ];
+
+      // Public only sees ACTIVE layouts. Owner & Admin see all layouts.
+      if (!isAdmin && !isOwner) {
+        layoutConditions.push(eq(listings.status, 'ACTIVE'));
+      }
+
       const layouts = await db.select()
         .from(listings)
-        .where(and(
-          eq(listings.projectId, id),
-          eq(listings.status, 'ACTIVE'),
-          sql`${listings.deletedAt} IS NULL`
-        ));
+        .where(and(...layoutConditions));
 
-      // Fetch the broker (owner) of the layouts in this project
+      // Fetch the broker (owner) of the project
       let owner = null;
-      if (layouts.length > 0) {
+      if (project.ownerId) {
         const owners = await db.select({
           id: users.id,
           name: users.name,
@@ -1059,7 +1073,7 @@ ${historyText}
           role: users.role
         })
         .from(users)
-        .where(eq(users.id, layouts[0].ownerId))
+        .where(eq(users.id, project.ownerId))
         .limit(1);
         owner = owners[0] || null;
       }
@@ -1142,12 +1156,15 @@ ${historyText}
       const completionStatus = query.completionStatus as string;
       const expectedDelivery = query.expectedDelivery as string;
 
-      const conditions: any[] = [];
+      const conditions: any[] = [
+        eq(projects.status, 'ACTIVE'),
+      ];
       if (city) {
         conditions.push(eq(projects.city, city));
       }
       if (isFeatured) {
         conditions.push(eq(projects.isFeatured, true));
+        conditions.push(sql`(${projects.featuredUntil} IS NULL OR ${projects.featuredUntil} >= NOW())`);
       }
       if (completionStatus) {
         conditions.push(eq(projects.completionStatus, completionStatus as any));
@@ -1215,7 +1232,7 @@ ${historyText}
         .limit(limit)
         .offset((page - 1) * limit)
         .orderBy(
-          desc(projects.isFeatured),
+          desc(sql`CASE WHEN ${projects.isFeatured} = true AND (${projects.featuredUntil} IS NULL OR ${projects.featuredUntil} >= NOW()) THEN 1 ELSE 0 END`),
           sql`CASE WHEN ${projects.featuredOrder} > 0 THEN ${projects.featuredOrder} ELSE 999999 END ASC`,
           desc(projects.createdAt)
         );

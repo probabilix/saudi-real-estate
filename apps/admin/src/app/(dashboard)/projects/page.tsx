@@ -21,6 +21,7 @@ interface ProjectListItem {
   nameAr: string;
   city: string;
   district: string | null;
+  status?: 'ACTIVE' | 'DRAFT' | 'FLAGGED' | 'REMOVED' | null;
   completionStatus: 'READY' | 'OFF_PLAN' | 'UNDER_CONSTRUCTION' | null;
   expectedDelivery: string | null;
   totalUnits: number | null;
@@ -32,6 +33,7 @@ interface ProjectListItem {
   createdAt: string;
   isFeatured?: boolean;
   featuredOrder?: number;
+  featuredUntil?: string | null;
 }
 
 interface LayoutItem {
@@ -57,6 +59,18 @@ export default function ProjectsPage() {
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [projectLayouts, setProjectLayouts] = useState<Record<string, LayoutItem[]>>({});
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  
+  // Featuring Modal state
+  const [featureModal, setFeatureModal] = useState<{
+    isOpen: boolean;
+    projectId: string | null;
+    currentExpiry?: string | null;
+  }>({
+    isOpen: false,
+    projectId: null,
+  });
+  const [featureDuration, setFeatureDuration] = useState<'7' | '14' | '30' | 'lifetime'>('30');
+
   const [analyticsModal, setAnalyticsModal] = useState<{
     isOpen: boolean;
     propertyId: string;
@@ -108,21 +122,64 @@ export default function ProjectsPage() {
   };
 
   const handleToggleFeatured = async (id: string, isCurrentlyFeatured: boolean) => {
+    if (isCurrentlyFeatured) {
+      try {
+        const res = await adminApi.patchProject(id, { isFeatured: false, featuredUntil: null });
+        if (res.success) {
+          setProjects(prev => prev.map(p => p.id === id ? { ...p, isFeatured: false, featuredUntil: null } : p));
+          setToast({ message: 'Project removed from featured section.', type: 'success' });
+        } else {
+          setToast({ message: 'Failed to unfeature project.', type: 'error' });
+        }
+      } catch (err: any) {
+        setToast({ message: err.message || 'Error unfeaturing project.', type: 'error' });
+      }
+    } else {
+      setFeatureModal({
+        isOpen: true,
+        projectId: id,
+        currentExpiry: null
+      });
+    }
+  };
+
+  const handleConfirmFeatured = async () => {
+    const id = featureModal.projectId;
+    if (!id) return;
+
+    let expiryDate: string | null = null;
+    if (featureDuration !== 'lifetime') {
+      const days = parseInt(featureDuration, 10);
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      expiryDate = d.toISOString();
+    }
+
     try {
-      const res = await adminApi.patchProject(id, { isFeatured: !isCurrentlyFeatured });
+      const maxOrder = projects.reduce((max, p) => (p.isFeatured && p.featuredOrder ? Math.max(max, p.featuredOrder) : max), 0);
+      const newOrder = maxOrder + 1;
+
+      const res = await adminApi.patchProject(id, {
+        isFeatured: true,
+        featuredUntil: expiryDate as any,
+        featuredOrder: newOrder
+      });
+
       if (res.success) {
-        setProjects(prev => prev.map(p => p.id === id ? { ...p, isFeatured: !isCurrentlyFeatured } : p));
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, isFeatured: true, featuredUntil: expiryDate, featuredOrder: newOrder } : p));
         setToast({
-          message: isCurrentlyFeatured
-            ? 'Project removed from featured section.'
-            : 'Project promoted to featured section.',
+          message: expiryDate
+            ? `Project promoted to featured section until ${new Date(expiryDate).toLocaleDateString()}.`
+            : 'Project promoted to featured section permanently (Lifetime).',
           type: 'success'
         });
       } else {
-        setToast({ message: 'Failed to update project featured status.', type: 'error' });
+        setToast({ message: 'Failed to feature project.', type: 'error' });
       }
     } catch (err: any) {
-      setToast({ message: err.message || 'Error updating featured status.', type: 'error' });
+      setToast({ message: err.message || 'Error featuring project.', type: 'error' });
+    } finally {
+      setFeatureModal({ isOpen: false, projectId: null });
     }
   };
 
@@ -137,6 +194,25 @@ export default function ProjectsPage() {
       }
     } catch (err: any) {
       setToast({ message: err.message || 'Error updating featured order.', type: 'error' });
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: 'ACTIVE' | 'DRAFT' | 'FLAGGED' | 'REMOVED') => {
+    try {
+      const res = await adminApi.patchProject(id, { status: newStatus as any });
+      if (res.success) {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
+        setToast({
+          message: newStatus === 'ACTIVE'
+            ? 'Project approved and activated successfully!'
+            : `Project status updated to ${newStatus}.`,
+          type: 'success'
+        });
+      } else {
+        setToast({ message: 'Failed to update project status.', type: 'error' });
+      }
+    } catch (err: any) {
+      setToast({ message: err.message || 'Error updating status.', type: 'error' });
     }
   };
 
@@ -792,9 +868,12 @@ export default function ProjectsPage() {
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
             >
-              <option value="ALL">All Status</option>
-              <option value="READY">Ready</option>
-              <option value="OFF_PLAN">Off-Plan</option>
+              <option value="ALL">All Statuses</option>
+              <option value="FLAGGED">Pending Approval (Flagged)</option>
+              <option value="ACTIVE">Active</option>
+              <option value="DRAFT">Draft</option>
+              <option value="READY">Ready (Completion)</option>
+              <option value="OFF_PLAN">Off-Plan (Completion)</option>
               <option value="UNDER_CONSTRUCTION">Under Construction</option>
             </select>
           </div>
@@ -883,7 +962,24 @@ export default function ProjectsPage() {
 
                         {/* Status */}
                         <td>
-                          <StatusBadge status={project.completionStatus} />
+                          <div className="flex flex-col gap-1 items-start">
+                            {project.status === 'FLAGGED' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                Pending Approval
+                              </span>
+                            ) : project.status === 'DRAFT' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200">
+                                Draft
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                                <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                Active
+                              </span>
+                            )}
+                            <StatusBadge status={project.completionStatus} />
+                          </div>
                         </td>
 
                         {/* Layouts count */}
@@ -951,7 +1047,26 @@ export default function ProjectsPage() {
 
                         {/* Actions */}
                         <td className="text-right">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {(project.status === 'FLAGGED' || project.status === 'DRAFT') && (
+                              <button
+                                onClick={() => handleUpdateStatus(project.id, 'ACTIVE')}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1"
+                                title="Approve & Publish Project"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Approve
+                              </button>
+                            )}
+                            {project.status === 'ACTIVE' && (
+                              <button
+                                onClick={() => handleUpdateStatus(project.id, 'DRAFT')}
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition-all"
+                                title="Mark as Draft"
+                              >
+                                Draft
+                              </button>
+                            )}
                             {project.brochureUrl && (
                               <a
                                 href={project.brochureUrl}
@@ -1412,6 +1527,62 @@ export default function ProjectsPage() {
               >
                 <FileText className="w-4 h-4" />
                 <span>Download PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Project Feature Selection Modal ── */}
+      {featureModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-surface-200 shadow-2xl max-w-sm w-full overflow-hidden p-6 space-y-6 transform scale-95 animate-in zoom-in-95 duration-200">
+            <div className="space-y-2 text-center">
+              <Star className="w-8 h-8 text-amber-500 mx-auto animate-pulse" />
+              <h3 className="text-base font-bold text-surface-900">Feature Real Estate Project</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Choose the promotional duration for this project featured placement.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: '7 Days Boost', key: '7' },
+                { label: '14 Days Promotion', key: '14' },
+                { label: '30 Days Dominance', key: '30' },
+                { label: 'Lifetime Permanent', key: 'lifetime' }
+              ].map(opt => (
+                <button
+                  type="button"
+                  key={opt.key}
+                  onClick={() => setFeatureDuration(opt.key as any)}
+                  className={clsx(
+                    "py-3 px-2.5 rounded-xl border text-center font-bold text-xs transition-all",
+                    featureDuration === opt.key
+                      ? "border-amber-500 bg-amber-50/50 text-amber-800"
+                      : "border-slate-200 hover:border-slate-350 text-slate-600"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setFeatureModal({ isOpen: false, projectId: null })}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 text-xs rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmFeatured}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 text-xs rounded-xl shadow flex items-center justify-center gap-1.5"
+              >
+                <Star className="w-3.5 h-3.5" />
+                Confirm Feature
               </button>
             </div>
           </div>

@@ -444,6 +444,7 @@
     "forBuyers": "For Buyers"
   },
   "metadata": {
+    "brandName": "Tamleeq",
     "title": "Tamleeq | AI-Powered Property Marketplace",
     "description": "Find your perfect property in Saudi Arabia. AI-powered search, qualified leads for brokers, personalized experience for buyers. Browse Riyadh, Jeddah, Dammam and more."
   },
@@ -606,6 +607,8 @@
     }
   },
   "about": {
+    "metaTitle": "About Tamleeq | AI-Powered Saudi Real Estate Marketplace",
+    "metaDescription": "Learn how Tamleeq is revolutionizing Saudi Arabia's real estate market with direct developer compounds, AI-guided qualification, and verified REGA licensing.",
     "title": "About Us",
     "subtitle": "Leading the future of Saudi real estate with our own premium properties",
     "mission": "Our Mission",
@@ -664,6 +667,8 @@
     "featureRefreshDesc": "Bump your listing back to the top by spending 5 credits."
   },
   "contact": {
+    "metaTitle": "Contact Tamleeq | Get in Touch — Riyadh, Saudi Arabia",
+    "metaDescription": "Contact Tamleeq's team for support, partnerships, or developer inquiries. Call, email, or chat with us on WhatsApp for fast responses.",
     "title": "Contact Us",
     "subtitle": "Have questions? We're here to help.",
     "name": "Your Name",

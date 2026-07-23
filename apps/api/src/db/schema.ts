@@ -17,7 +17,8 @@ export const tsvector = customType<{ data: string }>({
 });
 
 // ── Enums (Align with Master Architecture) ──
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER', 'SALES_AGENT']);
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'FIRM', 'AGENT', 'SOLO_BROKER', 'OWNER', 'BUYER', 'SALES_AGENT', 'DEVELOPER']);
+export const projectStatusEnum = pgEnum('project_status', ['ACTIVE', 'DRAFT', 'FLAGGED', 'REMOVED']);
 export const listingTypeEnum = pgEnum('listing_type', [
   'APARTMENT', 'VILLA', 'FLOOR', 'RESIDENTIAL_BUILDING', 'RESIDENTIAL_LAND', 
   'REST_HOUSE', 'CHALET', 'ROOM', 'TOWNHOUSE', 'DUPLEX',
@@ -121,6 +122,8 @@ export const brokerProfiles = pgTable('broker_profiles', {
 // ── Projects Table ──
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'set null' }),
+  status: projectStatusEnum('status').default('ACTIVE'),
   nameEn: varchar('name_en', { length: 255 }).notNull(),
   nameAr: varchar('name_ar', { length: 255 }).notNull(),
   descriptionEn: text('description_en'),
@@ -149,10 +152,13 @@ export const projects = pgTable('projects', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   isFeatured: boolean('is_featured').default(false),
   featuredOrder: integer('featured_order').default(0),
+  featuredUntil: timestamp('featured_until', { withTimezone: true }),
   foreignerEligible: boolean('foreigner_eligible').default(false),
   muslimOnly: boolean('muslim_only').default(false),
 }, (table) => ({
   latLngIdx: index('projects_lat_lng_idx').on(table.lat, table.lng),
+  ownerIdx: index('projects_owner_idx').on(table.ownerId),
+  statusIdx: index('projects_status_idx').on(table.status),
 }));
 
 
@@ -911,6 +917,8 @@ export const creditLedgerTypeEnum = pgEnum('credit_ledger_type', [
   'LISTING_BUMP',     // Credits spent to bump a listing
   'ADMIN_GRANT',      // Admin manually granted credits
   'FIRM_GRANT',       // Firm owner allocated credits to broker (future)
+  'PROJECT_PUBLISH',  // Credits spent to publish a project
+  'PROJECT_FEATURE',  // Credits spent to feature a project
 ]);
 
 // ── Credit Packages (admin-editable price table, source of truth) ──
@@ -961,7 +969,8 @@ export const creditLedger = pgTable('credit_ledger', {
   amount: integer('amount').notNull(),              // +ve = credit, -ve = debit
   balanceAfter: integer('balance_after').notNull(), // Wallet snapshot after this entry
   refOrderId: uuid('ref_order_id').references(() => creditOrders.id),   // for purchases
-  refListingId: uuid('ref_listing_id').references(() => listings.id),   // for spends
+  refListingId: uuid('ref_listing_id').references(() => listings.id),   // for listing spends
+  refProjectId: uuid('ref_project_id').references(() => projects.id),   // for project spends
   description: text('description'),
   performedById: uuid('performed_by_id').references(() => users.id),    // Admin granter or broker
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

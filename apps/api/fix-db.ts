@@ -145,9 +145,55 @@ async function fixDb() {
     await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "is_featured" boolean DEFAULT false;`);
     await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "featured_order" integer DEFAULT 0;`);
 
+    // ── Developer & Project Status Migration ──
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'project_status') THEN
+          CREATE TYPE "project_status" AS ENUM ('ACTIVE', 'DRAFT', 'FLAGGED', 'REMOVED');
+        END IF;
+      END $$;
+    `);
+
+    await db.execute(sql`
+      DO $$ BEGIN
+        ALTER TYPE "user_role" ADD VALUE IF NOT EXISTS 'DEVELOPER';
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    await db.execute(sql`
+      DO $$ BEGIN
+        ALTER TYPE "credit_ledger_type" ADD VALUE IF NOT EXISTS 'PROJECT_PUBLISH';
+        ALTER TYPE "credit_ledger_type" ADD VALUE IF NOT EXISTS 'PROJECT_FEATURE';
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "owner_id" uuid;`);
+    await db.execute(sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "status" "project_status" DEFAULT 'ACTIVE';`);
+    await db.execute(sql`ALTER TABLE "credit_ledger" ADD COLUMN IF NOT EXISTS "ref_project_id" uuid;`);
+
     console.log('⏳ Creating indexes and foreign keys...');
     
     // Add constraints if not exists (using DO block to handle safely)
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'projects_owner_id_users_id_fk') THEN
+          ALTER TABLE "projects" ADD CONSTRAINT "projects_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "users"("id") ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'credit_ledger_ref_project_id_projects_id_fk') THEN
+          ALTER TABLE "credit_ledger" ADD CONSTRAINT "credit_ledger_ref_project_id_projects_id_fk" FOREIGN KEY ("ref_project_id") REFERENCES "projects"("id") ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+
     await db.execute(sql`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chat_messages_listing_id_listings_id_fk') THEN
@@ -174,6 +220,8 @@ async function fixDb() {
 
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "chat_msg_listing_idx" ON "chat_messages" USING btree ("listing_id");`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "chat_msg_project_idx" ON "chat_messages" USING btree ("project_id");`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "projects_owner_idx" ON "projects" USING btree ("owner_id");`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "projects_status_idx" ON "projects" USING btree ("status");`);
     console.log('✅ Phase 1 schema alterations complete!');
 
   } catch (error) {

@@ -3,13 +3,14 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useRouter, usePathname } from 'next/navigation';
 import { crmApi } from '@/lib/api';
 
-export type CrmUserRole = 'ADMIN' | 'AGENT' | 'SOLO_BROKER' | 'SALES_AGENT';
+export type CrmUserRole = 'ADMIN' | 'AGENT' | 'SOLO_BROKER' | 'SALES_AGENT' | 'DEVELOPER';
 
 export interface CrmUser {
   id: string;
   name: string;
   email: string;
   role: CrmUserRole;
+  creditsBalance?: number;
 }
 
 interface CrmAuthContextType {
@@ -23,7 +24,7 @@ interface CrmAuthContextType {
 
 const CrmAuthContext = createContext<CrmAuthContextType | undefined>(undefined);
 
-const ALLOWED_ROLES: CrmUserRole[] = ['ADMIN', 'AGENT', 'SOLO_BROKER', 'SALES_AGENT'];
+const ALLOWED_ROLES: CrmUserRole[] = ['ADMIN', 'AGENT', 'SOLO_BROKER', 'SALES_AGENT', 'DEVELOPER'];
 
 export function CrmAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CrmUser | null>(null);

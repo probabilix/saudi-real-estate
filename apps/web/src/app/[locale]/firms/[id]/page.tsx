@@ -1,147 +1,102 @@
-'use client';
+import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { unstable_setRequestLocale } from 'next-intl/server';
+import FirmProfileClient from './FirmProfileClient';
+import { getApiBaseUrl } from '@/lib/api';
 
-import React, { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { 
-  Building, 
-  ChevronLeft, 
-  ChevronRight, 
-  Users
-} from 'lucide-react';
-import Link from 'next/link';
-import ListingCard from '@/components/listings/ListingCard';
-import FirmHero from '@/components/profiles/FirmHero';
-import ProfileSidebar from '@/components/profiles/ProfileSidebar';
-import AgentGrid from '@/components/profiles/AgentGrid';
-import { api } from '@/lib/api';
-import { User, Listing } from '@saudi-re/shared';
-
-interface FirmStats {
-  activeListings: number;
-  successListings: number;
-  agentsCount: number;
+interface Props {
+  params: {
+    locale: string;
+    id: string;
+  };
 }
 
-interface FirmData {
-  firm: User & { stats: FirmStats };
-  agents: User[];
-  stats: FirmStats;
-}
-
-export default function FirmProfilePage({ params: { locale, id } }: { params: { locale: string, id: string } }) {
-  const t = useTranslations('profiles');
-  const tCommon = useTranslations('common');
-  const isRTL = locale === 'ar';
-
-  const [firmData, setFirmData] = useState<FirmData | null>(null);
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'listings' | 'agents'>('listings');
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      try {
-        // Fetch public firm info
-        const res = await api.getPublicFirm(id);
-        
-        if (res.success) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setFirmData(res.data as any);
-        }
-
-        // Fetch firm's listings
-        const listingsRes = await api.getListings(`firmId=${id}&limit=20`);
-        
-        if (listingsRes.success && listingsRes.data) {
-          setListings(listingsRes.data.items || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch firm profile:', err);
-      } finally {
-        setLoading(false);
-      }
+async function getFirmData(id: string): Promise<any> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/user/public-firm/${id}`, { next: { revalidate: 60 } });
+    if (res.ok) {
+      const json = await res.json();
+      return json?.data || null;
     }
+  } catch (err) {
+    console.error('Error fetching firm data in server wrapper:', err);
+  }
+  return null;
+}
 
-    fetchData();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-        <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-600 rounded-full animate-spin mb-4" />
-        <p className="text-charcoal-muted font-bold uppercase tracking-widest text-xs">{tCommon('loading')}</p>
-      </div>
-    );
+export async function generateMetadata({ params: { locale, id } }: Props): Promise<Metadata> {
+  const data = await getFirmData(id);
+  if (!data || !data.firm) {
+    return {
+      title: 'Agency Profile Not Found',
+    };
   }
 
-  if (!firmData) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">{tCommon('notFoundTitle')}</h2>
-        <p className="text-gray-500 mb-8">{tCommon('notFoundDesc')}</p>
-        <Link href={`/${locale}/listings`} className="px-6 py-2 bg-primary-600 text-white rounded-xl font-bold">
-           {t('backToListings')}
-        </Link>
-      </div>
-    );
+  const isAr = locale === 'ar';
+  const name = data.firm.name || 'Agency';
+  const city = isAr ? data.firm.cityAr || data.firm.city : data.firm.cityEn || data.firm.city;
+  const listingsCount = data.stats?.activeListings || 0;
+  const agentsCount = data.stats?.agentsCount || 0;
+
+  // Title: "Dar Al Arkan — Real Estate Agency in Riyadh | Tamleeq"
+  let title = '';
+  if (isAr) {
+    title = `${name} — وكالة عقارية معتمدة في ${city || 'المملكة'}`;
+  } else {
+    title = `${name} — Real Estate Agency in ${city || 'Saudi Arabia'}`;
   }
 
-  const { firm, agents, stats } = firmData;
+  let description = '';
+  if (isAr) {
+    description = `تصفح ${listingsCount} عقار موثق معلن بواسطة الوكالة العقارية ${name} في ${city || 'المملكة'}، مع فريق من ${agentsCount} وسيط عقاري معتمد عبر تمليك.`;
+  } else {
+    description = `Browse ${listingsCount} verified property listings managed by ${name} in ${city || 'Saudi Arabia'}, with a team of ${agentsCount} professional brokers on Tamleeq.`;
+  }
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: `${process.env.NEXT_PUBLIC_WEB_URL || 'https://tamleeq.sa'}/${locale}/firms/${id}`,
+    },
+  };
+}
+
+export default async function FirmProfilePage({ params }: Props) {
+  unstable_setRequestLocale(params.locale);
+
+  const data = await getFirmData(params.id);
+  if (!data || !data.firm) {
+    notFound();
+  }
+
+  // Schema.org JSON-LD Structured Data
+  const isAr = params.locale === 'ar';
+  const name = data.firm.name || 'Agency';
+  const city = isAr ? data.firm.cityAr || data.firm.city : data.firm.cityEn || data.firm.city;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'RealEstateAgent',
+    'name': name,
+    'telephone': data.firm.phone || '',
+    'image': data.firm.avatarUrl || '',
+    'url': `${process.env.NEXT_PUBLIC_WEB_URL || 'https://tamleeq.sa'}/${params.locale}/firms/${params.id}`,
+    'address': {
+      '@type': 'PostalAddress',
+      'addressLocality': city || '',
+      'addressCountry': 'SA'
+    }
+  };
 
   return (
-    <div className="bg-surface-25 min-h-screen pb-20" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="container mx-auto px-4 py-6">
-        <Link 
-          href={`/${locale}/listings`}
-          className="inline-flex items-center gap-2 text-charcoal-muted hover:text-primary-600 font-bold transition-colors mb-6 text-sm"
-        >
-          {isRTL ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          {t('backToListings')}
-        </Link>
-
-        {/* Hero Section */}
-        <FirmHero firm={{ ...firm, stats }} />
-
-        {/* Tabs Bar */}
-        <div className="flex items-center gap-1 bg-white p-1.5 rounded-2xl w-fit border border-surface-100 mt-10 shadow-sm">
-           <button 
-             onClick={() => setActiveTab('listings')}
-             className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'listings' ? 'bg-primary-50 text-primary-700 shadow-sm' : 'text-charcoal-muted hover:text-charcoal'}`}
-           >
-              <Building className="w-4 h-4" />
-              {t('allProperties')} ({stats.activeListings})
-           </button>
-           <button 
-             onClick={() => setActiveTab('agents')}
-             className={`px-8 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'agents' ? 'bg-primary-50 text-primary-700 shadow-sm' : 'text-charcoal-muted hover:text-charcoal'}`}
-           >
-              <Users className="w-4 h-4" />
-              {t('ourAgents')} ({agents.length})
-           </button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mt-8">
-           <div className="lg:col-span-8">
-              {activeTab === 'listings' ? (
-                <div className="space-y-6">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {listings.map((item, idx) => (
-                        <ListingCard key={item.id} listing={item} index={idx} />
-                      ))}
-                   </div>
-                </div>
-              ) : (
-                <AgentGrid agents={agents} />
-              )}
-           </div>
-
-           <div className="lg:col-span-4">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              <ProfileSidebar type="firm" data={{ ...((firm as any).profile || {}), stats, createdAt: firm.createdAt }} />
-           </div>
-        </div>
-      </div>
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <FirmProfileClient params={params} />
+    </>
   );
 }

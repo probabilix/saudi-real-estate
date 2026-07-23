@@ -70,7 +70,7 @@ function StatCard({ label, value, icon: Icon, color, delta }: { label: string; v
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAdmin } = useCrmAuth();
-  const isSoloBroker = user?.role === 'SOLO_BROKER';
+  const isSoloBroker = user?.role === 'SOLO_BROKER' || user?.role === 'DEVELOPER';
   const [data, setData] = useState<CrmDashboardData | null>(null);
   const [followups, setFollowups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

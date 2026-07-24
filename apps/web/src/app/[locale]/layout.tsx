@@ -40,7 +40,7 @@ export async function generateMetadata({
   params: { locale: string };
 }): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'metadata' });
-  const base = process.env.NEXT_PUBLIC_WEB_URL || 'https://tamleeq.sa';
+  const base = process.env.NEXT_PUBLIC_WEB_URL || process.env.FRONTEND_URL || 'https://tamleeq.sa';
   const isAr = locale === 'ar';
 
   return {

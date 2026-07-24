@@ -250,7 +250,7 @@ export default function BillingPage() {
   // Promote Property States
   const [listings, setListings] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [promoteType, setPromoteType] = useState<'listing' | 'project'>('project');
+  const [promoteType, setPromoteType] = useState<'listing' | 'project'>('listing');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [loadingListings, setLoadingListings] = useState(false);
   const [selectedListingId, setSelectedListingId] = useState('');
@@ -258,6 +258,39 @@ export default function BillingPage() {
   const [submittingUpgrade, setSubmittingUpgrade] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
+
+  // Dynamic Credit Costs from DB System Settings
+  const [projectCost, setProjectCost] = useState<number>(50);
+  const [listingCost, setListingCost] = useState<number>(10);
+  const [featureCost7, setFeatureCost7] = useState<number>(15);
+  const [featureCost30, setFeatureCost30] = useState<number>(40);
+
+  useEffect(() => {
+    if (user?.role === 'DEVELOPER') {
+      setPromoteType('project');
+    } else if (user?.role) {
+      setPromoteType('listing');
+    }
+  }, [user?.role]);
+
+  useEffect(() => {
+    async function fetchCreditSettings() {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+        const res = await fetch(`${apiBase}/system/settings`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          if (json.data.project_cost_credits) setProjectCost(parseInt(json.data.project_cost_credits, 10) || 50);
+          if (json.data.listing_cost_credits) setListingCost(parseInt(json.data.listing_cost_credits, 10) || 10);
+          if (json.data.project_feature_cost_7_days) setFeatureCost7(parseInt(json.data.project_feature_cost_7_days, 10) || 15);
+          if (json.data.project_feature_cost_credits) setFeatureCost30(parseInt(json.data.project_feature_cost_credits, 10) || 40);
+        }
+      } catch (e) {
+        console.error('Failed to fetch credit settings', e);
+      }
+    }
+    fetchCreditSettings();
+  }, []);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -344,7 +377,7 @@ export default function BillingPage() {
         return;
       }
       
-      const cost = selectedUpgradeDays === 30 ? 40 : 15;
+      const cost = selectedUpgradeDays === 30 ? featureCost30 : featureCost7;
       if (balance !== null && balance < cost) {
         setUpgradeError(`Insufficient credits. You need ${cost} credits but have only ${balance}.`);
         return;
@@ -375,7 +408,7 @@ export default function BillingPage() {
         return;
       }
 
-      const cost = selectedUpgradeDays === 30 ? 40 : 15;
+      const cost = selectedUpgradeDays === 30 ? featureCost30 : featureCost7;
       if (balance !== null && balance < cost) {
         setUpgradeError(`Insufficient credits. You need ${cost} credits but have only ${balance}.`);
         return;
@@ -403,9 +436,11 @@ export default function BillingPage() {
     }
   };
 
+  const isDeveloper = user?.role === 'DEVELOPER';
+
   const TABS: { key: Tab; label: string; icon: typeof Wallet }[] = [
     { key: 'store',   label: 'Credit Store',     icon: ShoppingBag },
-    { key: 'promote',  label: 'Promote Property', icon: Sparkles },
+    { key: 'promote',  label: isDeveloper ? 'Promote Project' : 'Promote Property', icon: Sparkles },
     { key: 'orders',  label: 'My Orders',        icon: CreditCard },
     { key: 'ledger',  label: 'Spend Ledger',     icon: TrendingUp },
   ];
@@ -466,12 +501,17 @@ export default function BillingPage() {
 
             {/* Quick economics */}
             <div className="relative mt-5 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: 'Publish Listing', cost: '10 cr' },
-                { label: 'Feature 7 days', cost: '15 cr' },
-                { label: 'Feature 30 days', cost: '40 cr' },
+              {(isDeveloper ? [
+                { label: 'Publish Project', cost: `${projectCost} cr` },
+                { label: 'Feature 7 days', cost: `${featureCost7} cr` },
+                { label: 'Feature 30 days', cost: `${featureCost30} cr` },
+                { label: 'Manage Projects', cost: 'Workspace' },
+              ] : [
+                { label: 'Publish Listing', cost: `${listingCost} cr` },
+                { label: 'Feature 7 days', cost: `${featureCost7} cr` },
+                { label: 'Feature 30 days', cost: `${featureCost30} cr` },
                 { label: 'Bump Listing', cost: '5 cr' },
-              ].map(item => (
+              ]).map(item => (
                 <div key={item.label} className="bg-white/5 rounded-xl p-2.5 text-center">
                   <div className="text-[10px] text-[#a3cbc8] font-medium">{item.label}</div>
                   <div className="text-sm font-black text-white mt-0.5">{item.cost}</div>
@@ -589,41 +629,82 @@ export default function BillingPage() {
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Promote Property or Project</h3>
-                  <p className="text-xs text-slate-500">Feature your listings or development projects to place them at the top of search results</p>
+                  <h3 className="text-base font-bold text-slate-800">
+                    {isDeveloper ? 'Promote Development Project' : 'Promote Property Listing'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {isDeveloper 
+                      ? 'Feature your development projects to place them at the top of search results' 
+                      : 'Feature your listings to place them at the top of search results'}
+                  </p>
                 </div>
               </div>
 
               {/* Segmented control: Listing vs Project */}
               <div className="flex bg-slate-100 p-1 rounded-xl mb-5 gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPromoteType('listing');
-                    setUpgradeError(null);
-                    setUpgradeSuccess(null);
-                  }}
-                  className={clsx(
-                    'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all',
-                    promoteType === 'listing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                  )}
-                >
-                  Promote Listing
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPromoteType('project');
-                    setUpgradeError(null);
-                    setUpgradeSuccess(null);
-                  }}
-                  className={clsx(
-                    'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all',
-                    promoteType === 'project' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                  )}
-                >
-                  Promote Project
-                </button>
+                {isDeveloper ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromoteType('project');
+                        setUpgradeError(null);
+                        setUpgradeSuccess(null);
+                      }}
+                      className={clsx(
+                        'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all',
+                        promoteType === 'project' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      )}
+                    >
+                      Promote Project
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromoteType('listing');
+                        setUpgradeError(null);
+                        setUpgradeSuccess(null);
+                      }}
+                      className={clsx(
+                        'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all',
+                        promoteType === 'listing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      )}
+                    >
+                      Promote Listing
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromoteType('listing');
+                        setUpgradeError(null);
+                        setUpgradeSuccess(null);
+                      }}
+                      className={clsx(
+                        'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all',
+                        promoteType === 'listing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      )}
+                    >
+                      Promote Listing
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromoteType('project');
+                        setUpgradeError(null);
+                        setUpgradeSuccess(null);
+                      }}
+                      className={clsx(
+                        'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all',
+                        promoteType === 'project' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      )}
+                    >
+                      Promote Project
+                    </button>
+                  </>
+                )}
               </div>
 
               <form onSubmit={handleUpgradeListing} className="space-y-5">
@@ -677,8 +758,8 @@ export default function BillingPage() {
                       <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Promotion Plan</label>
                       <div className="grid grid-cols-2 gap-3">
                         {[
-                          { days: 7, cost: 15, desc: 'Weekly Boost' },
-                          { days: 30, cost: 40, desc: 'Monthly Dominance' },
+                          { days: 7, cost: featureCost7, desc: 'Weekly Boost' },
+                          { days: 30, cost: featureCost30, desc: 'Monthly Dominance' },
                         ].map(plan => (
                           <button
                             type="button"
@@ -737,8 +818,8 @@ export default function BillingPage() {
                       <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Promotion Plan</label>
                       <div className="grid grid-cols-2 gap-3">
                         {[
-                          { days: 7, cost: 15, desc: 'Weekly Boost' },
-                          { days: 30, cost: 40, desc: 'Monthly Dominance' },
+                          { days: 7, cost: featureCost7, desc: 'Weekly Boost' },
+                          { days: 30, cost: featureCost30, desc: 'Monthly Dominance' },
                         ].map(plan => (
                           <button
                             type="button"

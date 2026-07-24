@@ -194,13 +194,13 @@ export default function PropertyAnalyticsModal({
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filter Range</p>
-            <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+            <div className="flex bg-slate-100 p-1 rounded-xl gap-1 overflow-x-auto max-w-full">
               {(['today', 'yesterday', '7d', '30d', '90d'] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
                   className={clsx(
-                    "text-xs font-semibold px-3 py-1.5 rounded-lg transition-all capitalize",
+                    "text-xs font-semibold px-3 py-1.5 rounded-lg transition-all capitalize whitespace-nowrap",
                     period === p
                       ? "bg-white text-slate-800 shadow-sm font-bold border border-slate-200/50"
                       : "text-slate-500 hover:text-slate-800"
@@ -212,7 +212,13 @@ export default function PropertyAnalyticsModal({
             </div>
           </div>
 
-          <div className="bg-slate-50/50 border border-slate-150 rounded-2xl p-6 min-h-[260px] flex flex-col justify-between relative overflow-hidden">
+          {chartData.length > 7 && (
+            <div className="text-[10px] text-primary-600 font-semibold text-right sm:hidden -mt-2">
+              ← Drag horizontally to view all dates →
+            </div>
+          )}
+
+          <div className="bg-slate-50/50 border border-slate-150 rounded-2xl p-4 sm:p-6 min-h-[260px] flex flex-col justify-between relative overflow-hidden">
             {loading ? (
               <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-[#064e4b] mb-2" />
@@ -227,9 +233,9 @@ export default function PropertyAnalyticsModal({
                 <p className="text-[10px] text-slate-400 mt-1">Analytics populate as properties receive active dwell traffic</p>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col justify-end">
-                <div className="flex items-stretch gap-4">
-                  <div className="flex flex-col justify-between text-[10px] text-slate-400 font-bold text-right w-8 select-none py-1.5">
+              <div className="flex-1 flex flex-col justify-end min-w-0">
+                <div className="flex items-stretch gap-2 sm:gap-4 overflow-x-auto touch-pan-x scrollbar-thin pb-2">
+                  <div className="sticky left-0 bg-slate-50/90 backdrop-blur-xs z-10 flex flex-col justify-between text-[10px] text-slate-400 font-bold text-right w-8 select-none py-1.5 shrink-0 pr-1 border-r border-slate-200/50">
                     <span>{formatYLabel(topY)}</span>
                     <span>{formatYLabel(Math.round(topY * 0.75))}</span>
                     <span>{formatYLabel(Math.round(topY * 0.5))}</span>
@@ -237,120 +243,126 @@ export default function PropertyAnalyticsModal({
                     <span>0</span>
                   </div>
 
-                  <div className="flex-1 relative h-44 flex items-end">
-                    <svg className="w-full h-full" viewBox="0 0 500 150" preserveAspectRatio="none">
-                      {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-                        <line
-                          key={ratio}
-                          x1="0"
-                          y1={150 - ratio * 138 - 6}
-                          x2="500"
-                          y2={150 - ratio * 138 - 6}
-                          stroke="#e2e8f0"
-                          strokeWidth="1"
-                          opacity="0.6"
-                        />
-                      ))}
+                  <div 
+                    className="flex-1 flex flex-col justify-end"
+                    style={{ minWidth: `${Math.max(280, chartData.length * (period === '90d' ? 14 : period === '30d' ? 22 : 42))}px` }}
+                  >
+                    <div className="relative h-44 flex items-end w-full">
+                      <svg className="w-full h-full" viewBox="0 0 500 150" preserveAspectRatio="none">
+                        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+                          <line
+                            key={ratio}
+                            x1="0"
+                            y1={150 - ratio * 138 - 6}
+                            x2="500"
+                            y2={150 - ratio * 138 - 6}
+                            stroke="#e2e8f0"
+                            strokeWidth="1"
+                            opacity="0.6"
+                          />
+                        ))}
 
-                      {chartData.map((row, idx) => {
+                        {chartData.map((row, idx) => {
+                          const totalBars = chartData.length;
+                          const slotWidth = 500 / totalBars;
+                          const gapRatio = totalBars > 60 ? 0.15 : totalBars > 10 ? 0.25 : 0.4;
+                          const gap = slotWidth * gapRatio;
+                          const barWidth = slotWidth - gap;
+                          
+                          const x = idx * slotWidth + (gap / 2);
+                          const heightRatio = topY > 0 ? row.views / topY : 0;
+                          const height = heightRatio * 138;
+
+                          const finalHeight = row.views > 0 ? Math.max(height, 3) : 0;
+                          const finalY = row.views > 0 ? 144 - finalHeight : 144;
+
+                          return (
+                            <g 
+                              key={idx}
+                              onMouseEnter={() => setHoveredBar(idx)}
+                              onMouseLeave={() => setHoveredBar(null)}
+                              onClick={() => setHoveredBar(hoveredBar === idx ? null : idx)}
+                              onTouchStart={() => setHoveredBar(idx)}
+                              className="cursor-pointer"
+                            >
+                              <rect
+                                x={x}
+                                y={finalY}
+                                width={barWidth}
+                                height={finalHeight}
+                                rx={Math.min(barWidth / 2, 4)}
+                                fill={hoveredBar === idx ? '#334155' : '#475569'}
+                                className="transition-all duration-200"
+                              />
+                              <rect
+                                x={x - gap/2}
+                                y={0}
+                                width={slotWidth}
+                                height={150}
+                                fill="transparent"
+                              />
+                            </g>
+                          );
+                        })}
+                      </svg>
+
+                      {hoveredBar !== null && chartData[hoveredBar] && (() => {
                         const totalBars = chartData.length;
-                        const slotWidth = 500 / totalBars;
-                        const gapRatio = totalBars > 60 ? 0.15 : totalBars > 10 ? 0.25 : 0.4;
-                        const gap = slotWidth * gapRatio;
-                        const barWidth = slotWidth - gap;
-                        
-                        const x = idx * slotWidth + (gap / 2);
-                        const heightRatio = topY > 0 ? row.views / topY : 0;
-                        const height = heightRatio * 138;
-                        const y = 144 - height;
-
-                        const finalHeight = row.views > 0 ? Math.max(height, 3) : 0;
-                        const finalY = row.views > 0 ? 144 - finalHeight : 144;
+                        const percentX = (hoveredBar / totalBars) * 100;
+                        const translateTransform = percentX > 80 
+                          ? 'translateX(-90%)' 
+                          : percentX < 20 
+                          ? 'translateX(-10%)' 
+                          : 'translateX(-50%)';
 
                         return (
-                          <g 
-                            key={idx}
-                            onMouseEnter={() => setHoveredBar(idx)}
-                            onMouseLeave={() => setHoveredBar(null)}
-                            className="cursor-pointer"
+                          <div 
+                            className="absolute z-20 bg-slate-900/95 text-white px-3 py-1.5 rounded-xl text-[10px] shadow-xl font-bold pointer-events-none transition-all duration-150 whitespace-nowrap border border-slate-800"
+                            style={{
+                              left: `${((hoveredBar * (500 / chartData.length)) + (500 / chartData.length) / 2) / 5}%`,
+                              transform: translateTransform,
+                              bottom: `${Math.min(
+                                Math.max((topY > 0 ? chartData[hoveredBar].views / topY : 0) * 138 + 15, 30),
+                                140
+                              )}px`,
+                            }}
                           >
-                            <rect
-                              x={x}
-                              y={finalY}
-                              width={barWidth}
-                              height={finalHeight}
-                              rx={Math.min(barWidth / 2, 4)}
-                              fill={hoveredBar === idx ? '#334155' : '#475569'}
-                              className="transition-all duration-200"
-                            />
-                            <rect
-                              x={x - gap/2}
-                              y={0}
-                              width={slotWidth}
-                              height={150}
-                              fill="transparent"
-                            />
-                          </g>
+                            <p className="text-slate-400 font-medium">
+                              {new Date(chartData[hoveredBar].day).toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                            <p className="text-emerald-400 font-black text-xs mt-0.5">
+                              {chartData[hoveredBar].views.toLocaleString()} unique views
+                            </p>
+                          </div>
                         );
-                      })}
-                    </svg>
+                      })()}
+                    </div>
 
-                    {hoveredBar !== null && chartData[hoveredBar] && (() => {
-                      const totalBars = chartData.length;
-                      const percentX = (hoveredBar / totalBars) * 100;
-                      const translateTransform = percentX > 80 
-                        ? 'translateX(-90%)' 
-                        : percentX < 20 
-                        ? 'translateX(-10%)' 
-                        : 'translateX(-50%)';
-
-                      return (
-                        <div 
-                          className="absolute z-20 bg-slate-900/95 text-white px-3 py-1.5 rounded-xl text-[10px] shadow-xl font-bold pointer-events-none transition-all duration-150 whitespace-nowrap border border-slate-800"
-                          style={{
-                            left: `${((hoveredBar * (500 / chartData.length)) + (500 / chartData.length) / 2) / 5}%`,
-                            transform: translateTransform,
-                            bottom: `${Math.min(
-                              Math.max((topY > 0 ? chartData[hoveredBar].views / topY : 0) * 138 + 15, 30),
-                              140
-                            )}px`,
-                          }}
-                        >
-                          <p className="text-slate-400 font-medium">
-                            {new Date(chartData[hoveredBar].day).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </p>
-                          <p className="text-emerald-400 font-black text-xs mt-0.5">
-                            {chartData[hoveredBar].views.toLocaleString()} unique views
-                          </p>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                <div className="flex text-[10px] text-slate-400 font-bold select-none mt-2 pt-2 border-t border-slate-100 pl-12">
-                  <div className="flex-1 flex justify-between">
-                    {chartData.map((row, idx) => {
-                      if (!shouldShowXLabel(idx, chartData.length)) {
-                        return <div key={idx} className="flex-1" />;
-                      }
-                      return (
-                        <div 
-                          key={idx} 
-                          className="text-center font-bold text-slate-400"
-                          style={{
-                            width: `${100 / chartData.length}%`,
-                            minWidth: '50px'
-                          }}
-                        >
-                          {formatXLabel(row.day)}
-                        </div>
-                      );
-                    })}
+                    <div className="flex text-[10px] text-slate-400 font-bold select-none mt-2 pt-2 border-t border-slate-100 w-full">
+                      <div className="flex-1 flex justify-between w-full">
+                        {chartData.map((row, idx) => {
+                          if (!shouldShowXLabel(idx, chartData.length)) {
+                            return <div key={idx} className="flex-1" />;
+                          }
+                          return (
+                            <div 
+                              key={idx} 
+                              className="text-center font-bold text-slate-400 truncate px-0.5"
+                              style={{
+                                width: `${100 / chartData.length}%`,
+                                minWidth: '35px'
+                              }}
+                            >
+                              {formatXLabel(row.day)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

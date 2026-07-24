@@ -9,7 +9,7 @@ import {
   Plus, Trash2, Save, ArrowLeft, ArrowRight, Loader2,
   Upload, Image as ImageIcon, Check,
   AlertCircle, Sparkles, Layers, Star,
-  ShieldCheck, Building2, FileText, MapPin, Hash, Calendar
+  ShieldCheck, Building2, FileText, MapPin, Hash, Calendar, Menu
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -93,6 +93,7 @@ export default function EditDeveloperProjectPage() {
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isOverIndex, setIsOverIndex] = useState<number | null>(null);
+  const touchStartIndexRef = useRef<number | null>(null);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.setData('text/plain', index.toString());
@@ -125,6 +126,42 @@ export default function EditDeveloperProjectPage() {
   };
 
   const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setIsOverIndex(null);
+  };
+
+  const handleTouchStart = (index: number) => {
+    touchStartIndexRef.current = index;
+    setDraggedIndex(index);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartIndexRef.current === null) return;
+    const touch = e.touches[0];
+    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!targetEl) return;
+    const photoCard = targetEl.closest('[data-photo-index]');
+    if (photoCard) {
+      const targetIdxStr = photoCard.getAttribute('data-photo-index');
+      if (targetIdxStr !== null) {
+        const targetIdx = parseInt(targetIdxStr, 10);
+        if (!isNaN(targetIdx) && targetIdx !== touchStartIndexRef.current) {
+          setIsOverIndex(targetIdx);
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartIndexRef.current !== null && isOverIndex !== null && touchStartIndexRef.current !== isOverIndex) {
+      const sourceIdx = touchStartIndexRef.current;
+      const targetIdx = isOverIndex;
+      const updated = [...projectData.photos];
+      const [moved] = updated.splice(sourceIdx, 1);
+      updated.splice(targetIdx, 0, moved);
+      handleProjectChange('photos', updated);
+    }
+    touchStartIndexRef.current = null;
     setDraggedIndex(null);
     setIsOverIndex(null);
   };
@@ -444,7 +481,15 @@ export default function EditDeveloperProjectPage() {
       <div className="bg-slate-900 border-b border-slate-800 p-6 text-white shrink-0">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href="/my-projects" className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('crm-sidebar-toggle'))}
+              className="md:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all shrink-0"
+              title="Toggle Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <Link href="/my-projects" className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all shrink-0">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
@@ -836,20 +881,24 @@ export default function EditDeveloperProjectPage() {
                 {projectData.photos.map((url, idx) => (
                   <div
                     key={url}
+                    data-photo-index={idx}
                     draggable
                     onDragStart={(e) => handleDragStart(e, idx)}
                     onDragOver={(e) => handleDragOver(e, idx)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, idx)}
                     onDragEnd={handleDragEnd}
+                    onTouchStart={() => handleTouchStart(idx)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                     className={clsx(
-                      'relative group w-28 h-24 rounded-lg overflow-hidden border bg-slate-100 transition-all cursor-move flex flex-col justify-between p-1',
+                      'relative group w-28 h-24 rounded-lg overflow-hidden border bg-slate-100 transition-all cursor-move flex flex-col justify-between p-1 touch-none',
                       idx === 0 ? 'border-primary-500 ring-2 ring-primary-500/20' : 'border-slate-200',
                       draggedIndex === idx && 'opacity-40 scale-95',
                       isOverIndex === idx && 'border-primary-500 ring-2 ring-primary-500'
                     )}
                   >
-                    <img src={url} alt={`Project ${idx + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                    <img src={url} alt={`Project ${idx + 1}`} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
                     <div className="relative z-10 flex justify-between items-start w-full">
                       {idx === 0 ? (
                         <span className="bg-primary-600 text-white text-[8px] font-extrabold px-1 py-0.5 rounded shadow">
@@ -865,8 +914,8 @@ export default function EditDeveloperProjectPage() {
                       </button>
                     </div>
 
-                    {/* Move shortcuts */}
-                    <div className="relative z-10 flex items-center justify-center gap-1.5 w-full bg-black/40 py-0.5 rounded backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-all">
+                    {/* Move shortcuts - always visible on touch/mobile */}
+                    <div className="relative z-10 flex items-center justify-center gap-1.5 w-full bg-black/60 py-1 rounded backdrop-blur-[1px] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
                       <button
                         type="button"
                         disabled={idx === 0}
@@ -876,9 +925,10 @@ export default function EditDeveloperProjectPage() {
                           updated.splice(idx - 1, 0, item);
                           handleProjectChange('photos', updated);
                         }}
-                        className="p-0.5 text-white disabled:opacity-30"
+                        className="p-1 text-white disabled:opacity-30 active:scale-125 transition-transform"
+                        title="Move left"
                       >
-                        <ArrowLeft className="w-3 h-3" />
+                        <ArrowLeft className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
@@ -889,9 +939,10 @@ export default function EditDeveloperProjectPage() {
                           updated.splice(idx + 1, 0, item);
                           handleProjectChange('photos', updated);
                         }}
-                        className="p-0.5 text-white disabled:opacity-30"
+                        className="p-1 text-white disabled:opacity-30 active:scale-125 transition-transform"
+                        title="Move right"
                       >
-                        <ArrowRight className="w-3 h-3" />
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>

@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { getApiBaseUrl } from '../lib/api';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.NEXT_PUBLIC_WEB_URL || 'https://tamleeq.sa';
+  const base = process.env.NEXT_PUBLIC_WEB_URL || process.env.FRONTEND_URL || 'https://tamleeq.sa';
   const apiBase = getApiBaseUrl();
   const locales = ['en', 'ar'];
 

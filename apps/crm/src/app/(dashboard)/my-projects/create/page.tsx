@@ -1,6 +1,6 @@
 'use client';
 export const dynamic = 'force-dynamic';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCrmAuth } from '@/hooks/use-crm-auth';
@@ -8,7 +8,7 @@ import { CldUploadWidget } from 'next-cloudinary';
 import {
   Layers, Plus, Trash2, Save, ArrowLeft, ArrowRight, Loader2,
   Upload, Image as ImageIcon, Check, AlertCircle, Building2,
-  MapPin, ShieldCheck, Calendar, CreditCard, Sparkles, Hash, FileText
+  MapPin, ShieldCheck, Calendar, CreditCard, Sparkles, Hash, FileText, Menu
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -84,6 +84,7 @@ export default function CreateDeveloperProjectPage() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isOverIndex, setIsOverIndex] = useState<number | null>(null);
+  const touchStartIndexRef = useRef<number | null>(null);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.setData('text/plain', index.toString());
@@ -118,6 +119,44 @@ export default function CreateDeveloperProjectPage() {
   };
 
   const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setIsOverIndex(null);
+  };
+
+  const handleTouchStart = (index: number) => {
+    touchStartIndexRef.current = index;
+    setDraggedIndex(index);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartIndexRef.current === null) return;
+    const touch = e.touches[0];
+    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!targetEl) return;
+    const photoCard = targetEl.closest('[data-photo-index]');
+    if (photoCard) {
+      const targetIdxStr = photoCard.getAttribute('data-photo-index');
+      if (targetIdxStr !== null) {
+        const targetIdx = parseInt(targetIdxStr, 10);
+        if (!isNaN(targetIdx) && targetIdx !== touchStartIndexRef.current) {
+          setIsOverIndex(targetIdx);
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartIndexRef.current !== null && isOverIndex !== null && touchStartIndexRef.current !== isOverIndex) {
+      const sourceIdx = touchStartIndexRef.current;
+      const targetIdx = isOverIndex;
+      setPhotos(prev => {
+        const updated = [...prev];
+        const [moved] = updated.splice(sourceIdx, 1);
+        updated.splice(targetIdx, 0, moved);
+        return updated;
+      });
+    }
+    touchStartIndexRef.current = null;
     setDraggedIndex(null);
     setIsOverIndex(null);
   };
@@ -756,20 +795,24 @@ export default function CreateDeveloperProjectPage() {
                 {photos.map((url, idx) => (
                   <div
                     key={url}
+                    data-photo-index={idx}
                     draggable
                     onDragStart={(e) => handleDragStart(e, idx)}
                     onDragOver={(e) => handleDragOver(e, idx)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, idx)}
                     onDragEnd={handleDragEnd}
+                    onTouchStart={() => handleTouchStart(idx)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                     className={clsx(
-                      'relative group w-28 h-24 rounded-lg overflow-hidden border bg-slate-100 transition-all cursor-move flex flex-col justify-between p-1',
+                      'relative group w-28 h-24 rounded-lg overflow-hidden border bg-slate-100 transition-all cursor-move flex flex-col justify-between p-1 touch-none',
                       idx === 0 ? 'border-primary-500 ring-2 ring-primary-500/20' : 'border-slate-200',
                       draggedIndex === idx && 'opacity-40 scale-95',
                       isOverIndex === idx && 'border-primary-500 ring-2 ring-primary-500'
                     )}
                   >
-                    <img src={url} alt={`Project ${idx + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                    <img src={url} alt={`Project ${idx + 1}`} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
                     <div className="relative z-10 flex justify-between items-start w-full">
                       {idx === 0 ? (
                         <span className="bg-primary-600 text-white text-[8px] font-extrabold px-1 py-0.5 rounded shadow">
@@ -785,8 +828,8 @@ export default function CreateDeveloperProjectPage() {
                       </button>
                     </div>
 
-                    {/* Move shortcuts */}
-                    <div className="relative z-10 flex items-center justify-center gap-1.5 w-full bg-black/40 py-0.5 rounded backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-all">
+                    {/* Move shortcuts - always visible on touch/mobile */}
+                    <div className="relative z-10 flex items-center justify-center gap-1.5 w-full bg-black/60 py-1 rounded backdrop-blur-[1px] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
                       <button
                         type="button"
                         disabled={idx === 0}
@@ -798,9 +841,10 @@ export default function CreateDeveloperProjectPage() {
                             return updated;
                           });
                         }}
-                        className="p-0.5 text-white disabled:opacity-30"
+                        className="p-1 text-white disabled:opacity-30 active:scale-125 transition-transform"
+                        title="Move left"
                       >
-                        <ArrowLeft className="w-3 h-3" />
+                        <ArrowLeft className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
@@ -813,9 +857,10 @@ export default function CreateDeveloperProjectPage() {
                             return updated;
                           });
                         }}
-                        className="p-0.5 text-white disabled:opacity-30"
+                        className="p-1 text-white disabled:opacity-30 active:scale-125 transition-transform"
+                        title="Move right"
                       >
-                        <ArrowRight className="w-3 h-3" />
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>

@@ -28,7 +28,11 @@ export default async function systemRoutes(app: FastifyInstance) {
         'sidebar_ad_link',
         'sidebar_ad_aspect_ratio',
         'logo_url',
-        'favicon_url'
+        'favicon_url',
+        'listing_cost_credits',
+        'project_cost_credits',
+        'project_feature_cost_7_days',
+        'project_feature_cost_credits'
       ];
       const settings = await db.select()
         .from(systemSettings)

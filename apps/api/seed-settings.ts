@@ -168,6 +168,34 @@ async function seedSettings() {
       set: { description: 'Unified Google Maps JS API key for client-side maps and backend commute search.' }
     });
 
+    // 10. Project Credit Costs
+    await db.insert(systemSettings).values({
+      key: 'project_cost_credits',
+      value: '50',
+      description: 'The number of credits deducted when a developer publishes a new development project.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { value: '50' }
+    });
+
+    await db.insert(systemSettings).values({
+      key: 'project_feature_cost_7_days',
+      value: '15',
+      description: 'The number of credits deducted to feature a project for 7 days.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { value: '15' }
+    });
+
+    await db.insert(systemSettings).values({
+      key: 'project_feature_cost_credits',
+      value: '40',
+      description: 'The number of credits deducted to feature a project for 30 days.'
+    }).onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { value: '40' }
+    });
+
     console.log('✅ Successfully seeded system settings');
   } catch (error) {
     console.error('❌ Seeding failed:', error);

@@ -1,7 +1,11 @@
 import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
-  const base = process.env.NEXT_PUBLIC_WEB_URL || process.env.FRONTEND_URL || 'https://tamleeq.sa';
+  const base = process.env.NEXT_PUBLIC_WEB_URL 
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
+    || process.env.FRONTEND_URL 
+    || 'https://tamleeq.sa';
   return {
     rules: [
       {

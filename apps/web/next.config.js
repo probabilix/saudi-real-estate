@@ -51,7 +51,10 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' https://portfolio.adonixdigital.com http://localhost:3000 http://localhost:3001",
+          },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
         ],

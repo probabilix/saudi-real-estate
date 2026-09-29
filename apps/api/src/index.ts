@@ -217,6 +217,22 @@ const bootstrap = async () => {
       };
     });
 
+    // ── Direct /api Health Route ──
+    app.get('/api', async () => {
+      return { 
+        status: 'online', 
+        message: 'Saudi Real Estate API is running',
+        environment: process.env.NODE_ENV,
+        version: '0.1.0',
+        deployment: {
+          commitSha: process.env.VERCEL_GIT_COMMIT_SHA || 'dev',
+          branch: process.env.VERCEL_GIT_COMMIT_REF || 'dev',
+          commitMessage: process.env.VERCEL_GIT_COMMIT_MESSAGE || 'local development',
+          commitAuthor: process.env.VERCEL_GIT_COMMIT_AUTHOR_NAME || 'local'
+        }
+      };
+    });
+
     // ── Dedicated Version Endpoint ──
     app.get('/version', async () => {
       return {
@@ -230,6 +246,14 @@ const bootstrap = async () => {
     });
 
     // ── Register v1 API ──
+    app.get('/api/v1', async () => {
+      return { 
+        status: 'online', 
+        message: 'Saudi Real Estate API v1 is running',
+        environment: process.env.NODE_ENV,
+        version: '0.1.0'
+      };
+    });
     await app.register(v1Routes, { prefix: '/api/v1' });
 
     // ── Global Error Handler ──
@@ -287,5 +311,14 @@ if (!isProduction) {
 export default async (req: any, res: any) => {
   await bootstrap();
   await app.ready();
+
+  // Normalize req.url if Vercel serverless proxy prepends /api/index.js
+  if (req && typeof req.url === 'string') {
+    if (req.url.startsWith('/api/index.js')) {
+      const stripped = req.url.slice('/api/index.js'.length);
+      req.url = stripped.startsWith('/') ? stripped : `/${stripped}`.replace(/\/$/, '') || '/';
+    }
+  }
+
   app.server.emit('request', req, res);
 };

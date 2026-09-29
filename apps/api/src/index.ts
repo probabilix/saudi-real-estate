@@ -312,11 +312,22 @@ export default async (req: any, res: any) => {
   await bootstrap();
   await app.ready();
 
-  // Normalize req.url if Vercel serverless proxy prepends /api/index.js
+  // Reconstruct original request path if routed through Vercel serverless rewrite
   if (req && typeof req.url === 'string') {
-    if (req.url.startsWith('/api/index.js')) {
-      const stripped = req.url.slice('/api/index.js'.length);
-      req.url = stripped.startsWith('/') ? stripped : `/${stripped}`.replace(/\/$/, '') || '/';
+    try {
+      const urlObj = new URL(req.url, 'http://localhost');
+      const targetPath = urlObj.searchParams.get('__url');
+      if (targetPath) {
+        urlObj.searchParams.delete('__url');
+        const remainingQuery = urlObj.searchParams.toString();
+        const normalizedPath = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
+        req.url = `${normalizedPath}${remainingQuery ? `?${remainingQuery}` : ''}`;
+      } else if (req.url.startsWith('/api/index.js')) {
+        const stripped = req.url.slice('/api/index.js'.length);
+        req.url = stripped.startsWith('/') ? stripped : `/${stripped}`.replace(/\/$/, '') || '/';
+      }
+    } catch {
+      // Fallback silently if URL parsing fails
     }
   }
 
